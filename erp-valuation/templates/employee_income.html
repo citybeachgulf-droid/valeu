@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>📊 تقرير دخل الموظف</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container py-4">
+  <h2 class="mb-4">📊 تقرير دخل الموظف</h2>
+
+  <!-- نموذج الفلترة -->
+  <form method="POST" class="row g-3 mb-4">
+    <div class="col-md-4">
+      <label class="form-label">اختر الموظف:</label>
+      <select name="employee_id" class="form-select" required>
+        <option value="">-- اختر --</option>
+        {% for emp in employees %}
+          <option value="{{ emp.id }}" {% if selected_emp==emp.username %}selected{% endif %}>
+            {{ emp.username }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-3">
+      <label class="form-label">من:</label>
+      <input type="date" name="start_date" value="{{ start_date or '' }}" class="form-control">
+    </div>
+
+    <div class="col-md-3">
+      <label class="form-label">إلى:</label>
+      <input type="date" name="end_date" value="{{ end_date or '' }}" class="form-control">
+    </div>
+
+    <div class="col-md-2 d-flex align-items-end">
+      <button type="submit" class="btn btn-primary w-100">عرض</button>
+    </div>
+  </form>
+
+  {% if income is not none %}
+    <!-- بطاقة الدخل -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-body text-center">
+        <h4>💰 إجمالي دخل الموظف <span class="text-primary">"{{ selected_emp }}"</span></h4>
+        <p class="fs-3 text-success">{{ income }} ريال</p>
+      </div>
+    </div>
+
+    <!-- جدول المعاملات -->
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="mb-3">📑 تفاصيل المعاملات</h5>
+        <table class="table table-bordered table-striped">
+      <thead class="table-dark">
+  <tr>
+    <th>#</th>
+    <th>العميل</th>
+    <th>التاريخ</th>
+    <th>الحالة</th>
+    <th>المبلغ المحصل</th>
+    <th>حالة الدفع</th> <!-- جديد -->
+  </tr>
+</thead>
+<tbody>
+  {% for t in transactions %}
+  <tr>
+    <td>{{ t.id }}</td>
+    <td>{{ t.client }}</td>
+    <td>{{ t.date }}</td>
+    <td>{{ t.status }}</td>
+    <td>{{ t.fee }} ريال</td>
+    <td>
+      {% if t.payment_status == "مدفوعة" %}
+        <span class="badge bg-success">مدفوعة ✅</span>
+      {% else %}
+        <span class="badge bg-danger">غير مدفوعة ❌</span>
+      {% endif %}
+    </td>
+  </tr>
+  {% else %}
+  <tr>
+    <td colspan="6" class="text-center">لا توجد معاملات في هذه الفترة</td>
+  </tr>
+  {% endfor %}
+</tbody>
+
+        </table>
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+</body>
+</html>

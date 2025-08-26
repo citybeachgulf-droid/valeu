@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>📊 تفاصيل {{ branch_name }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container py-4">
+  <h2 class="mb-4">📊 تفاصيل {{ branch_name }}</h2>
+
+  <!-- البطاقات -->
+  <div class="row mb-4">
+    <div class="col-md-4">
+      <div class="card shadow-sm text-center">
+        <div class="card-body">
+          <h5>📥 إجمالي الدخل</h5>
+          <p class="fs-4 text-success">{{ total_income }} ريال</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm text-center">
+        <div class="card-body">
+          <h5>📤 إجمالي المصاريف</h5>
+          <p class="fs-4 text-danger">{{ total_expenses }} ريال</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm text-center">
+        <div class="card-body">
+          <h5>💹 صافي الربح</h5>
+          <p class="fs-4 text-primary">{{ net_profit }} ريال</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- جدول المعاملات -->
+  <h4 class="mb-3">📑 المعاملات</h4>
+  <table class="table table-bordered">
+    <thead class="table-dark">
+      <tr>
+        <th>#</th>
+        <th>العميل</th>
+        <th>الموظف</th>
+        <th>الرسوم</th>
+        <th>الحالة</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in transactions %}
+      <tr>
+        <td>{{ t.id }}</td>
+        <td>{{ t.client }}</td>
+        <td>{{ t.employee }}</td>
+        <td>{{ t.fee }} ريال</td>
+        <td>{{ t.status }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="text-center">🚫 لا توجد معاملات</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- جدول المصاريف -->
+  <h4 class="mb-3 mt-4">📑 المصاريف</h4>
+  <table class="table table-bordered">
+    <thead class="table-dark">
+      <tr>
+        <th>#</th>
+        <th>اسم المصروف</th>
+        <th>المبلغ</th>
+        <th>التاريخ</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in expenses %}
+      <tr>
+        <td>{{ e.id }}</td>
+        <td>{{ e.name }}</td>
+        <td>{{ e.amount }} ريال</td>
+        <td>{{ e.date }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-center">🚫 لا توجد مصاريف</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+</body>
+</html>
+

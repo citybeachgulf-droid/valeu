@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+   <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">🛠️ نظام التثمين</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <!-- زر الصفحة الرئيسية -->
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('engineer_dashboard') }}">🏠 الصفحة الرئيسية</a>
+        </li>
+        <!-- زر تسجيل الخروج -->
+        <li class="nav-item">
+          <a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 تسجيل الخروج</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+  <meta charset="UTF-8">
+  <title>💰 تثمين المعاملة</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<!-- نمرّر المساحة من Jinja عبر data-transaction-area لتجنّب أخطاء محرّر JavaScript -->
+<body class="container mt-4" data-transaction-area="{{ t.area or 0 }}">
+
+  <h3>💰 تثمين المعاملة رقم {{ t.id }}</h3>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <p><strong>👤 العميل:</strong> {{ t.client }}</p>
+      <p><strong>📅 التاريخ:</strong> {{ t.date.strftime('%Y-%m-%d %H:%M') }}</p>
+      <p><strong>📍 الولاية:</strong> {{ t.state }} | <strong>المنطقة:</strong> {{ t.region }}</p>
+      <p><strong>🏦 البنك:</strong> {{ t.bank.name if t.bank else "غير محدد" }}</p>
+      <p><strong>🏠 المساحة:</strong> {{ t.area }} م²</p>
+      <p><strong>📂 الملفات:</strong> {{ t.files }}</p>
+      <p><strong>💵 الرسوم:</strong> {{ t.fee }}</p>
+      <p><strong>📌 الحالة الحالية:</strong> {{ t.status }}</p>
+    </div>
+  </div>
+
+<form method="POST" action="{{ url_for('valuate_transaction', tid=t.id) }}">
+    <!-- سعر المتر من الذاكرة -->
+    <div class="mb-3">
+      <label class="form-label">💰 سعر المتر (من الذاكرة)</label>
+      <input type="number" step="0.01" id="saved_price" class="form-control" value="{{ saved_price or 0 }}">
+      <small class="text-muted">يمكن تعديله وسيتم تحديثه في الذاكرة لهذه المنطقة والولاية والبنك</small>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">💰 قيمة الأرض</label>
+      <input type="number" step="0.01" name="land_value" id="land_value" class="form-control" value="{{ t.land_value or 0 }}">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">🏢 قيمة البناء</label>
+      <input type="number" step="0.01" name="building_value" id="building_value" class="form-control" value="{{ t.building_value or 0 }}">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">📊 الإجمالي</label>
+      <input type="text" id="total_estimate" class="form-control" value="{{ t.total_estimate or 0 }}" readonly>
+    </div>
+
+    <button type="submit" class="btn btn-success">💾 حفظ التثمين</button>
+    <a href="{{ url_for('manager_dashboard') }}" class="btn btn-secondary">⬅ رجوع</a>
+  </form>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      // نقرأ المساحة من data-attribute بدل Jinja داخل سكربت
+      const transactionArea = parseFloat(document.body.dataset.transactionArea || "0");
+
+      const savedPriceInput    = document.getElementById("saved_price");
+      const landValueInput     = document.getElementById("land_value");
+      const buildingValueInput = document.getElementById("building_value");
+      const totalInput         = document.getElementById("total_estimate");
+
+      function toNumber(v) {
+        const n = parseFloat(v);
+        return isNaN(n) ? 0 : n;
+      }
+
+      function updateLandValue() {
+        if (!savedPriceInput || !landValueInput) return;
+        const price = toNumber(savedPriceInput.value);
+        landValueInput.value = (transactionArea * price).toFixed(2);
+        updateTotal();
+      }
+
+      function updateTotal() {
+        if (!landValueInput || !buildingValueInput || !totalInput) return;
+        const land     = toNumber(landValueInput.value);
+        const building = toNumber(buildingValueInput.value);
+        totalInput.value = (land + building).toFixed(2);
+      }
+
+      if (savedPriceInput) {
+        savedPriceInput.addEventListener("input", updateLandValue);
+        savedPriceInput.addEventListener("change", updateLandValue);
+      }
+      if (landValueInput)      landValueInput.addEventListener("input", updateTotal);
+      if (buildingValueInput)  buildingValueInput.addEventListener("input", updateTotal);
+
+      // استدعاء أولي آمن
+      if (savedPriceInput) {
+        updateLandValue();
+      } else {
+        updateTotal();
+      }
+    });
+  </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>نتيجة التثمين</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container my-4">
+  <div class="card shadow p-4">
+    <h4>📊 نتيجة التثمين المبدئي</h4>
+    <ul class="list-group">
+      <li class="list-group-item">رقم الكروكي: <b>{{ kroki_no }}</b></li>
+      <li class="list-group-item">المساحة: <b>{{ area }}</b> م²</li>
+      <li class="list-group-item">على شارع: <b>{{ 'نعم' if street else 'لا' }}</b></li>
+      <li class="list-group-item">زاوية: <b>{{ 'نعم' if corner else 'لا' }}</b></li>
+      <li class="list-group-item">سعر المتر (أدنى/متوسط/أعلى): <b>{{ price_min }} / {{ price_mid }} / {{ price_max }}</b> ريال</li>
+      <li class="list-group-item">معامل الزيادة الإجمالي: <b>{{ '%.2f'|format(factor) }}x</b></li>
+    </ul>
+
+    <div class="row text-center mt-4">
+      <div class="col-md-4"><div class="card p-3"><div>الحد الأدنى</div><div class="fs-4 text-muted">{{ '%.2f'|format(est_min) }} ريال</div></div></div>
+      <div class="col-md-4"><div class="card p-3"><div>المتوسط</div><div class="fs-4 text-primary">{{ '%.2f'|format(est_mid) }} ريال</div></div></div>
+      <div class="col-md-4"><div class="card p-3"><div>الحد الأعلى</div><div class="fs-4 text-success">{{ '%.2f'|format(est_max) }} ريال</div></div></div>
+    </div>
+
+    {% if filename %}
+      <a class="btn btn-outline-secondary mt-3" href="/uploads/{{ filename }}" target="_blank">📂 عرض المستند المرفوع</a>
+    {% endif %}
+
+    <div class="mt-3">
+      <a class="btn btn-success" href="/employee">⬅️ إرسال للمدير للموافقة</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

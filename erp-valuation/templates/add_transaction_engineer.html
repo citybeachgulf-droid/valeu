@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>➕ إضافة معاملة - لوحة المهندس</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    body { background-color: #f8f9fa; font-family: "Cairo", sans-serif; }
+    .card { border-radius: 15px; }
+    .table th, .table td { vertical-align: middle; }
+  </style>
+</head>
+<body>
+
+  <!-- ✅ شريط التنقل -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">🛠️ نظام التثمين</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('engineer_dashboard') }}">🏠 الصفحة الرئيسية</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 تسجيل الخروج</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+    <h2 class="text-center mb-4">➕ إضافة معاملة جديدة</h2>
+
+    <div class="row justify-content-center">
+      <div class="col-md-8">
+        <div class="card shadow p-4">
+          <form method="POST" action="{{ url_for('add_transaction_engineer') }}" enctype="multipart/form-data">
+            
+            <!-- 👤 اسم العميل -->
+            <div class="mb-3">
+              <label class="form-label">اسم العميل</label>
+              <input type="text" name="client_name" class="form-control" required>
+            </div>
+
+            <!-- 📌 نوع المعاملة -->
+            <div class="mb-3">
+              <label class="form-label">نوع المعاملة</label>
+              <select name="transaction_type" id="transaction_type" class="form-control" required>
+                <option value="">-- اختر النوع --</option>
+                <option value="real_estate">🏠 عقار</option>
+                <option value="vehicle">🚗 مركبة</option>
+              </select>
+            </div>
+
+            <!-- 🏠 حقول العقار -->
+            <div id="real_estate_fields" style="display:none;">
+              <div class="mb-3">
+                <label class="form-label">الولاية</label>
+                <input type="text" name="state" class="form-control">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">المنطقة</label>
+                <input type="text" name="region" class="form-control">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">🏦 البنك</label>
+                <select name="bank_id" class="form-control">
+                  <option value="">-- اختر البنك --</option>
+                  {% for bank in banks %}
+                    <option value="{{ bank.id }}">{{ bank.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">المساحة (م²)</label>
+                <input type="number" step="0.01" name="area" id="area" class="form-control">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">💰 سعر المتر (من الذاكرة)</label>
+                <input type="number" step="0.01" id="price_per_meter" name="price_per_meter" class="form-control" value="0" readonly>
+              </div>
+              <h6 class="text-muted">تفاصيل البناء</h6>
+              <div class="mb-3">
+                <label class="form-label">مساحة البناء (م²)</label>
+                <input type="number" step="0.01" name="building_area" id="building_area" class="form-control">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">عمر البناء (بالسنوات)</label>
+                <input type="number" name="building_age" id="building_age" class="form-control">
+              </div>
+            </div>
+
+            <!-- 🚗 حقول المركبة -->
+            <div id="vehicle_fields" style="display:none;">
+              <div class="mb-3">
+                <label class="form-label">نوع المركبة</label>
+                <input type="text" name="vehicle_type" class="form-control">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">الموديل</label>
+                <input type="text" name="vehicle_model" class="form-control">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">سنة الصنع</label>
+                <input type="number" name="vehicle_year" class="form-control">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">قيمة المركبة</label>
+                <input type="number" step="0.01" name="vehicle_value" class="form-control">
+              </div>
+            </div>
+
+            <!-- 💰 الرسوم -->
+            <div class="mb-3">
+              <label class="form-label">رسوم المعاملة</label>
+              <input type="number" step="0.01" name="fee" class="form-control">
+            </div>
+
+            <!-- 📎 الملفات -->
+            <div class="mb-3">
+              <label class="form-label">📎 ملفات المعاملة</label>
+              <input type="file" name="files" class="form-control" multiple>
+            </div>
+
+            <!-- 🖩 عرض التثمين -->
+            <div id="estimate_box" class="alert alert-info" style="display:none;">
+              <b>القيمة التقديرية للأرض:</b> <span id="land_value">0</span> ريال <br>
+              <b>القيمة التقديرية للبناء:</b> <span id="building_value">0</span> ريال <br>
+              <b>الإجمالي:</b> <span id="total_estimate">0</span> ريال
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">🚀 حفظ المعاملة</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+function calculateEstimate() {
+  let area            = parseFloat(document.getElementById("area")?.value) || 0;
+  let price_per_meter = parseFloat(document.getElementById("price_per_meter")?.value) || 0;
+  let building_area   = parseFloat(document.getElementById("building_area")?.value) || 0;
+  let building_age    = parseInt(document.getElementById("building_age")?.value) || 0;
+
+  let land_value = area * price_per_meter;
+  let building_value = 0;
+
+if (building_area > 0 && building_age > 0) {
+  building_value = building_area * 185 / 50 * (50 - building_age);
+}
+
+
+  let total_estimate = land_value + building_value;
+
+  document.getElementById("land_value").innerText = land_value.toFixed(2);
+  document.getElementById("building_value").innerText = building_value.toFixed(2);
+  document.getElementById("total_estimate").innerText = total_estimate.toFixed(2);
+}
+
+function fetchPrice() {
+  let state   = document.querySelector("input[name='state']").value;
+  let region  = document.querySelector("input[name='region']").value;
+  let bank_id = document.querySelector("select[name='bank_id']").value;
+
+  if (state && region && bank_id) {
+    $.post("/get_price", { state, region, bank_id }, function(data) {
+      if (data.price_per_meter !== undefined) {
+        document.getElementById("price_per_meter").value = data.price_per_meter;
+        calculateEstimate();
+      }
+    });
+  }
+}
+
+document.getElementById("transaction_type").addEventListener("change", function() {
+  let type = this.value;
+  document.getElementById("real_estate_fields").style.display = (type === "real_estate") ? "block" : "none";
+  document.getElementById("vehicle_fields").style.display   = (type === "vehicle") ? "block" : "none";
+  document.getElementById("estimate_box").style.display     = (type === "real_estate") ? "block" : "none";
+});
+
+document.querySelector("input[name='state']").addEventListener("input", fetchPrice);
+document.querySelector("input[name='region']").addEventListener("input", fetchPrice);
+document.querySelector("select[name='bank_id']").addEventListener("change", fetchPrice);
+document.querySelectorAll("input").forEach(inp => {
+  inp.addEventListener("input", calculateEstimate);
+});
+calculateEstimate();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

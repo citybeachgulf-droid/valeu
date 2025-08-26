@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>🔎 تفاصيل المعاملة</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+
+<body class="container mt-4">
+
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">🛠️ نظام التثمين</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <!-- زر الصفحة الرئيسية -->
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('engineer_dashboard') }}">🏠 الصفحة الرئيسية</a>
+        </li>
+        <!-- زر تسجيل الخروج -->
+        <li class="nav-item">
+          <a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 تسجيل الخروج</a>
+        </li>
+          <li class="nav-item">
+            <a class="nav-link text-warning" href="/reports">📑 التقارير</a>
+          </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  <h2 class="mb-3">تفاصيل المعاملة #{{ t.id }}</h2>
+
+  <!-- ✅ بيانات عامة -->
+  <div class="card mb-3">
+    <div class="card-header bg-primary text-white">📌 بيانات العميل</div>
+    <div class="card-body">
+      <p><strong>العميل:</strong> {{ t.client }}</p>
+      <p><strong>الموظف المدخل:</strong> {{ t.employee }}</p>
+      <p><strong>التاريخ:</strong> {{ t.date.strftime("%Y-%m-%d %H:%M") }}</p>
+      <p><strong>الفرع:</strong> {{ t.branch.name if t.branch else "غير محدد" }}</p>
+      <p><strong>الحالة الحالية:</strong> {{ t.status }}</p>
+    </div>
+  </div>
+
+  <!-- ✅ بيانات خاصة بالعقار -->
+  {% if t.transaction_type == "real_estate" %}
+  <div class="card mb-3">
+    <div class="card-header bg-success text-white">🏠 بيانات العقار</div>
+    <div class="card-body">
+      <p><strong>المحافظة:</strong> {{ t.state }}</p>
+      <p><strong>المنطقة:</strong> {{ t.region }}</p>
+      <p><strong>البنك:</strong> {{ t.bank.name if t.bank else "غير محدد" }}</p>
+      <p><strong>المساحة:</strong> {{ t.area }} م²</p>
+      <p><strong>مساحة المبنى:</strong> {{ t.building_area }} م²</p>
+      <p><strong>عمر المبنى:</strong> {{ t.building_age }} سنة</p>
+      <p><strong>قيمة الأرض:</strong> {{ t.land_value }} ريال</p>
+      <p><strong>قيمة المبنى:</strong> {{ t.building_value }} ريال</p>
+      <p><strong>إجمالي التثمين:</strong> <span class="fw-bold text-success">{{ t.total_estimate }}</span> ريال</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ✅ بيانات خاصة بالسيارة -->
+  {% if t.transaction_type == "vehicle" %}
+  <div class="card mb-3">
+    <div class="card-header bg-warning">🚗 بيانات المركبة</div>
+    <div class="card-body">
+      <p><strong>النوع:</strong> {{ t.vehicle_type }}</p>
+      <p><strong>الموديل:</strong> {{ t.vehicle_model }}</p>
+      <p><strong>سنة الصنع:</strong> {{ t.vehicle_year }}</p>
+      <p><strong>قيمة المركبة:</strong> <span class="fw-bold text-success">{{ t.total_estimate }}</span> ريال</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ✅ المستندات المرفوعة -->
+  <div class="card mb-3">
+    <div class="card-header bg-dark text-white">📂 المستندات المرفوعة</div>
+    <div class="card-body">
+      {% if t.files %}
+        <ul>
+          {% for f in t.files.split(",") %}
+            <li><a href="{{ url_for('static', filename='uploads/' ~ f) }}" target="_blank">{{ f }}</a></li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>❌ لا يوجد مستندات</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ✅ رفع تقرير -->
+  <div class="card mb-3">
+    <div class="card-header bg-info text-white">📑 رفع تقرير</div>
+    <div class="card-body">
+<form action="{{ url_for('engineer_upload_report', tid=t.id) }}" method="POST" enctype="multipart/form-data">
+  <div class="mb-3">
+    <label for="report_file" class="form-label">اختر ملف التقرير:</label>
+    <input type="file" class="form-control" name="report_file" required>
+  </div>
+  <button type="submit" class="btn btn-success">⬆️ رفع التقرير</button>
+</form>
+
+    </div>
+  </div>
+
+  <a href="{{ url_for('engineer_dashboard') }}" class="btn btn-secondary">🔙 رجوع</a>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>
