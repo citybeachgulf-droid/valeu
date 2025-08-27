@@ -208,6 +208,7 @@
                   <th>الانتهاء</th>
                   <th>الحالة</th>
                   <th>الملف</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -227,6 +228,43 @@
                     {% else %}
                       —
                     {% endif %}
+                  </td>
+                  <td class="text-end">
+                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#editDoc{{ d.id }}">تعديل</button>
+                    <form method="POST" action="{{ url_for('employee_delete_branch_document', doc_id=d.id) }}" style="display:inline" onsubmit="return confirm('حذف المستند نهائيًا؟');">
+                      <button class="btn btn-sm btn-outline-danger">حذف</button>
+                    </form>
+                  </td>
+                </tr>
+                <tr class="collapse" id="editDoc{{ d.id }}">
+                  <td colspan="7">
+                    <form method="POST" action="{{ url_for('employee_edit_branch_document', doc_id=d.id) }}" enctype="multipart/form-data" class="border rounded p-3 bg-light">
+                      <div class="row g-2">
+                        <div class="col-md-3">
+                          <label class="form-label">العنوان</label>
+                          <input type="text" name="title" class="form-control" value="{{ d.title }}" required>
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label">النوع</label>
+                          <input type="text" name="doc_type" class="form-control" value="{{ d.doc_type or '' }}">
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label">الإصدار</label>
+                          <input type="date" name="issued_at" class="form-control" value="{{ d.issued_at.strftime('%Y-%m-%d') if d.issued_at else '' }}">
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label">الانتهاء</label>
+                          <input type="date" name="expires_at" class="form-control" value="{{ d.expires_at.strftime('%Y-%m-%d') if d.expires_at else '' }}">
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label">استبدال الملف</label>
+                          <input type="file" name="file" class="form-control">
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end justify-content-end">
+                          <button class="btn btn-primary">💾 حفظ التعديلات</button>
+                        </div>
+                      </div>
+                    </form>
                   </td>
                 </tr>
                 {% else %}

@@ -1812,6 +1812,64 @@ def employee_add_branch_document():
     flash("✅ تم رفع مستند الفرع", "success")
     return redirect(url_for("employee_dashboard"))
 
+# ✅ تعديل مستند فرع (للموظف ضمن فرعه)
+@app.route("/employee/branch_documents/<int:doc_id>/edit", methods=["POST"])
+def employee_edit_branch_document(doc_id):
+    if session.get("role") != "employee":
+        return redirect(url_for("login"))
+
+    user = User.query.get(session.get("user_id"))
+    doc = BranchDocument.query.get_or_404(doc_id)
+    if not user or doc.branch_id != user.branch_id:
+        flash("⛔ غير مسموح تعديل مستندات فرع آخر", "danger")
+        return redirect(url_for("employee_dashboard"))
+
+    title = (request.form.get("title") or "").strip()
+    doc_type = (request.form.get("doc_type") or "").strip()
+    issued_at = request.form.get("issued_at")
+    expires_at = request.form.get("expires_at")
+    file = request.files.get("file")
+
+    if title:
+        doc.title = title
+    doc.doc_type = doc_type
+    doc.issued_at = datetime.fromisoformat(issued_at) if issued_at else None
+    doc.expires_at = datetime.fromisoformat(expires_at) if expires_at else None
+
+    if file and file.filename:
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+        doc.file = filename
+
+    db.session.commit()
+    flash("✅ تم تحديث المستند", "success")
+    return redirect(url_for("employee_dashboard"))
+
+# ✅ حذف مستند فرع (للموظف ضمن فرعه)
+@app.route("/employee/branch_documents/<int:doc_id>/delete", methods=["POST"])
+def employee_delete_branch_document(doc_id):
+    if session.get("role") != "employee":
+        return redirect(url_for("login"))
+
+    user = User.query.get(session.get("user_id"))
+    doc = BranchDocument.query.get_or_404(doc_id)
+    if not user or doc.branch_id != user.branch_id:
+        flash("⛔ غير مسموح حذف مستندات فرع آخر", "danger")
+        return redirect(url_for("employee_dashboard"))
+
+    try:
+        if doc.file:
+            fpath = os.path.join(app.config["UPLOAD_FOLDER"], doc.file)
+            if os.path.exists(fpath):
+                os.remove(fpath)
+    except Exception:
+        pass
+
+    db.session.delete(doc)
+    db.session.commit()
+    flash("✅ تم حذف المستند", "success")
+    return redirect(url_for("employee_dashboard"))
+
 @app.route("/reports")
 def reports():
     if not session.get("role") in ["employee", "manager", "engineer"]:
