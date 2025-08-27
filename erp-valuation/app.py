@@ -1591,39 +1591,13 @@ def bank_detail(bank_id):
     )
 
 
-# ---------------- مستندات وفواتير الفروع ----------------
-@app.route("/branch_documents", methods=["GET", "POST"])
+# ---------------- مستندات وفواتير الفروع (عرض فقط للمدير) ----------------
+@app.route("/branch_documents", methods=["GET"])
 def branch_documents():
     if session.get("role") != "manager":
         return redirect(url_for("login"))
 
     branches = Branch.query.order_by(Branch.name.asc()).all()
-
-    if request.method == "POST":
-        branch_id = request.form.get("branch_id")
-        title = (request.form.get("title") or "").strip()
-        doc_type = (request.form.get("doc_type") or "").strip()
-        issued_at = request.form.get("issued_at")
-        expires_at = request.form.get("expires_at")
-        file = request.files.get("file")
-
-        filename = None
-        if file and file.filename:
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
-
-        doc = BranchDocument(
-            branch_id=int(branch_id) if branch_id else None,
-            title=title,
-            doc_type=doc_type,
-            file=filename,
-            issued_at=datetime.fromisoformat(issued_at) if issued_at else None,
-            expires_at=datetime.fromisoformat(expires_at) if expires_at else None,
-        )
-        db.session.add(doc)
-        db.session.commit()
-        flash("✅ تم إضافة المستند بنجاح", "success")
-        return redirect(url_for("branch_documents"))
 
     # فلترة اختيارية بالفرع
     selected_branch_id = request.args.get("branch_id")
