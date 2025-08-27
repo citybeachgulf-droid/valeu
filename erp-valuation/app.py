@@ -1258,30 +1258,34 @@ def engineer_upload_report(tid):
     filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(filepath)
 
-    # محاولة ختم التقرير برمز QR يشير إلى رابط التحقق العام
-    try:
-        verify_url = url_for('verify_report', token=t.verification_token or generate_verification_token(), _external=True)
-        # إنشئ QR كصورة مؤقتة
-        import qrcode
-        from PIL import Image as PILImage
-        qr_img = qrcode.make(verify_url)
-        qr_path = os.path.join(app.config["UPLOAD_FOLDER"], f"qr_{t.id}.png")
-        qr_img.save(qr_path)
+    # تأكيد وجود رمز تحقق ثابت قبل توليد QR
+    if not t.verification_token:
+        t.verification_token = generate_verification_token()
+        db.session.commit()
 
-        # حاول ختم PDF عبر PyMuPDF (fitz)
-        try:
-            doc = fitz.open(filepath)
-            page = doc[0]
-            rect = fitz.Rect(page.rect.width - 150, page.rect.height - 150, page.rect.width - 10, page.rect.height - 10)
-            page.insert_image(rect, filename=qr_path)
-            # إضافة نص رابط التحقق الصغير أسفل ال QR
-            page.insert_text((rect.x0, rect.y1 + 5), verify_url, fontsize=6, color=(0, 0, 1))
-            stamped_path = os.path.join(app.config["UPLOAD_FOLDER"], f"stamped_{filename}")
-            doc.save(stamped_path)
-            doc.close()
-            os.replace(stamped_path, filepath)
-        except Exception:
-            pass
+    # محاولة ختم التقرير برمز QR (PDF فقط) يشير إلى رابط التحقق العام
+    try:
+        _, ext = os.path.splitext(filename.lower())
+        if ext == ".pdf":
+            verify_url = url_for('verify_report', token=t.verification_token, _external=True)
+            import qrcode
+            from PIL import Image as PILImage
+            qr_img = qrcode.make(verify_url)
+            qr_path = os.path.join(app.config["UPLOAD_FOLDER"], f"qr_{t.id}.png")
+            qr_img.save(qr_path)
+
+            try:
+                doc = fitz.open(filepath)
+                page = doc[0]  # الصفحة الأولى
+                rect = fitz.Rect(page.rect.width - 150, 10, page.rect.width - 10, 150)
+                page.insert_image(rect, filename=qr_path)
+                page.insert_text((rect.x0, rect.y1 + 5), verify_url, fontsize=6, color=(0, 0, 1))
+                stamped_path = os.path.join(app.config["UPLOAD_FOLDER"], f"stamped_{filename}")
+                doc.save(stamped_path)
+                doc.close()
+                os.replace(stamped_path, filepath)
+            except Exception:
+                pass
     except Exception:
         # تخطَ أي فشل في الختم ولا تُفشل الرفع
         pass
@@ -1315,6 +1319,7 @@ def engineer_upload_report(tid):
         send_notification(employee.id, "📄 تقرير جاهز", f"تم رفع التقرير للمعاملة رقم {t.id}")
 
     flash(f"✅ تم رفع التقرير (الرقم المرجعي: {t.report_number})", "success")
+    return redirect(url_for("engineer_transaction_details", tid=tid))
 
 
 
