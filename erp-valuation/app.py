@@ -418,9 +418,25 @@ def add_transaction():
     user = User.query.get(session["user_id"])
     transaction_type = request.form.get("transaction_type")  # ✅ نحدد نوع المعاملة
     client_name = (request.form.get("client_name") or "").strip()
+    client_phone = (request.form.get("client_phone") or "").strip()
     fee = float(request.form.get("fee") or 0)
 
     t = None  # المعاملة
+
+    # ✅ تحقق من رقم العميل
+    if not client_phone:
+        flash("⚠️ يجب إدخال رقم العميل", "danger")
+        return redirect(url_for("employee_dashboard"))
+
+    # 🧾 حفظ/تحديث العميل في جدول العملاء
+    existing_customer = Customer.query.filter_by(phone=client_phone).first()
+    if existing_customer:
+        # نحدّث الاسم إذا كان مختلفًا
+        if client_name and existing_customer.name != client_name:
+            existing_customer.name = client_name
+    else:
+        db.session.add(Customer(name=client_name or "-", phone=client_phone))
+        db.session.flush()
 
     # 🏠 معاملة عقار
     if transaction_type == "real_estate":
@@ -1183,7 +1199,22 @@ def add_transaction_engineer():
     if request.method == "POST":
         transaction_type = request.form.get("transaction_type")
         client_name = (request.form.get("client_name") or "").strip()
+        client_phone = (request.form.get("client_phone") or "").strip()
         fee = float(request.form.get("fee") or 0)
+
+        # ✅ تحقق من رقم العميل
+        if not client_phone:
+            flash("⚠️ يجب إدخال رقم العميل", "danger")
+            return redirect(url_for("add_transaction_engineer"))
+
+        # 🧾 حفظ/تحديث العميل في جدول العملاء
+        existing_customer = Customer.query.filter_by(phone=client_phone).first()
+        if existing_customer:
+            if client_name and existing_customer.name != client_name:
+                existing_customer.name = client_name
+        else:
+            db.session.add(Customer(name=client_name or "-", phone=client_phone))
+            db.session.flush()
 
         t = None
 
