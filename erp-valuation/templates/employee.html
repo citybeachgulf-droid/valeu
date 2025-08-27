@@ -167,6 +167,76 @@
           </form>
         </div>
       </div>
+      
+      <!-- 🗂️ قسم مستندات الشركة/الفرع -->
+      <div class="col-md-5">
+        <div class="card shadow-lg p-4">
+          <h5 class="mb-3">📁 مستندات الشركة/الفرع</h5>
+          <form method="POST" action="{{ url_for('employee_add_branch_document') }}" enctype="multipart/form-data" class="mb-3">
+            <div class="mb-2">
+              <label class="form-label">عنوان المستند</label>
+              <input type="text" name="title" class="form-control" required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">نوع المستند</label>
+              <input type="text" name="doc_type" class="form-control" placeholder="سجل تجاري، ضريبة، ..">
+            </div>
+            <div class="row">
+              <div class="col-md-6 mb-2">
+                <label class="form-label">تاريخ الإصدار</label>
+                <input type="date" name="issued_at" class="form-control">
+              </div>
+              <div class="col-md-6 mb-2">
+                <label class="form-label">تاريخ الانتهاء</label>
+                <input type="date" name="expires_at" class="form-control">
+              </div>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">الملف</label>
+              <input type="file" name="file" class="form-control">
+            </div>
+            <button class="btn btn-success w-100">⬆️ رفع المستند</button>
+          </form>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>العنوان</th>
+                  <th>النوع</th>
+                  <th>الإصدار</th>
+                  <th>الانتهاء</th>
+                  <th>الحالة</th>
+                  <th>الملف</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for d in docs or [] %}
+                <tr>
+                  <td>{{ d.title }}</td>
+                  <td>{{ d.doc_type or '—' }}</td>
+                  <td>{{ d.issued_at.strftime('%Y-%m-%d') if d.issued_at else '—' }}</td>
+                  <td>{{ d.expires_at.strftime('%Y-%m-%d') if d.expires_at else '—' }}</td>
+                  <td>
+                    {% set s = status_for(d) %}
+                    <span class="badge {% if s=='ساري' %}bg-success{% elif s=='قريب الانتهاء' %}bg-warning text-dark{% elif s=='منتهي' %}bg-danger{% else %}bg-secondary{% endif %}">{{ s }}</span>
+                  </td>
+                  <td>
+                    {% if d.file %}
+                      <a href="{{ url_for('uploaded_file', filename=d.file) }}" target="_blank">فتح</a>
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted">لا توجد مستندات لهذا الفرع</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

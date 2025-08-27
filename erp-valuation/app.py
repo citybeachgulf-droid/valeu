@@ -282,6 +282,21 @@ def naturaltime_ar(dt):
     else:
         return f"منذ {years} سنوات"
 
+# ---------------- حالة مستند حسب تاريخ الانتهاء ----------------
+def document_status(doc):
+    try:
+        exp = getattr(doc, "expires_at", None)
+        if not exp:
+            return "بدون انتهاء"
+        delta_days = (exp - datetime.utcnow()).days
+        if delta_days < 0:
+            return "منتهي"
+        if delta_days <= 30:
+            return "قريب الانتهاء"
+        return "ساري"
+    except Exception:
+        return "بدون انتهاء"
+
 # ---------------- المسارات ----------------
 @app.route("/")
 def index():
@@ -333,6 +348,16 @@ def employee_dashboard():
     transactions = Transaction.query.filter_by(assigned_to=session.get("user_id")).all()
     banks = Bank.query.all()
 
+    # مستندات الفرع الخاصة بالموظف
+    user = User.query.get(session.get("user_id"))
+    branch_docs = []
+    if user and getattr(user, "branch_id", None):
+        try:
+            branch_docs = BranchDocument.query.filter_by(branch_id=user.branch_id)\
+                .order_by(BranchDocument.expires_at.asc().nulls_last()).all()
+        except Exception:
+            branch_docs = BranchDocument.query.filter_by(branch_id=user.branch_id).all()
+
     # تمرير السعر الافتراضي (لو ما فيه ذاكرة نخليه صفر)
     price_per_meter = 0.0  
 
@@ -341,7 +366,9 @@ def employee_dashboard():
         transactions=transactions,
         banks=banks,
         vapid_public_key=VAPID_PUBLIC_KEY,
-        price_per_meter=price_per_meter
+        price_per_meter=price_per_meter,
+        docs=branch_docs,
+        status_for=document_status
     )
 
 @app.route("/add_transaction", methods=["POST"])
@@ -1744,6 +1771,45 @@ def employee_upload_bank_docs(tid):
     else:
         flash("⚠️ لم يتم اختيار أي ملف", "warning")
 
+    return redirect(url_for("employee_dashboard"))
+
+# ✅ رفع مستندات الشركة بواسطة الموظف لفرعه
+@app.route("/employee/branch_documents", methods=["POST"])
+def employee_add_branch_document():
+    if session.get("role") != "employee":
+        return redirect(url_for("login"))
+
+    user = User.query.get(session.get("user_id"))
+    if not user or not getattr(user, "branch_id", None):
+        flash("⛔ لا يوجد فرع مرتبط بالمستخدم", "danger")
+        return redirect(url_for("employee_dashboard"))
+
+    title = (request.form.get("title") or "").strip()
+    doc_type = (request.form.get("doc_type") or "").strip()
+    issued_at = request.form.get("issued_at")
+    expires_at = request.form.get("expires_at")
+    file = request.files.get("file")
+
+    if not title:
+        flash("⚠️ يجب إدخال عنوان المستند", "warning")
+        return redirect(url_for("employee_dashboard"))
+
+    filename = None
+    if file and file.filename:
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+
+    doc = BranchDocument(
+        branch_id=user.branch_id,
+        title=title,
+        doc_type=doc_type,
+        file=filename,
+        issued_at=datetime.fromisoformat(issued_at) if issued_at else None,
+        expires_at=datetime.fromisoformat(expires_at) if expires_at else None,
+    )
+    db.session.add(doc)
+    db.session.commit()
+    flash("✅ تم رفع مستند الفرع", "success")
     return redirect(url_for("employee_dashboard"))
 
 @app.route("/reports")
