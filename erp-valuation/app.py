@@ -25,6 +25,10 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///erp.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
+def generate_verification_token() -> str:
+    import secrets
+    return secrets.token_hex(16)
+
 
 # ---------------- النماذج ----------------
 class Branch(db.Model):
@@ -61,6 +65,8 @@ class Transaction(db.Model):
     building_value  = db.Column(db.Float, default=0)
     total_estimate  = db.Column(db.Float, default=0)
     files           = db.Column(db.Text)
+    # ملفات أُرسلت للبنك بواسطة الموظف (قائمة أسماء مفصولة بفواصل)
+    bank_sent_files = db.Column(db.Text)
     area            = db.Column(db.Float, default=0)
     building_area   = db.Column(db.Float, default=0)
     building_age    = db.Column(db.Integer, default=0)
@@ -89,6 +95,9 @@ class Transaction(db.Model):
     branch_id   = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=False)
 
     payment_status  = db.Column(db.String(20), default="غير مدفوعة")
+
+    # رمز تحقق عام للباركود/QR
+    verification_token = db.Column(db.String(64), nullable=True, unique=True)
 
     payments = db.relationship("Payment", backref="transaction", lazy=True)
 
@@ -124,7 +133,9 @@ class ReportTemplate(db.Model):
     __tablename__ = "report_template"
     id = db.Column(db.Integer, primary_key=True)
     template_type = db.Column(db.String(50), nullable=False)  # real_estate / vehicle
-    content = db.Column(db.Text, nullable=False)
+    content = db.Column(db.Text, nullable=True)
+    title = db.Column(db.String(150), nullable=True)
+    file = db.Column(db.String(255), nullable=True)  # مسار ملف DOCX المرفوع إن وُجد
 
 
 # فواتير البنك بمراحلها
@@ -156,6 +167,18 @@ class Expense(db.Model):
     file   = db.Column(db.String(200))
     branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"))
     branch = db.relationship("Branch", backref="expenses")
+
+class BranchDocument(db.Model):
+    __tablename__ = "branch_document"
+    id = db.Column(db.Integer, primary_key=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    doc_type = db.Column(db.String(100), nullable=True)
+    file = db.Column(db.String(255), nullable=True)
+    issued_at = db.Column(db.DateTime, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    branch = db.relationship("Branch", backref="documents")
 
 # ---------------- دوال مساعدة ----------------
 def save_price(state, region, bank, price):
@@ -379,7 +402,7 @@ def add_transaction():
             client=client_name,
             employee=user.username,
             date=datetime.utcnow(),
-            status="معلقة",   # ✅ يمر على المدير أولاً
+            status="بانتظار المهندس",
             fee=fee,
             branch_id=user.branch_id,
             land_value=land_value,
@@ -395,7 +418,8 @@ def add_transaction():
             bank_branch=bank_branch,
             created_by=user.id,
             payment_status="غير مدفوعة",
-            transaction_type="real_estate"
+            transaction_type="real_estate",
+            assigned_to=None
         )
 
     # 🚗 معاملة مركبة
@@ -439,6 +463,11 @@ def add_transaction():
         if engineer:
             t.assigned_to = engineer.id
 
+        # 👨‍🔧 تعيين مباشر للمهندس (أول مهندس في نفس الفرع إن وجد)
+        engineer = User.query.filter_by(role="engineer", branch_id=user.branch_id).first()
+        if engineer:
+            t.assigned_to = engineer.id
+
     # رفع الملفات
     files = request.files.getlist("files")
     saved_files = []
@@ -451,9 +480,14 @@ def add_transaction():
 
     db.session.add(t)
     db.session.commit()
-    manager = User.query.filter_by(role="manager").first()
-    if manager:
-     send_notification(manager.id, "📋 معاملة جديدة", f"تمت إضافة معاملة رقم {t.id}")
+
+    # 🔔 إشعار جميع مهندسي نفس الفرع بوجود معاملة جديدة
+    try:
+        engineers = User.query.filter_by(role="engineer", branch_id=user.branch_id).all()
+        for eng in engineers:
+            send_notification(eng.id, "📋 معاملة جديدة", f"تمت إضافة معاملة رقم {t.id}")
+    except Exception:
+        pass
     flash("✅ تم إضافة المعاملة بنجاح", "success")
     return redirect(url_for("employee_dashboard"))
 
@@ -613,13 +647,20 @@ def manager_dashboard():
             "banks": banks_list
         })
 
+    # 🔔 مستندات على وشك الانتهاء خلال 30 يومًا (كل الفروع)
+    expiring_docs = BranchDocument.query.filter(
+        BranchDocument.expires_at != None,
+        BranchDocument.expires_at <= (now + timedelta(days=30))
+    ).order_by(BranchDocument.expires_at.asc()).all()
+
     return render_template(
         "manager_dashboard.html",
         transactions=transactions,
         users=users,
         branches=branches_data,
         vapid_public_key=VAPID_PUBLIC_KEY,
-        net_profit=sum(b["profit"] for b in branches_data)
+        net_profit=sum(b["profit"] for b in branches_data),
+        expiring_docs=expiring_docs
     )
 
 
@@ -729,65 +770,62 @@ def generate_report_number():
             return f"ref{int(match.group(1)) + 1}"
     return "ref1001"
 
-# ✅ صفحة التثمين (المدير)
-@app.route("/valuate/<int:tid>", methods=["GET", "POST"])
-def valuate_transaction(tid):
-    if session.get("role") != "manager":
+# ✅ نقل التثمين إلى المهندس
+@app.route("/engineer/valuate/<int:tid>", methods=["POST"])
+def engineer_valuate_transaction(tid):
+    if session.get("role") != "engineer":
         return redirect(url_for("login"))
 
     t = Transaction.query.get_or_404(tid)
 
-    if request.method == "POST":
-        if t.transaction_type == "real_estate":
-            # 🏠 معاملات العقار
-            land_value     = float(request.form.get("land_value", 0) or 0)
-            building_value = float(request.form.get("building_value", 0) or 0)
-            total_estimate = land_value + building_value
+    if t.transaction_type == "real_estate":
+        land_value     = float(request.form.get("land_value", 0) or 0)
+        building_value = float(request.form.get("building_value", 0) or 0)
+        total_estimate = land_value + building_value
 
-            t.land_value      = land_value
-            t.building_value  = building_value
-            t.total_estimate  = total_estimate
-            t.status          = "بإنتظار المهندس"
+        t.land_value      = land_value
+        t.building_value  = building_value
+        t.total_estimate  = total_estimate
+        t.valuation_amount = total_estimate
+        t.status          = "قيد المعاينة"
 
-            # ✅ تحديث ذاكرة التثمين
-            memory = ValuationMemory.query.filter_by(
-                state=t.state, region=t.region, bank_id=t.bank_id
-            ).first()
-            if memory:
-                memory.price_per_meter = land_value / t.area if t.area > 0 else 0
-                memory.updated_at = datetime.utcnow()
-            else:
-                memory = ValuationMemory(
-                    state=t.state,
-                    region=t.region,
-                    bank_id=t.bank_id,
-                    price_per_meter=land_value / t.area if t.area > 0 else 0
-                )
-                db.session.add(memory)
+        # ✅ تحديث ذاكرة التثمين
+        memory = ValuationMemory.query.filter_by(
+            state=t.state, region=t.region, bank_id=t.bank_id
+        ).first()
+        if memory:
+            memory.price_per_meter = land_value / t.area if t.area > 0 else 0
+            memory.updated_at = datetime.utcnow()
+        else:
+            memory = ValuationMemory(
+                state=t.state,
+                region=t.region,
+                bank_id=t.bank_id,
+                price_per_meter=land_value / t.area if t.area > 0 else 0
+            )
+            db.session.add(memory)
 
-        elif t.transaction_type == "vehicle":
-            # 🚗 معاملات المركبات (القيمة تدخل مباشرة من الموظف)
-            vehicle_value = float(request.form.get("vehicle_value", 0) or 0)
-            t.total_estimate = vehicle_value
-            t.status = "بإنتظار المهندس"
+    elif t.transaction_type == "vehicle":
+        vehicle_value = float(request.form.get("vehicle_value", 0) or 0)
+        t.total_estimate = vehicle_value
+        t.valuation_amount = vehicle_value
+        t.status = "قيد المعاينة"
 
-        # ✅ إضافة رقم مرجعي إذا ما كان موجود
-        if not t.report_number:
-            last_txn = Transaction.query.filter(
-                Transaction.report_number != None
-            ).order_by(Transaction.id.desc()).first()
+    # ✅ إضافة رقم مرجعي إذا ما كان موجود
+    if not t.report_number:
+        last_txn = Transaction.query.filter(
+            Transaction.report_number != None
+        ).order_by(Transaction.id.desc()).first()
 
-            if last_txn and last_txn.report_number.startswith("ref"):
-                last_num = int(last_txn.report_number.replace("ref", ""))
-                t.report_number = f"ref{last_num + 1}"
-            else:
-                t.report_number = "ref1001"
+        if last_txn and last_txn.report_number.startswith("ref"):
+            last_num = int(last_txn.report_number.replace("ref", ""))
+            t.report_number = f"ref{last_num + 1}"
+        else:
+            t.report_number = "ref1001"
 
-        db.session.commit()
-        flash(f"✅ تم حفظ التثمين وإرساله للمهندس (الرقم المرجعي: {t.report_number})", "success")
-        return redirect(url_for("manager_dashboard"))
-
-    return render_template("valuate.html", t=t)
+    db.session.commit()
+    flash("✅ تم حفظ التثمين بواسطة المهندس", "success")
+    return redirect(url_for("engineer_transaction_details", tid=tid))
 
 
 
@@ -945,6 +983,7 @@ def manage_report_templates():
     vehicle_tpl = get_template_by_type("vehicle")
 
     if request.method == "POST":
+        # حفظ النصوص
         re_content = (request.form.get("real_estate_content") or "").strip()
         ve_content = (request.form.get("vehicle_content") or "").strip()
 
@@ -962,6 +1001,24 @@ def manage_report_templates():
             else:
                 vehicle_tpl.content = ve_content
 
+        # رفع ملفات DOCX متعددة: 6 للعقار و1 للمركبات
+        if 're_files' in request.files:
+            re_files = request.files.getlist('re_files')
+            for f in re_files:
+                if f and f.filename:
+                    fname = secure_filename(f.filename)
+                    f.save(os.path.join(app.config['UPLOAD_FOLDER'], fname))
+                    # نخزن سجل لكل ملف كقالب عقار
+                    db.session.add(ReportTemplate(template_type='real_estate', title=fname, file=fname))
+
+        if 've_file' in request.files:
+            ve_file = request.files['ve_file']
+            if ve_file and ve_file.filename:
+                fname = secure_filename(ve_file.filename)
+                ve_file.save(os.path.join(app.config['UPLOAD_FOLDER'], fname))
+                # نخزن سجل قالب مركبات (واحد)
+                db.session.add(ReportTemplate(template_type='vehicle', title=fname, file=fname))
+
         db.session.commit()
         flash("✅ تم حفظ القوالب", "success")
         return redirect(url_for("manage_report_templates"))
@@ -969,7 +1026,9 @@ def manage_report_templates():
     return render_template(
         "manager_report_templates.html",
         real_estate_content=real_estate_tpl.content if real_estate_tpl else "",
-        vehicle_content=vehicle_tpl.content if vehicle_tpl else ""
+        vehicle_content=vehicle_tpl.content if vehicle_tpl else "",
+        real_estate_files=ReportTemplate.query.filter_by(template_type='real_estate').filter(ReportTemplate.file.isnot(None)).all(),
+        vehicle_files=ReportTemplate.query.filter_by(template_type='vehicle').filter(ReportTemplate.file.isnot(None)).all()
     )
 
 
@@ -1172,6 +1231,34 @@ def engineer_upload_report(tid):
     filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(filepath)
 
+    # محاولة ختم التقرير برمز QR يشير إلى رابط التحقق العام
+    try:
+        verify_url = url_for('verify_report', token=t.verification_token or generate_verification_token(), _external=True)
+        # إنشئ QR كصورة مؤقتة
+        import qrcode
+        from PIL import Image as PILImage
+        qr_img = qrcode.make(verify_url)
+        qr_path = os.path.join(app.config["UPLOAD_FOLDER"], f"qr_{t.id}.png")
+        qr_img.save(qr_path)
+
+        # حاول ختم PDF عبر PyMuPDF (fitz)
+        try:
+            doc = fitz.open(filepath)
+            page = doc[0]
+            rect = fitz.Rect(page.rect.width - 150, page.rect.height - 150, page.rect.width - 10, page.rect.height - 10)
+            page.insert_image(rect, filename=qr_path)
+            # إضافة نص رابط التحقق الصغير أسفل ال QR
+            page.insert_text((rect.x0, rect.y1 + 5), verify_url, fontsize=6, color=(0, 0, 1))
+            stamped_path = os.path.join(app.config["UPLOAD_FOLDER"], f"stamped_{filename}")
+            doc.save(stamped_path)
+            doc.close()
+            os.replace(stamped_path, filepath)
+        except Exception:
+            pass
+    except Exception:
+        # تخطَ أي فشل في الختم ولا تُفشل الرفع
+        pass
+
     t.report_file = filename
     t.status = "📑 تقرير مرفوع"
 
@@ -1186,6 +1273,9 @@ def engineer_upload_report(tid):
         else:
             t.report_number = "ref1001"
 
+    # توليد رمز تحقق إن لم يوجد
+    if not t.verification_token:
+        t.verification_token = generate_verification_token()
     db.session.commit()
 
     # بعد db.session.commit() في upload_report
@@ -1413,6 +1503,12 @@ def bank_detail(bank_id):
         # ملف التقرير (إن وجد)
         if t.report_file:
             documents.append({"transaction_id": t.id, "filename": t.report_file})
+        # ملفات البنك التي رفعها الموظف
+        if getattr(t, "bank_sent_files", None):
+            for fname in (t.bank_sent_files or "").split(","):
+                fname = (fname or "").strip()
+                if fname:
+                    documents.append({"transaction_id": t.id, "filename": fname})
 
     # فواتير البنك بمراحلها (إن وُجدت)
     inv_query = BankInvoice.query.filter_by(bank_id=bank_id)
@@ -1434,6 +1530,23 @@ def bank_detail(bank_id):
         )
     invoices = inv_query.order_by(BankInvoice.id.desc()).all()
 
+    # ✅ ملخص للفواتير والمراحل (للإظهار كملخص عند المدير)
+    total_invoices = len(invoices)
+    total_amount = sum((inv.amount or 0) for inv in invoices)
+    issued_count = sum(1 for inv in invoices if inv.issued_at)
+    delivered_count = sum(1 for inv in invoices if inv.delivered_at)
+    received_count = sum(1 for inv in invoices if inv.received_at)
+    pending_count = total_invoices - received_count
+
+    invoice_summary = {
+        "total_invoices": total_invoices,
+        "total_amount": total_amount,
+        "issued_count": issued_count,
+        "delivered_count": delivered_count,
+        "received_count": received_count,
+        "pending_count": pending_count,
+    }
+
     return render_template(
         "bank_detail.html",
         bank=bank,
@@ -1442,15 +1555,79 @@ def bank_detail(bank_id):
         payments=payments,
         documents=documents,
         invoices=invoices,
+        invoice_summary=invoice_summary,
         start=start_date_str,
         end=end_date_str,
+    )
+
+
+# ---------------- مستندات وفواتير الفروع ----------------
+@app.route("/branch_documents", methods=["GET", "POST"])
+def branch_documents():
+    if session.get("role") != "manager":
+        return redirect(url_for("login"))
+
+    branches = Branch.query.order_by(Branch.name.asc()).all()
+
+    if request.method == "POST":
+        branch_id = request.form.get("branch_id")
+        title = (request.form.get("title") or "").strip()
+        doc_type = (request.form.get("doc_type") or "").strip()
+        issued_at = request.form.get("issued_at")
+        expires_at = request.form.get("expires_at")
+        file = request.files.get("file")
+
+        filename = None
+        if file and file.filename:
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+
+        doc = BranchDocument(
+            branch_id=int(branch_id) if branch_id else None,
+            title=title,
+            doc_type=doc_type,
+            file=filename,
+            issued_at=datetime.fromisoformat(issued_at) if issued_at else None,
+            expires_at=datetime.fromisoformat(expires_at) if expires_at else None,
+        )
+        db.session.add(doc)
+        db.session.commit()
+        flash("✅ تم إضافة المستند بنجاح", "success")
+        return redirect(url_for("branch_documents"))
+
+    # فلترة اختيارية بالفرع
+    selected_branch_id = request.args.get("branch_id")
+    q = BranchDocument.query
+    if selected_branch_id:
+        q = q.filter_by(branch_id=int(selected_branch_id))
+    docs = q.order_by(BranchDocument.expires_at.asc().nulls_last()).all()
+
+    # تصنيف المستندات
+    now = datetime.utcnow()
+    def status_for(doc):
+        if not doc.expires_at:
+            return "بدون انتهاء"
+        delta = (doc.expires_at - now).days
+        if delta < 0:
+            return "منتهي"
+        if delta <= 30:
+            return "قريب الانتهاء"
+        return "ساري"
+
+    return render_template(
+        "branch_documents.html",
+        branches=branches,
+        docs=docs,
+        selected_branch_id=selected_branch_id,
+        status_for=status_for,
     )
 
 
 # تحديث مراحل فاتورة بنك
 @app.route("/banks/<int:bank_id>/invoice_stage", methods=["POST"]) 
 def update_bank_invoice_stage(bank_id):
-    if session.get("role") not in ["manager", "finance"]:
+    # ✅ حصر إدخال وتحديث مراحل فواتير البنك على قسم المالية فقط
+    if session.get("role") != "finance":
         return redirect(url_for("login"))
 
     action = request.form.get("action")  # issue/deliver/receive
@@ -1538,6 +1715,37 @@ def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 # ---------------- صفحة التقارير المشتركة ----------------
+@app.route("/employee/upload_bank_docs/<int:tid>", methods=["POST"])
+def employee_upload_bank_docs(tid):
+    if session.get("role") != "employee":
+        return redirect(url_for("login"))
+
+    t = Transaction.query.get_or_404(tid)
+    user = User.query.get(session["user_id"])
+    # منع رفع ملفات لمعاملة من فرع آخر
+    if t.branch_id != user.branch_id:
+        flash("⛔ لا يمكنك رفع مستندات لمعالجة من فرع آخر", "danger")
+        return redirect(url_for("employee_dashboard"))
+
+    uploaded = request.files.getlist("bank_docs")
+    saved = []
+    for f in uploaded:
+        if f and f.filename:
+            fname = secure_filename(f.filename)
+            f.save(os.path.join(app.config["UPLOAD_FOLDER"], fname))
+            saved.append(fname)
+
+    if saved:
+        existing = (t.bank_sent_files or "").split(",") if t.bank_sent_files else []
+        existing = [x.strip() for x in existing if x.strip()]
+        t.bank_sent_files = ",".join(existing + saved)
+        db.session.commit()
+        flash("✅ تم رفع ملفات البنك وحفظها", "success")
+    else:
+        flash("⚠️ لم يتم اختيار أي ملف", "warning")
+
+    return redirect(url_for("employee_dashboard"))
+
 @app.route("/reports")
 def reports():
     if not session.get("role") in ["employee", "manager", "engineer"]:
@@ -1559,6 +1767,14 @@ def search_report():
         if search_number:
             results = Transaction.query.filter_by(report_number=search_number).all()
     return render_template("reports.html", reports=results, search_number=search_number)
+
+# --------- تحقق عام من التقرير عبر رمز QR ---------
+@app.route("/verify/<token>")
+def verify_report(token):
+    tx = Transaction.query.filter_by(verification_token=token).first()
+    if not tx:
+        return render_template("verify.html", ok=False, tx=None)
+    return render_template("verify.html", ok=True, tx=tx)
 
 # --------- إنشاء الجداول + ترقيعات متوافقة مع قواعد قديمة ---------
 with app.app_context():
@@ -1598,6 +1814,15 @@ with app.app_context():
             db.session.rollback()
 
     # محاولة إضافة عمود bank_branch للمعاملات إذا كان الجدول قديم
+    # محاولة إضافة عمود bank_sent_files إذا كان الجدول قديم
+    try:
+        if not column_exists("transaction", "bank_sent_files"):
+            db.session.execute(text("ALTER TABLE transaction ADD COLUMN bank_sent_files TEXT"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود bank_sent_files")
+    except Exception:
+        db.session.rollback()
+
     try:
         if not column_exists("transaction", "bank_branch"):
             db.session.execute(text("ALTER TABLE transaction ADD COLUMN bank_branch VARCHAR(120)"))
@@ -1616,7 +1841,9 @@ with app.app_context():
                 CREATE TABLE IF NOT EXISTS report_template (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     template_type VARCHAR(50) NOT NULL,
-                    content TEXT NOT NULL
+                    content TEXT,
+                    title VARCHAR(150),
+                    file VARCHAR(255)
                 )
                 """
             ))
@@ -1626,6 +1853,30 @@ with app.app_context():
             db.session.rollback()
 
     # إنشاء مدير افتراضي إن أمكن (تجنب الأعمدة الناقصة)
+    # محاولة إنشاء جدول branch_document إذا غير موجود
+    try:
+        db.session.execute(text("SELECT 1 FROM branch_document LIMIT 1"))
+    except Exception:
+        try:
+            db.session.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS branch_document (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    branch_id INTEGER NOT NULL,
+                    title VARCHAR(200) NOT NULL,
+                    doc_type VARCHAR(100),
+                    file VARCHAR(255),
+                    issued_at TIMESTAMP,
+                    expires_at TIMESTAMP,
+                    created_at TIMESTAMP
+                )
+                """
+            ))
+            db.session.commit()
+            print("✅ تم إنشاء جدول branch_document")
+        except Exception:
+            db.session.rollback()
+
     try:
         mgr = User.query.filter_by(role="manager").first()
     except OperationalError:
@@ -1635,6 +1886,33 @@ with app.app_context():
         db.session.add(admin)
         db.session.commit()
         print("✅ تم إنشاء حساب المدير الافتراضي (username=admin, password=1234)")
+
+    # ✅ إنشاء حساب افتراضي لقسم المالية إن لم يكن موجودًا
+    try:
+        fin = User.query.filter_by(role="finance").first()
+    except OperationalError:
+        fin = None
+    if not fin:
+        # ربطه بأول فرع إن وجد
+        first_branch = Branch.query.first()
+        finance_user = User(
+            username="finance",
+            password=generate_password_hash("1234"),
+            role="finance",
+            branch_id=first_branch.id if first_branch else None
+        )
+        db.session.add(finance_user)
+        db.session.commit()
+        print("✅ تم إنشاء حساب المالية الافتراضي (username=finance, password=1234)")
+
+    # محاولة إضافة عمود verification_token إذا كان الجدول قديم
+    try:
+        if not column_exists("transaction", "verification_token"):
+            db.session.execute(text("ALTER TABLE transaction ADD COLUMN verification_token VARCHAR(64)"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود verification_token")
+    except Exception:
+        db.session.rollback()
 
 # ---------------- تقرير دخل موظف ----------------
 @app.route("/employee_income", methods=["GET", "POST"])
