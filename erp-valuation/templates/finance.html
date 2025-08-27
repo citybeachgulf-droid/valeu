@@ -34,6 +34,81 @@
 
   <h2 class="mb-4">💰 لوحة التحكم المالية</h2>
 
+  <!-- إنشاء عرض سعر وفاتورة بنك -->
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="mb-3">📝 إنشاء عرض سعر للبنك</h5>
+          <form method="POST" action="{{ url_for('finance_create_quote') }}" class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">البنك</label>
+              <select name="bank_id" class="form-select" required>
+                <option value="">اختر البنك</option>
+                {% for b in banks %}
+                  <option value="{{ b.id }}">{{ b.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">المبلغ</label>
+              <input type="number" step="0.01" name="amount" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">صالح حتى (اختياري)</label>
+              <input type="date" name="valid_until" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">رقم معاملة (اختياري)</label>
+              <input type="number" name="transaction_id" class="form-control" placeholder="إن وجد">
+            </div>
+            <div class="col-12">
+              <label class="form-label">ملاحظة</label>
+              <input type="text" name="note" class="form-control" placeholder="ملاحظة">
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-primary">إنشاء</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="mb-3">📄 إنشاء فاتورة بنك</h5>
+          <form method="POST" action="{{ url_for('finance_create_bank_invoice') }}" class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">البنك</label>
+              <select name="bank_id" class="form-select" required>
+                <option value="">اختر البنك</option>
+                {% for b in banks %}
+                  <option value="{{ b.id }}">{{ b.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">المبلغ</label>
+              <input type="number" step="0.01" name="amount" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">رقم معاملة (اختياري)</label>
+              <input type="number" name="transaction_id" class="form-control" placeholder="إن وجد">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">ملاحظة</label>
+              <input type="text" name="note" class="form-control" placeholder="ملاحظة">
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-success">إصدار فاتورة</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- البطاقات -->
   <div class="row mb-4">
     <div class="col-md-4">
@@ -142,6 +217,78 @@
           {% endfor %}
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- العروض الأخيرة والفواتير الأخيرة -->
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="mb-3">📝 آخر عروض الأسعار</h5>
+          <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+              <thead class="table-dark">
+                <tr>
+                  <th>#</th>
+                  <th>البنك</th>
+                  <th>المبلغ</th>
+                  <th>صالح حتى</th>
+                  <th>ملاحظة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for q in recent_quotes %}
+                <tr>
+                  <td>{{ q.id }}</td>
+                  <td>{{ q.bank_id }}</td>
+                  <td>{{ q.amount }}</td>
+                  <td>{{ q.valid_until.strftime('%Y-%m-%d') if q.valid_until else '-' }}</td>
+                  <td>{{ q.note or '-' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center">لا توجد عروض بعد</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="mb-3">📄 آخر فواتير البنوك</h5>
+          <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+              <thead class="table-dark">
+                <tr>
+                  <th>#</th>
+                  <th>البنك</th>
+                  <th>المبلغ</th>
+                  <th>إصدار</th>
+                  <th>تسليم</th>
+                  <th>استلام</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for inv in recent_bank_invoices %}
+                <tr>
+                  <td>{{ inv.id }}</td>
+                  <td>{{ inv.bank_id }}</td>
+                  <td>{{ inv.amount }}</td>
+                  <td>{{ inv.issued_at.strftime('%Y-%m-%d') if inv.issued_at else '-' }}</td>
+                  <td>{{ inv.delivered_at.strftime('%Y-%m-%d') if inv.delivered_at else '-' }}</td>
+                  <td>{{ inv.received_at.strftime('%Y-%m-%d') if inv.received_at else '-' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center">لا توجد فواتير بعد</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

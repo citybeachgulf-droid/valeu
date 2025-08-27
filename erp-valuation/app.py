@@ -150,6 +150,17 @@ class BankInvoice(db.Model):
     received_at = db.Column(db.DateTime, nullable=True)   # المرحلة 3: استلام المبلغ
     note = db.Column(db.String(255))
 
+class Quote(db.Model):
+    __tablename__ = "quote"
+    id = db.Column(db.Integer, primary_key=True)
+    bank_id = db.Column(db.Integer, db.ForeignKey("bank.id"), nullable=False)
+    transaction_id = db.Column(db.Integer, db.ForeignKey("transaction.id"), nullable=True)
+    amount = db.Column(db.Float, default=0)
+    valid_until = db.Column(db.DateTime, nullable=True)
+    note = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
 class ValuationMemory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     state = db.Column(db.String(100), nullable=False)   # الولاية
@@ -1396,6 +1407,11 @@ def finance_dashboard():
 
     net_profit = total_income - total_expenses
 
+    # ✅ بيانات العروض والفواتير للبنوك لعرضها بسرعة في لوحة المالية
+    banks = Bank.query.order_by(Bank.name.asc()).all()
+    recent_quotes = Quote.query.order_by(Quote.id.desc()).limit(20).all()
+    recent_bank_invoices = BankInvoice.query.order_by(BankInvoice.id.desc()).limit(20).all()
+
     return render_template(
         "finance.html",
         transactions=unpaid_transactions,
@@ -1403,7 +1419,10 @@ def finance_dashboard():
         expenses=expenses,
         total_income=total_income,
         total_expenses=total_expenses,
-        net_profit=net_profit
+        net_profit=net_profit,
+        banks=banks,
+        recent_quotes=recent_quotes,
+        recent_bank_invoices=recent_bank_invoices,
     )
 
 # ✅ إضافة دفعة جديدة
@@ -1443,6 +1462,61 @@ def add_payment(tid):
         transaction.payment_status = "مدفوعة" if total_paid >= transaction.fee else "غير مدفوعة"
         db.session.commit()
         flash("✅ تم تسجيل الدفعة بنجاح", "success")
+    return redirect(url_for("finance_dashboard"))
+
+# ✅ إنشاء عرض سعر للبنك (من المالية)
+@app.route("/finance/quotes", methods=["POST"])
+def finance_create_quote():
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+
+    bank_id = int(request.form.get("bank_id"))
+    amount = float(request.form.get("amount") or 0)
+    valid_until_str = request.form.get("valid_until")
+    note = request.form.get("note")
+    transaction_id = request.form.get("transaction_id")
+
+    valid_until_dt = None
+    if valid_until_str:
+        try:
+            valid_until_dt = datetime.fromisoformat(valid_until_str)
+        except Exception:
+            valid_until_dt = None
+
+    q = Quote(
+        bank_id=bank_id,
+        amount=amount,
+        valid_until=valid_until_dt,
+        note=note,
+        transaction_id=int(transaction_id) if transaction_id else None,
+        created_by=session.get("user_id"),
+    )
+    db.session.add(q)
+    db.session.commit()
+    flash("✅ تم إنشاء عرض السعر", "success")
+    return redirect(url_for("finance_dashboard"))
+
+# ✅ إنشاء فاتورة بنك بمبلغ محدد (مرحلة الإصدار)
+@app.route("/finance/bank_invoices", methods=["POST"])
+def finance_create_bank_invoice():
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+
+    bank_id = int(request.form.get("bank_id"))
+    amount = float(request.form.get("amount") or 0)
+    transaction_id = request.form.get("transaction_id")
+    note = request.form.get("note")
+
+    inv = BankInvoice(
+        bank_id=bank_id,
+        amount=amount,
+        transaction_id=int(transaction_id) if transaction_id else None,
+        note=note,
+        issued_at=datetime.utcnow(),
+    )
+    db.session.add(inv)
+    db.session.commit()
+    flash("✅ تم إنشاء فاتورة البنك", "success")
     return redirect(url_for("finance_dashboard"))
 
 # ---------------- صفحة البنوك: نظرة عامة ----------------
@@ -1911,6 +1985,30 @@ with app.app_context():
             ))
             db.session.commit()
             print("✅ تم إنشاء جدول bank_invoice")
+        except Exception:
+            db.session.rollback()
+
+    # محاولة إنشاء جدول عروض الأسعار إذا غير موجود
+    try:
+        db.session.execute(text("SELECT 1 FROM quote LIMIT 1"))
+    except Exception:
+        try:
+            db.session.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS quote (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    bank_id INTEGER NOT NULL,
+                    transaction_id INTEGER,
+                    amount FLOAT DEFAULT 0,
+                    valid_until TIMESTAMP,
+                    note VARCHAR(255),
+                    created_at TIMESTAMP,
+                    created_by INTEGER
+                )
+                """
+            ))
+            db.session.commit()
+            print("✅ تم إنشاء جدول quote")
         except Exception:
             db.session.rollback()
 
