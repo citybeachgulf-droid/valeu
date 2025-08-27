@@ -133,7 +133,9 @@ class ReportTemplate(db.Model):
     __tablename__ = "report_template"
     id = db.Column(db.Integer, primary_key=True)
     template_type = db.Column(db.String(50), nullable=False)  # real_estate / vehicle
-    content = db.Column(db.Text, nullable=False)
+    content = db.Column(db.Text, nullable=True)
+    title = db.Column(db.String(150), nullable=True)
+    file = db.Column(db.String(255), nullable=True)  # مسار ملف DOCX المرفوع إن وُجد
 
 
 # فواتير البنك بمراحلها
@@ -981,6 +983,7 @@ def manage_report_templates():
     vehicle_tpl = get_template_by_type("vehicle")
 
     if request.method == "POST":
+        # حفظ النصوص
         re_content = (request.form.get("real_estate_content") or "").strip()
         ve_content = (request.form.get("vehicle_content") or "").strip()
 
@@ -998,6 +1001,24 @@ def manage_report_templates():
             else:
                 vehicle_tpl.content = ve_content
 
+        # رفع ملفات DOCX متعددة: 6 للعقار و1 للمركبات
+        if 're_files' in request.files:
+            re_files = request.files.getlist('re_files')
+            for f in re_files:
+                if f and f.filename:
+                    fname = secure_filename(f.filename)
+                    f.save(os.path.join(app.config['UPLOAD_FOLDER'], fname))
+                    # نخزن سجل لكل ملف كقالب عقار
+                    db.session.add(ReportTemplate(template_type='real_estate', title=fname, file=fname))
+
+        if 've_file' in request.files:
+            ve_file = request.files['ve_file']
+            if ve_file and ve_file.filename:
+                fname = secure_filename(ve_file.filename)
+                ve_file.save(os.path.join(app.config['UPLOAD_FOLDER'], fname))
+                # نخزن سجل قالب مركبات (واحد)
+                db.session.add(ReportTemplate(template_type='vehicle', title=fname, file=fname))
+
         db.session.commit()
         flash("✅ تم حفظ القوالب", "success")
         return redirect(url_for("manage_report_templates"))
@@ -1005,7 +1026,9 @@ def manage_report_templates():
     return render_template(
         "manager_report_templates.html",
         real_estate_content=real_estate_tpl.content if real_estate_tpl else "",
-        vehicle_content=vehicle_tpl.content if vehicle_tpl else ""
+        vehicle_content=vehicle_tpl.content if vehicle_tpl else "",
+        real_estate_files=ReportTemplate.query.filter_by(template_type='real_estate').filter(ReportTemplate.file.isnot(None)).all(),
+        vehicle_files=ReportTemplate.query.filter_by(template_type='vehicle').filter(ReportTemplate.file.isnot(None)).all()
     )
 
 
@@ -1818,7 +1841,9 @@ with app.app_context():
                 CREATE TABLE IF NOT EXISTS report_template (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     template_type VARCHAR(50) NOT NULL,
-                    content TEXT NOT NULL
+                    content TEXT,
+                    title VARCHAR(150),
+                    file VARCHAR(255)
                 )
                 """
             ))
