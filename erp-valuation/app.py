@@ -79,6 +79,8 @@ class Transaction(db.Model):
     
     # 👇 هنا فقط مفتاح خارجي يربط بالجدول Bank
     bank_id = db.Column(db.Integer, db.ForeignKey("bank.id"), nullable=True)
+    # 👇 اسم فرع البنك المرتبط بالمعاملة
+    bank_branch = db.Column(db.String(120), nullable=True)
 
     price = db.Column(db.Float, nullable=True)   # سعر التثمين (اختياري)
 
@@ -329,6 +331,7 @@ def add_transaction():
         state = request.form.get("state")
         region = request.form.get("region")
         bank_id = request.form.get("bank_id")
+        bank_branch = (request.form.get("bank_branch") or "").strip()
         try:
             bank_id = int(bank_id) if bank_id else None
         except Exception:
@@ -360,6 +363,11 @@ def add_transaction():
 
         total_estimate = land_value + building_value
 
+        # تحقق أساسي: البنك وفرع البنك مطلوبان
+        if not bank_id or not bank_branch:
+            flash("⚠️ يرجى اختيار البنك وكتابة فرع البنك", "danger")
+            return redirect(url_for("employee_dashboard"))
+
         t = Transaction(
             client=client_name,
             employee=user.username,
@@ -377,6 +385,7 @@ def add_transaction():
             state=state,
             region=region,
             bank_id=bank_id,
+            bank_branch=bank_branch,
             created_by=user.id,
             payment_status="غير مدفوعة",
             transaction_type="real_estate"
@@ -388,6 +397,13 @@ def add_transaction():
         vehicle_model = request.form.get("vehicle_model")
         vehicle_year  = request.form.get("vehicle_year")
         vehicle_value = float(request.form.get("vehicle_value") or 0)
+
+        # تحقق أساسي: البنك وفرع البنك مطلوبان لمعاملات المركبات أيضًا
+        bank_id = request.form.get("bank_id")
+        bank_branch = (request.form.get("bank_branch") or "").strip()
+        if not bank_id or not bank_branch:
+            flash("⚠️ يرجى اختيار البنك وكتابة فرع البنك", "danger")
+            return redirect(url_for("employee_dashboard"))
 
         t = Transaction(
     client=client_name,
@@ -405,7 +421,8 @@ def add_transaction():
     vehicle_year=vehicle_year,
     state=None,
     region=None,
-    bank_id=None,
+    bank_id=bank_id,
+    bank_branch=bank_branch,
     assigned_to=None   # ✅
 )
 
@@ -927,10 +944,16 @@ def add_transaction_engineer():
             state = request.form.get("state")
             region = request.form.get("region")
             bank_id = request.form.get("bank_id")
+            bank_branch = (request.form.get("bank_branch") or "").strip()
 
             area = float(request.form.get("area") or 0)
             building_area = float(request.form.get("building_area") or 0)
             building_age = int(request.form.get("building_age") or 0)
+
+            # تحقق أساسي: البنك وفرع البنك مطلوبان
+            if not bank_id or not bank_branch:
+                flash("⚠️ يرجى اختيار البنك وكتابة فرع البنك", "danger")
+                return redirect(url_for("add_transaction_engineer"))
 
             t = Transaction(
                 client=client_name,
@@ -946,6 +969,7 @@ def add_transaction_engineer():
                 state=state,
                 region=region,
                 bank_id=bank_id,
+                bank_branch=bank_branch,
                 created_by=user.id,
                 transaction_type="real_estate",
                 payment_status="غير مدفوعة",
@@ -958,6 +982,13 @@ def add_transaction_engineer():
             vehicle_model = request.form.get("vehicle_model")
             vehicle_year  = request.form.get("vehicle_year")
             vehicle_value = float(request.form.get("vehicle_value") or 0)
+
+            # تحقق أساسي: البنك وفرع البنك مطلوبان لمعاملات المركبات أيضًا
+            bank_id = request.form.get("bank_id")
+            bank_branch = (request.form.get("bank_branch") or "").strip()
+            if not bank_id or not bank_branch:
+                flash("⚠️ يرجى اختيار البنك وكتابة فرع البنك", "danger")
+                return redirect(url_for("add_transaction_engineer"))
 
             t = Transaction(
                 client=client_name,
@@ -974,6 +1005,8 @@ def add_transaction_engineer():
                 vehicle_model=vehicle_model,
                 vehicle_year=vehicle_year,
                 valuation_amount = vehicle_value,
+                bank_id=bank_id,
+                bank_branch=bank_branch,
 
                 assigned_to=None   # ✅
             )
@@ -1441,6 +1474,15 @@ with app.app_context():
             print("✅ تم إنشاء جدول bank_invoice")
         except Exception:
             db.session.rollback()
+
+    # محاولة إضافة عمود bank_branch للمعاملات إذا كان الجدول قديم
+    try:
+        if not column_exists("transaction", "bank_branch"):
+            db.session.execute(text("ALTER TABLE transaction ADD COLUMN bank_branch VARCHAR(120)"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود bank_branch")
+    except Exception:
+        db.session.rollback()
 
     # إنشاء مدير افتراضي إن أمكن (تجنب الأعمدة الناقصة)
     try:
