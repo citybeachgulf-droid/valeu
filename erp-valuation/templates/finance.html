@@ -253,40 +253,7 @@
 
   <!-- العروض الأخيرة والفواتير الأخيرة (بنوك) -->
   <div class="row mb-4">
-    <div class="col-md-6">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <h5 class="mb-3">📝 آخر عروض الأسعار</h5>
-          <div class="table-responsive">
-            <table class="table table-bordered table-striped">
-              <thead class="table-dark">
-                <tr>
-                  <th>#</th>
-                  <th>البنك</th>
-                  <th>المبلغ</th>
-                  <th>صالح حتى</th>
-                  <th>ملاحظة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for q in recent_quotes %}
-                <tr>
-                  <td>{{ q.id }}</td>
-                  <td>{{ q.bank_id }}</td>
-                  <td>{{ q.amount }}</td>
-                  <td>{{ q.valid_until.strftime('%Y-%m-%d') if q.valid_until else '-' }}</td>
-                  <td>{{ q.note or '-' }}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="5" class="text-center">لا توجد عروض بعد</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-6">
+    <div class="col-md-12">
       <div class="card shadow-sm">
         <div class="card-body">
           <h5 class="mb-3">📄 آخر فواتير البنوك</h5>
