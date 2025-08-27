@@ -1839,9 +1839,7 @@ def bank_detail(bank_id):
                 fname = (fname or "").strip()
                 if fname:
                     documents.append({"transaction_id": t.id, "filename": fname})
-        # ملف التقرير (إن وجد)
-        if t.report_file:
-            documents.append({"transaction_id": t.id, "filename": t.report_file})
+        # لا نعرض ملفات التقارير هنا حسب الطلب
         # ملفات البنك التي رفعها الموظف
         if getattr(t, "bank_sent_files", None):
             for fname in (t.bank_sent_files or "").split(","):
