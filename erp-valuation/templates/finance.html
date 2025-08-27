@@ -39,43 +39,7 @@
 
   <!-- إنشاء عرض سعر وفاتورة بنك / عميل -->
   <div class="row mb-4">
-    <div class="col-md-6">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <h5 class="mb-3">📝 إنشاء عرض سعر للبنك</h5>
-          <form method="POST" action="{{ url_for('finance_create_quote') }}" class="row g-2">
-            <div class="col-md-6">
-              <label class="form-label">البنك</label>
-              <select name="bank_id" class="form-select" required>
-                <option value="">اختر البنك</option>
-                {% for b in banks %}
-                  <option value="{{ b.id }}">{{ b.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">المبلغ</label>
-              <input type="number" step="0.01" name="amount" class="form-control" required>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">صالح حتى (اختياري)</label>
-              <input type="date" name="valid_until" class="form-control">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">رقم معاملة (اختياري)</label>
-              <input type="number" name="transaction_id" class="form-control" placeholder="إن وجد">
-            </div>
-            <div class="col-12">
-              <label class="form-label">ملاحظة</label>
-              <input type="text" name="note" class="form-control" placeholder="ملاحظة">
-            </div>
-            <div class="col-12 d-flex justify-content-end">
-              <button class="btn btn-primary">إنشاء</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+    <!-- تم إزالة قسم "إنشاء عرض سعر للبنك" -->
 
     <div class="col-md-6">
       <div class="card shadow-sm">
