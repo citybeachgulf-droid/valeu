@@ -379,7 +379,7 @@ def add_transaction():
             client=client_name,
             employee=user.username,
             date=datetime.utcnow(),
-            status="معلقة",   # ✅ يمر على المدير أولاً
+            status="بانتظار المهندس",
             fee=fee,
             branch_id=user.branch_id,
             land_value=land_value,
@@ -395,7 +395,8 @@ def add_transaction():
             bank_branch=bank_branch,
             created_by=user.id,
             payment_status="غير مدفوعة",
-            transaction_type="real_estate"
+            transaction_type="real_estate",
+            assigned_to=None
         )
 
     # 🚗 معاملة مركبة
@@ -439,6 +440,11 @@ def add_transaction():
         if engineer:
             t.assigned_to = engineer.id
 
+        # 👨‍🔧 تعيين مباشر للمهندس (أول مهندس في نفس الفرع إن وجد)
+        engineer = User.query.filter_by(role="engineer", branch_id=user.branch_id).first()
+        if engineer:
+            t.assigned_to = engineer.id
+
     # رفع الملفات
     files = request.files.getlist("files")
     saved_files = []
@@ -451,9 +457,14 @@ def add_transaction():
 
     db.session.add(t)
     db.session.commit()
-    manager = User.query.filter_by(role="manager").first()
-    if manager:
-     send_notification(manager.id, "📋 معاملة جديدة", f"تمت إضافة معاملة رقم {t.id}")
+
+    # 🔔 إشعار جميع مهندسي نفس الفرع بوجود معاملة جديدة
+    try:
+        engineers = User.query.filter_by(role="engineer", branch_id=user.branch_id).all()
+        for eng in engineers:
+            send_notification(eng.id, "📋 معاملة جديدة", f"تمت إضافة معاملة رقم {t.id}")
+    except Exception:
+        pass
     flash("✅ تم إضافة المعاملة بنجاح", "success")
     return redirect(url_for("employee_dashboard"))
 
@@ -729,65 +740,62 @@ def generate_report_number():
             return f"ref{int(match.group(1)) + 1}"
     return "ref1001"
 
-# ✅ صفحة التثمين (المدير)
-@app.route("/valuate/<int:tid>", methods=["GET", "POST"])
-def valuate_transaction(tid):
-    if session.get("role") != "manager":
+# ✅ نقل التثمين إلى المهندس
+@app.route("/engineer/valuate/<int:tid>", methods=["POST"])
+def engineer_valuate_transaction(tid):
+    if session.get("role") != "engineer":
         return redirect(url_for("login"))
 
     t = Transaction.query.get_or_404(tid)
 
-    if request.method == "POST":
-        if t.transaction_type == "real_estate":
-            # 🏠 معاملات العقار
-            land_value     = float(request.form.get("land_value", 0) or 0)
-            building_value = float(request.form.get("building_value", 0) or 0)
-            total_estimate = land_value + building_value
+    if t.transaction_type == "real_estate":
+        land_value     = float(request.form.get("land_value", 0) or 0)
+        building_value = float(request.form.get("building_value", 0) or 0)
+        total_estimate = land_value + building_value
 
-            t.land_value      = land_value
-            t.building_value  = building_value
-            t.total_estimate  = total_estimate
-            t.status          = "بإنتظار المهندس"
+        t.land_value      = land_value
+        t.building_value  = building_value
+        t.total_estimate  = total_estimate
+        t.valuation_amount = total_estimate
+        t.status          = "قيد المعاينة"
 
-            # ✅ تحديث ذاكرة التثمين
-            memory = ValuationMemory.query.filter_by(
-                state=t.state, region=t.region, bank_id=t.bank_id
-            ).first()
-            if memory:
-                memory.price_per_meter = land_value / t.area if t.area > 0 else 0
-                memory.updated_at = datetime.utcnow()
-            else:
-                memory = ValuationMemory(
-                    state=t.state,
-                    region=t.region,
-                    bank_id=t.bank_id,
-                    price_per_meter=land_value / t.area if t.area > 0 else 0
-                )
-                db.session.add(memory)
+        # ✅ تحديث ذاكرة التثمين
+        memory = ValuationMemory.query.filter_by(
+            state=t.state, region=t.region, bank_id=t.bank_id
+        ).first()
+        if memory:
+            memory.price_per_meter = land_value / t.area if t.area > 0 else 0
+            memory.updated_at = datetime.utcnow()
+        else:
+            memory = ValuationMemory(
+                state=t.state,
+                region=t.region,
+                bank_id=t.bank_id,
+                price_per_meter=land_value / t.area if t.area > 0 else 0
+            )
+            db.session.add(memory)
 
-        elif t.transaction_type == "vehicle":
-            # 🚗 معاملات المركبات (القيمة تدخل مباشرة من الموظف)
-            vehicle_value = float(request.form.get("vehicle_value", 0) or 0)
-            t.total_estimate = vehicle_value
-            t.status = "بإنتظار المهندس"
+    elif t.transaction_type == "vehicle":
+        vehicle_value = float(request.form.get("vehicle_value", 0) or 0)
+        t.total_estimate = vehicle_value
+        t.valuation_amount = vehicle_value
+        t.status = "قيد المعاينة"
 
-        # ✅ إضافة رقم مرجعي إذا ما كان موجود
-        if not t.report_number:
-            last_txn = Transaction.query.filter(
-                Transaction.report_number != None
-            ).order_by(Transaction.id.desc()).first()
+    # ✅ إضافة رقم مرجعي إذا ما كان موجود
+    if not t.report_number:
+        last_txn = Transaction.query.filter(
+            Transaction.report_number != None
+        ).order_by(Transaction.id.desc()).first()
 
-            if last_txn and last_txn.report_number.startswith("ref"):
-                last_num = int(last_txn.report_number.replace("ref", ""))
-                t.report_number = f"ref{last_num + 1}"
-            else:
-                t.report_number = "ref1001"
+        if last_txn and last_txn.report_number.startswith("ref"):
+            last_num = int(last_txn.report_number.replace("ref", ""))
+            t.report_number = f"ref{last_num + 1}"
+        else:
+            t.report_number = "ref1001"
 
-        db.session.commit()
-        flash(f"✅ تم حفظ التثمين وإرساله للمهندس (الرقم المرجعي: {t.report_number})", "success")
-        return redirect(url_for("manager_dashboard"))
-
-    return render_template("valuate.html", t=t)
+    db.session.commit()
+    flash("✅ تم حفظ التثمين بواسطة المهندس", "success")
+    return redirect(url_for("engineer_transaction_details", tid=tid))
 
 
 

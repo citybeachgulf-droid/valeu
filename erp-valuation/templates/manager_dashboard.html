@@ -70,14 +70,10 @@
 
             <hr>
 
-            <!-- 🔹 الأزرار -->
+            <!-- 🔹 ملخص الرسوم (بدون إجراءات) -->
             <div class="d-flex justify-content-between">
               <span><strong>💵 الرسوم:</strong> {{ "{:,.0f}".format(t.fee) }} ريال</span>
-              <div>
-                <a href="{{ url_for('valuate_transaction', tid=t.id) }}" class="btn btn-primary btn-sm">✍️ تثمين / ملاحظات</a>
-                <a href="{{ url_for('approve_transaction', tid=t.id) }}" class="btn btn-success btn-sm">✅ اعتماد وإرسال للمهندسين</a>
-                <a href="{{ url_for('update_status', tid=t.id, status='مرفوضة') }}" class="btn btn-danger btn-sm">❌ رفض</a>
-              </div>
+              <span class="text-muted">الإجراءات تتم بواسطة المهندس والمالية</span>
             </div>
           </div>
         </div>

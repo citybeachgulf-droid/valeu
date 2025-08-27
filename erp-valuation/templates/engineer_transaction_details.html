@@ -61,6 +61,23 @@
       <p><strong>قيمة الأرض:</strong> {{ t.land_value }} ريال</p>
       <p><strong>قيمة المبنى:</strong> {{ t.building_value }} ريال</p>
       <p><strong>إجمالي التثمين:</strong> <span class="fw-bold text-success">{{ t.total_estimate }}</span> ريال</p>
+
+      {% if session.get('role') == 'engineer' %}
+      <hr>
+      <form method="POST" action="{{ url_for('engineer_valuate_transaction', tid=t.id) }}" class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">قيمة الأرض</label>
+          <input type="number" step="0.01" name="land_value" class="form-control" value="{{ t.land_value or '' }}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">قيمة المبنى</label>
+          <input type="number" step="0.01" name="building_value" class="form-control" value="{{ t.building_value or '' }}">
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+          <button class="btn btn-primary w-100">💾 حفظ التثمين</button>
+        </div>
+      </form>
+      {% endif %}
     </div>
   </div>
   {% endif %}
@@ -74,6 +91,18 @@
       <p><strong>الموديل:</strong> {{ t.vehicle_model }}</p>
       <p><strong>سنة الصنع:</strong> {{ t.vehicle_year }}</p>
       <p><strong>قيمة المركبة:</strong> <span class="fw-bold text-success">{{ t.total_estimate }}</span> ريال</p>
+      {% if session.get('role') == 'engineer' %}
+      <hr>
+      <form method="POST" action="{{ url_for('engineer_valuate_transaction', tid=t.id) }}" class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">قيمة المركبة</label>
+          <input type="number" step="0.01" name="vehicle_value" class="form-control" value="{{ t.total_estimate or '' }}" required>
+        </div>
+        <div class="col-md-6 d-flex align-items-end">
+          <button class="btn btn-primary w-100">💾 حفظ التثمين</button>
+        </div>
+      </form>
+      {% endif %}
     </div>
   </div>
   {% endif %}
