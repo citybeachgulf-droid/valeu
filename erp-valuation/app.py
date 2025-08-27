@@ -1316,8 +1316,11 @@ def engineer_upload_report(tid):
 
     flash(f"✅ تم رفع التقرير (الرقم المرجعي: {t.report_number})", "success")
 
-
-
+    role = session.get("role")
+    if role == "engineer":
+        return redirect(url_for("engineer_transaction_details", tid=tid))
+    else:
+        return redirect(url_for("reports_page"))
 
 @app.route("/reports", endpoint="reports_page")
 def reports():
