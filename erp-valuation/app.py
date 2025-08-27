@@ -61,6 +61,8 @@ class Transaction(db.Model):
     building_value  = db.Column(db.Float, default=0)
     total_estimate  = db.Column(db.Float, default=0)
     files           = db.Column(db.Text)
+    # ملفات أُرسلت للبنك بواسطة الموظف (قائمة أسماء مفصولة بفواصل)
+    bank_sent_files = db.Column(db.Text)
     area            = db.Column(db.Float, default=0)
     building_area   = db.Column(db.Float, default=0)
     building_age    = db.Column(db.Integer, default=0)
@@ -1421,6 +1423,12 @@ def bank_detail(bank_id):
         # ملف التقرير (إن وجد)
         if t.report_file:
             documents.append({"transaction_id": t.id, "filename": t.report_file})
+        # ملفات البنك التي رفعها الموظف
+        if getattr(t, "bank_sent_files", None):
+            for fname in (t.bank_sent_files or "").split(","):
+                fname = (fname or "").strip()
+                if fname:
+                    documents.append({"transaction_id": t.id, "filename": fname})
 
     # فواتير البنك بمراحلها (إن وُجدت)
     inv_query = BankInvoice.query.filter_by(bank_id=bank_id)
@@ -1565,6 +1573,37 @@ def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 # ---------------- صفحة التقارير المشتركة ----------------
+@app.route("/employee/upload_bank_docs/<int:tid>", methods=["POST"])
+def employee_upload_bank_docs(tid):
+    if session.get("role") != "employee":
+        return redirect(url_for("login"))
+
+    t = Transaction.query.get_or_404(tid)
+    user = User.query.get(session["user_id"])
+    # منع رفع ملفات لمعاملة من فرع آخر
+    if t.branch_id != user.branch_id:
+        flash("⛔ لا يمكنك رفع مستندات لمعالجة من فرع آخر", "danger")
+        return redirect(url_for("employee_dashboard"))
+
+    uploaded = request.files.getlist("bank_docs")
+    saved = []
+    for f in uploaded:
+        if f and f.filename:
+            fname = secure_filename(f.filename)
+            f.save(os.path.join(app.config["UPLOAD_FOLDER"], fname))
+            saved.append(fname)
+
+    if saved:
+        existing = (t.bank_sent_files or "").split(",") if t.bank_sent_files else []
+        existing = [x.strip() for x in existing if x.strip()]
+        t.bank_sent_files = ",".join(existing + saved)
+        db.session.commit()
+        flash("✅ تم رفع ملفات البنك وحفظها", "success")
+    else:
+        flash("⚠️ لم يتم اختيار أي ملف", "warning")
+
+    return redirect(url_for("employee_dashboard"))
+
 @app.route("/reports")
 def reports():
     if not session.get("role") in ["employee", "manager", "engineer"]:
@@ -1625,6 +1664,15 @@ with app.app_context():
             db.session.rollback()
 
     # محاولة إضافة عمود bank_branch للمعاملات إذا كان الجدول قديم
+    # محاولة إضافة عمود bank_sent_files إذا كان الجدول قديم
+    try:
+        if not column_exists("transaction", "bank_sent_files"):
+            db.session.execute(text("ALTER TABLE transaction ADD COLUMN bank_sent_files TEXT"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود bank_sent_files")
+    except Exception:
+        db.session.rollback()
+
     try:
         if not column_exists("transaction", "bank_branch"):
             db.session.execute(text("ALTER TABLE transaction ADD COLUMN bank_branch VARCHAR(120)"))

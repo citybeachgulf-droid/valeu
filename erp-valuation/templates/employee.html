@@ -156,7 +156,7 @@
               <b>الإجمالي:</b> <span id="total_estimate">0</span> ريال
             </div>
 
-            <button type="submit" class="btn btn-primary w-100 mt-3">🚀 إرسال للمدير</button>
+            <button type="submit" class="btn btn-primary w-100 mt-3">🚀 حفظ المعاملة وإشعار المهندس</button>
           </form>
         </div>
       </div>
@@ -284,6 +284,37 @@
   <button onclick="subscribeUser()" class="btn btn-warning">
     🔔 تفعيل الإشعارات
   </button>
+
+  <!-- 🆕 رفع ملفات أُرسلت للبنك لكل معاملة (قسم مبسط أسفل الصفحة) -->
+  <div class="container my-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="mb-3">📤 رفع مستندات مُرسلة للبنك</h5>
+        <form class="row g-2 align-items-end" method="POST" action="/employee/upload_bank_docs/" onsubmit="return attachTidToAction(this)" enctype="multipart/form-data">
+          <div class="col-md-3">
+            <label class="form-label">رقم المعاملة</label>
+            <input type="number" class="form-control" name="tid_input" placeholder="مثال: 123" required>
+          </div>
+          <div class="col-md-7">
+            <label class="form-label">الملفات</label>
+            <input type="file" class="form-control" name="bank_docs" multiple>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-success w-100">رفع</button>
+          </div>
+        </form>
+        <script>
+          function attachTidToAction(form){
+            var tid = form.querySelector('[name="tid_input"]').value;
+            if(!tid){ return false; }
+            form.action = '/employee/upload_bank_docs/' + encodeURIComponent(tid);
+            return true;
+          }
+        </script>
+        <div class="form-text">الملفات تظهر ضمن تبويب "المستندات المرسلة" في صفحة تفاصيل البنك لدى المدير.</div>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>
