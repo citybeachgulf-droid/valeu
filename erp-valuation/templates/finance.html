@@ -18,6 +18,9 @@
           <a class="nav-link" href="{{ url_for('finance_dashboard') }}">🏠 الصفحة الرئيسية</a>
         </li>
         <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('finance_paid') }}">✅ المدفوعة</a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link" href="{{ url_for('customers_page') }}">👥 العملاء</a>
         </li>
         <!-- زر تسجيل الخروج -->
@@ -212,44 +215,7 @@
     </div>
   </div>
 
-  <!-- جدول المعاملات المدفوعة -->
-  <div class="card shadow-sm mb-4">
-    <div class="card-body">
-      <h5 class="mb-3">✅ المعاملات المدفوعة</h5>
-      <table class="table table-bordered table-striped">
-        <thead class="table-dark">
-          <tr>
-            <th>#</th>
-            <th>العميل</th>
-            <th>الموظف</th>
-            <th>المبلغ</th>
-            <th>طريقة الدفع</th>
-            <th>الإيصال</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for p in payments %}
-          <tr>
-            <td>{{ p.transaction_id }}</td>
-            <td>{{ p.transaction.client }}</td>
-            <td>{{ p.transaction.employee }}</td>
-            <td>{{ p.amount }} ريال</td>
-            <td>{{ p.method }}</td>
-            <td>
-              {% if p.receipt_file %}
-                <a href="{{ url_for('static', filename='uploads/' ~ p.receipt_file) }}" target="_blank">📎 عرض</a>
-              {% else %}
-                -
-              {% endif %}
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="6" class="text-center">❌ لا توجد معاملات مدفوعة بعد</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+  <!-- تم نقل جدول المعاملات المدفوعة إلى صفحة منفصلة -->
 
   <!-- العروض الأخيرة والفواتير الأخيرة (بنوك) -->
   <div class="row mb-4">

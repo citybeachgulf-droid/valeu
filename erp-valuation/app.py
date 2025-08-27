@@ -1476,7 +1476,6 @@ def finance_dashboard():
     return render_template(
         "finance.html",
         transactions=unpaid_transactions,
-        payments=paid_transactions,
         expenses=expenses,
         total_income=total_income,
         total_expenses=total_expenses,
@@ -1487,6 +1486,25 @@ def finance_dashboard():
         recent_customer_quotes=recent_customer_quotes,
         recent_customer_invoices=recent_customer_invoices,
     )
+
+# ---------------- صفحة المعاملات المدفوعة (مالية) ----------------
+@app.route("/finance/paid")
+def finance_paid():
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+
+    user = User.query.get(session["user_id"])
+
+    # معاملات هذا الفرع التي لديها مدفوعات
+    payments = Payment.query.join(Transaction).filter(
+        Transaction.branch_id == user.branch_id
+    ).order_by(Payment.id.desc()).all()
+
+    total_income = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0))\
+        .join(Transaction)\
+        .filter(Transaction.branch_id == user.branch_id).scalar() or 0.0
+
+    return render_template("finance_paid.html", payments=payments, total_income=total_income)
 
 # ✅ إضافة دفعة جديدة
 @app.route("/add_payment/<int:tid>", methods=["POST"])
