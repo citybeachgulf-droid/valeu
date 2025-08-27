@@ -1750,6 +1750,66 @@ def employee_upload_bank_docs(tid):
 
     return redirect(url_for("employee_dashboard"))
 
+# ✅ رفع مستندات البنك بالبحث برقم المعاملة أو باسم العميل
+@app.route("/employee/upload_bank_docs_lookup", methods=["POST"])
+def employee_upload_bank_docs_lookup():
+    if session.get("role") != "employee":
+        return redirect(url_for("login"))
+
+    lookup = (request.form.get("lookup") or "").strip()
+    if not lookup:
+        flash("⚠️ يرجى إدخال رقم المعاملة أو اسم العميل", "warning")
+        return redirect(url_for("employee_dashboard"))
+
+    # محاولة تفسيره كرقم معاملة أولًا
+    t = None
+    try:
+        tid = int(lookup)
+        t = Transaction.query.get(tid)
+    except Exception:
+        t = None
+
+    # إن لم يكن رقم، نبحث بالاسم (يطابق جزئيًا أحدث معاملة)
+    if not t:
+        t = (
+            Transaction.query
+            .filter(Transaction.client.ilike(f"%{lookup}%"))
+            .order_by(Transaction.id.desc())
+            .first()
+        )
+
+    if not t:
+        flash("❌ لم يتم العثور على معاملة بهذا الرقم أو الاسم", "danger")
+        return redirect(url_for("employee_dashboard"))
+
+    user = User.query.get(session.get("user_id"))
+    if not user:
+        return redirect(url_for("login"))
+
+    # منع رفع ملفات لمعاملة من فرع آخر
+    if t.branch_id != user.branch_id:
+        flash("⛔ لا يمكنك رفع مستندات لمعالجة من فرع آخر", "danger")
+        return redirect(url_for("employee_dashboard"))
+
+    uploaded = request.files.getlist("bank_docs")
+    saved = []
+    for f in uploaded:
+        if f and f.filename:
+            fname = secure_filename(f.filename)
+            f.save(os.path.join(app.config["UPLOAD_FOLDER"], fname))
+            saved.append(fname)
+
+    if saved:
+        existing = (t.bank_sent_files or "").split(",") if t.bank_sent_files else []
+        existing = [x.strip() for x in existing if x.strip()]
+        t.bank_sent_files = ",".join(existing + saved)
+        db.session.commit()
+        flash("✅ تم رفع ملفات البنك وحفظها", "success")
+    else:
+        flash("⚠️ لم يتم اختيار أي ملف", "warning")
+
+    return redirect(url_for("employee_dashboard"))
+
 # ✅ رفع مستندات الشركة بواسطة الموظف لفرعه
 @app.route("/employee/branch_documents", methods=["POST"])
 def employee_add_branch_document():
