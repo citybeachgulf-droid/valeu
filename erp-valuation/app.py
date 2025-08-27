@@ -117,6 +117,19 @@ class Payment(db.Model):
     method         = db.Column(db.String(20))   # كاش / تحويل
     receipt_file   = db.Column(db.String(200))  # صورة أو ملف الإيصال
 
+
+# فواتير البنك بمراحلها
+class BankInvoice(db.Model):
+    __tablename__ = "bank_invoice"
+    id = db.Column(db.Integer, primary_key=True)
+    bank_id = db.Column(db.Integer, db.ForeignKey("bank.id"), nullable=False)
+    transaction_id = db.Column(db.Integer, db.ForeignKey("transaction.id"), nullable=True)
+    amount = db.Column(db.Float, default=0)
+    issued_at = db.Column(db.DateTime, nullable=True)     # المرحلة 1: إصدار
+    delivered_at = db.Column(db.DateTime, nullable=True)  # المرحلة 2: تسليم
+    received_at = db.Column(db.DateTime, nullable=True)   # المرحلة 3: استلام المبلغ
+    note = db.Column(db.String(255))
+
 class ValuationMemory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     state = db.Column(db.String(100), nullable=False)   # الولاية
@@ -1157,6 +1170,169 @@ def add_payment(tid):
         flash("✅ تم تسجيل الدفعة بنجاح", "success")
     return redirect(url_for("finance_dashboard"))
 
+# ---------------- صفحة البنوك: نظرة عامة ----------------
+@app.route("/banks")
+def banks_overview():
+    if session.get("role") not in ["manager", "finance"]:
+        return redirect(url_for("login"))
+
+    # فلترة بالتاريخ (اختياري)
+    start_date_str = request.args.get("start")
+    end_date_str = request.args.get("end")
+    start_date = datetime.fromisoformat(start_date_str) if start_date_str else None
+    end_date = datetime.fromisoformat(end_date_str) if end_date_str else None
+
+    tx_query = db.session.query(Bank.id, Bank.name, func.count(Transaction.id))\
+        .outerjoin(Transaction, Transaction.bank_id == Bank.id)
+    if start_date:
+        tx_query = tx_query.filter(Transaction.date >= start_date)
+    if end_date:
+        tx_query = tx_query.filter(Transaction.date <= end_date)
+
+    banks_stats = tx_query.group_by(Bank.id, Bank.name)\
+        .order_by(Bank.name.asc()).all()
+
+    banks_list = [
+        {"id": b_id, "name": b_name, "count": tx_count}
+        for (b_id, b_name, tx_count) in banks_stats
+    ]
+
+    return render_template("banks.html", banks=banks_list, start=start_date_str, end=end_date_str)
+
+
+# ---------------- صفحة بنك محدد: تفاصيل وإحصائيات ----------------
+@app.route("/banks/<int:bank_id>")
+def bank_detail(bank_id):
+    if session.get("role") not in ["manager", "finance"]:
+        return redirect(url_for("login"))
+
+    bank = Bank.query.get_or_404(bank_id)
+
+    # فلترة بالتاريخ (اختياري)
+    start_date_str = request.args.get("start")
+    end_date_str = request.args.get("end")
+    start_date = datetime.fromisoformat(start_date_str) if start_date_str else None
+    end_date = datetime.fromisoformat(end_date_str) if end_date_str else None
+
+    # إحصائية عدد المعاملات لكل فرع لهذا البنك
+    br_query = db.session.query(Branch.id, Branch.name, func.count(Transaction.id))\
+        .join(Transaction, Transaction.branch_id == Branch.id)\
+        .filter(Transaction.bank_id == bank_id)
+    if start_date:
+        br_query = br_query.filter(Transaction.date >= start_date)
+    if end_date:
+        br_query = br_query.filter(Transaction.date <= end_date)
+    branch_rows = br_query.group_by(Branch.id, Branch.name)\
+        .order_by(Branch.name.asc()).all()
+    branch_stats = [
+        {"id": bid, "name": bname, "count": bcount}
+        for (bid, bname, bcount) in branch_rows
+    ]
+
+    total_tx = sum(b["count"] for b in branch_stats)
+
+    # الفواتير المرتبطة بمعاملات هذا البنك (اعتماداً على جدول Payments)
+    pay_query = Payment.query.join(Transaction, Payment.transaction_id == Transaction.id)\
+        .filter(Transaction.bank_id == bank_id)
+    if start_date:
+        pay_query = pay_query.filter(Payment.date_received >= start_date)
+    if end_date:
+        pay_query = pay_query.filter(Payment.date_received <= end_date)
+    payments = pay_query.order_by(Payment.date_received.desc()).all()
+
+    # المستندات المرتبطة بمعاملات هذا البنك (ملفات المعاملة + ملف التقرير)
+    txs_query = Transaction.query.filter(Transaction.bank_id == bank_id)
+    if start_date:
+        txs_query = txs_query.filter(Transaction.date >= start_date)
+    if end_date:
+        txs_query = txs_query.filter(Transaction.date <= end_date)
+    txs = txs_query.order_by(Transaction.id.desc()).all()
+    documents = []
+    for t in txs:
+        # ملفات متعددة محفوظة كسلسلة مفصولة بفواصل
+        if t.files:
+            for fname in (t.files or "").split(","):
+                fname = (fname or "").strip()
+                if fname:
+                    documents.append({"transaction_id": t.id, "filename": fname})
+        # ملف التقرير (إن وجد)
+        if t.report_file:
+            documents.append({"transaction_id": t.id, "filename": t.report_file})
+
+    # فواتير البنك بمراحلها (إن وُجدت)
+    inv_query = BankInvoice.query.filter_by(bank_id=bank_id)
+    if start_date:
+        inv_query = inv_query.filter(
+            or_(
+                BankInvoice.issued_at >= start_date,
+                BankInvoice.delivered_at >= start_date,
+                BankInvoice.received_at >= start_date,
+            )
+        )
+    if end_date:
+        inv_query = inv_query.filter(
+            or_(
+                BankInvoice.issued_at <= end_date,
+                BankInvoice.delivered_at <= end_date,
+                BankInvoice.received_at <= end_date,
+            )
+        )
+    invoices = inv_query.order_by(BankInvoice.id.desc()).all()
+
+    return render_template(
+        "bank_detail.html",
+        bank=bank,
+        branches=branch_stats,
+        total_tx=total_tx,
+        payments=payments,
+        documents=documents,
+        invoices=invoices,
+        start=start_date_str,
+        end=end_date_str,
+    )
+
+
+# تحديث مراحل فاتورة بنك
+@app.route("/banks/<int:bank_id>/invoice_stage", methods=["POST"]) 
+def update_bank_invoice_stage(bank_id):
+    if session.get("role") not in ["manager", "finance"]:
+        return redirect(url_for("login"))
+
+    action = request.form.get("action")  # issue/deliver/receive
+    amount = float(request.form.get("amount") or 0)
+    invoice_id = request.form.get("invoice_id")
+    transaction_id = request.form.get("transaction_id")
+    note = request.form.get("note")
+
+    # أنشئ/حدث سجل الفاتورة
+    invoice = None
+    if invoice_id:
+        invoice = BankInvoice.query.get(invoice_id)
+    if not invoice:
+        invoice = BankInvoice(bank_id=bank_id)
+        if transaction_id:
+            invoice.transaction_id = int(transaction_id)
+        if amount:
+            invoice.amount = amount
+        db.session.add(invoice)
+        db.session.commit()
+
+    now_ts = datetime.utcnow()
+    if action == "issue":
+        invoice.issued_at = now_ts
+        if amount:
+            invoice.amount = amount
+    elif action == "deliver":
+        invoice.delivered_at = now_ts
+    elif action == "receive":
+        invoice.received_at = now_ts
+    if note:
+        invoice.note = note
+    db.session.commit()
+
+    flash("✅ تم تحديث مرحلة الفاتورة", "success")
+    return redirect(url_for("bank_detail", bank_id=bank_id, start=request.args.get('start'), end=request.args.get('end')))
+
 # ---------------- إدارة الموظفين ----------------
 @app.route("/manage_employees", methods=["GET", "POST"])
 def manage_employees():
@@ -1241,6 +1417,30 @@ with app.app_context():
             print("✅ تمت إضافة عمود sent_to_engineer_at")
     except Exception:
         db.session.rollback()
+
+    # محاولة إنشاء جدول فواتير البنك إذا غير موجود
+    try:
+        db.session.execute(text("SELECT 1 FROM bank_invoice LIMIT 1"))
+    except Exception:
+        try:
+            db.session.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS bank_invoice (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    bank_id INTEGER NOT NULL,
+                    transaction_id INTEGER,
+                    amount FLOAT DEFAULT 0,
+                    issued_at TIMESTAMP,
+                    delivered_at TIMESTAMP,
+                    received_at TIMESTAMP,
+                    note VARCHAR(255)
+                )
+                """
+            ))
+            db.session.commit()
+            print("✅ تم إنشاء جدول bank_invoice")
+        except Exception:
+            db.session.rollback()
 
     # إنشاء مدير افتراضي إن أمكن (تجنب الأعمدة الناقصة)
     try:
