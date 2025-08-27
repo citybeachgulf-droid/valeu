@@ -42,10 +42,14 @@
         <div class="card shadow p-4">
           <form method="POST" action="{{ url_for('add_transaction_engineer') }}" enctype="multipart/form-data">
             
-            <!-- 👤 اسم العميل -->
+            <!-- 👤 بيانات العميل -->
             <div class="mb-3">
               <label class="form-label">اسم العميل</label>
               <input type="text" name="client_name" class="form-control" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">📞 رقم العميل</label>
+              <input type="text" name="client_phone" class="form-control" placeholder="مثال: 05xxxxxxxx" required>
             </div>
 
             <!-- 📌 نوع المعاملة -->

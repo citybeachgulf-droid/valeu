@@ -4,13 +4,14 @@ from datetime import datetime, timedelta, date
 import fitz  # PyMuPDF (kept to preserve functionality if used in templates/utilities)
 import pytesseract  # OCR (kept to preserve functionality if used elsewhere)
 from PIL import Image  # Image handling (kept)
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, flash
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, send_file, flash
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, text
 from sqlalchemy.exc import OperationalError
 from pywebpush import webpush, WebPushException
+from docx import Document
 
 # ---------------- إعداد Flask ----------------
 app = Flask(__name__)
@@ -219,6 +220,35 @@ class Customer(db.Model):
     name = db.Column(db.String(150), nullable=False)
     phone = db.Column(db.String(50), nullable=False)
 
+# ✅ حفظ ملفات قوالب الوورد للفواتير وعروض الأسعار
+class TemplateDoc(db.Model):
+    __tablename__ = "template_doc"
+    id = db.Column(db.Integer, primary_key=True)
+    doc_type = db.Column(db.String(50), nullable=False)  # invoice | quote
+    filename = db.Column(db.String(255), nullable=False)  # اسم الملف داخل uploads
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+def replace_placeholders_in_docx(doc: Document, replacements: dict) -> None:
+    # فقرات
+    for paragraph in doc.paragraphs:
+        for key, val in replacements.items():
+            if key in paragraph.text:
+                for run in paragraph.runs:
+                    run.text = run.text.replace(key, val)
+    # الجداول
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for key, val in replacements.items():
+                    if key in cell.text:
+                        for p in cell.paragraphs:
+                            for r in p.runs:
+                                r.text = r.text.replace(key, val)
+
+def get_template_filename(doc_type: str) -> str | None:
+    rec = TemplateDoc.query.filter_by(doc_type=doc_type).order_by(TemplateDoc.uploaded_at.desc()).first()
+    return rec.filename if rec else None
+
 # ---------------- دوال مساعدة ----------------
 def save_price(state, region, bank, price):
     record = ValuationMemory.query.filter_by(
@@ -418,9 +448,25 @@ def add_transaction():
     user = User.query.get(session["user_id"])
     transaction_type = request.form.get("transaction_type")  # ✅ نحدد نوع المعاملة
     client_name = (request.form.get("client_name") or "").strip()
+    client_phone = (request.form.get("client_phone") or "").strip()
     fee = float(request.form.get("fee") or 0)
 
     t = None  # المعاملة
+
+    # ✅ تحقق من رقم العميل
+    if not client_phone:
+        flash("⚠️ يجب إدخال رقم العميل", "danger")
+        return redirect(url_for("employee_dashboard"))
+
+    # 🧾 حفظ/تحديث العميل في جدول العملاء
+    existing_customer = Customer.query.filter_by(phone=client_phone).first()
+    if existing_customer:
+        # نحدّث الاسم إذا كان مختلفًا
+        if client_name and existing_customer.name != client_name:
+            existing_customer.name = client_name
+    else:
+        db.session.add(Customer(name=client_name or "-", phone=client_phone))
+        db.session.flush()
 
     # 🏠 معاملة عقار
     if transaction_type == "real_estate":
@@ -1183,7 +1229,22 @@ def add_transaction_engineer():
     if request.method == "POST":
         transaction_type = request.form.get("transaction_type")
         client_name = (request.form.get("client_name") or "").strip()
+        client_phone = (request.form.get("client_phone") or "").strip()
         fee = float(request.form.get("fee") or 0)
+
+        # ✅ تحقق من رقم العميل
+        if not client_phone:
+            flash("⚠️ يجب إدخال رقم العميل", "danger")
+            return redirect(url_for("add_transaction_engineer"))
+
+        # 🧾 حفظ/تحديث العميل في جدول العملاء
+        existing_customer = Customer.query.filter_by(phone=client_phone).first()
+        if existing_customer:
+            if client_name and existing_customer.name != client_name:
+                existing_customer.name = client_name
+        else:
+            db.session.add(Customer(name=client_name or "-", phone=client_phone))
+            db.session.flush()
 
         t = None
 
@@ -1445,7 +1506,6 @@ def finance_dashboard():
     return render_template(
         "finance.html",
         transactions=unpaid_transactions,
-        payments=paid_transactions,
         expenses=expenses,
         total_income=total_income,
         total_expenses=total_expenses,
@@ -1456,6 +1516,86 @@ def finance_dashboard():
         recent_customer_quotes=recent_customer_quotes,
         recent_customer_invoices=recent_customer_invoices,
     )
+
+# ---------------- صفحة المعاملات المدفوعة (مالية) ----------------
+@app.route("/finance/paid")
+def finance_paid():
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+
+    user = User.query.get(session["user_id"])
+
+    # معاملات هذا الفرع التي لديها مدفوعات
+    payments = Payment.query.join(Transaction).filter(
+        Transaction.branch_id == user.branch_id
+    ).order_by(Payment.id.desc()).all()
+
+    total_income = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0))\
+        .join(Transaction)\
+        .filter(Transaction.branch_id == user.branch_id).scalar() or 0.0
+
+    return render_template("finance_paid.html", payments=payments, total_income=total_income)
+
+# ---------------- إدارة قوالب وورد (مالية) ----------------
+@app.route("/finance/templates", methods=["GET", "POST"])
+def finance_templates():
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        doc_type = request.form.get("doc_type")  # invoice | quote
+        file = request.files.get("file")
+        if doc_type not in ["invoice", "quote"] or not file or not file.filename.lower().endswith('.docx'):
+            flash("⚠️ اختر النوع الصحيح وارفع ملف DOCX", "danger")
+            return redirect(url_for("finance_templates"))
+        fname = secure_filename(file.filename)
+        file.save(os.path.join(app.config["UPLOAD_FOLDER"], fname))
+        db.session.add(TemplateDoc(doc_type=doc_type, filename=fname))
+        db.session.commit()
+        flash("✅ تم رفع القالب", "success")
+        return redirect(url_for("finance_templates"))
+
+    templates = {
+        "invoice": get_template_filename("invoice"),
+        "quote": get_template_filename("quote"),
+    }
+    return render_template("finance_templates.html", templates=templates)
+
+def _render_docx_from_template(doc_type: str, placeholders: dict, out_name: str):
+    template_filename = get_template_filename(doc_type)
+    if not template_filename:
+        flash("⚠️ لم يتم رفع قالب لهذا النوع بعد", "warning")
+        return redirect(url_for("finance_templates"))
+    path = os.path.join(app.config["UPLOAD_FOLDER"], template_filename)
+    doc = Document(path)
+    replace_placeholders_in_docx(doc, placeholders)
+    output_path = os.path.join(app.config["UPLOAD_FOLDER"], out_name)
+    doc.save(output_path)
+    return send_file(output_path, as_attachment=True, download_name=out_name)
+
+@app.route("/finance/templates/quote/<int:transaction_id>")
+def download_quote_doc(transaction_id: int):
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+    t = Transaction.query.get_or_404(transaction_id)
+    placeholders = {
+        "{NAME}": t.client or "—",
+        "{PRICE}": f"{t.fee or 0:.2f}",
+        "{DATE}": datetime.utcnow().strftime("%Y-%m-%d"),
+    }
+    return _render_docx_from_template("quote", placeholders, f"quote_{t.id}.docx")
+
+@app.route("/finance/templates/invoice/<int:transaction_id>")
+def download_invoice_doc(transaction_id: int):
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+    t = Transaction.query.get_or_404(transaction_id)
+    placeholders = {
+        "{NAME}": t.client or "—",
+        "{PRICE}": f"{t.fee or 0:.2f}",
+        "{DATE}": datetime.utcnow().strftime("%Y-%m-%d"),
+    }
+    return _render_docx_from_template("invoice", placeholders, f"invoice_{t.id}.docx")
 
 # ✅ إضافة دفعة جديدة
 @app.route("/add_payment/<int:tid>", methods=["POST"])
@@ -1699,9 +1839,7 @@ def bank_detail(bank_id):
                 fname = (fname or "").strip()
                 if fname:
                     documents.append({"transaction_id": t.id, "filename": fname})
-        # ملف التقرير (إن وجد)
-        if t.report_file:
-            documents.append({"transaction_id": t.id, "filename": t.report_file})
+        # لا نعرض ملفات التقارير هنا حسب الطلب
         # ملفات البنك التي رفعها الموظف
         if getattr(t, "bank_sent_files", None):
             for fname in (t.bank_sent_files or "").split(","):
