@@ -36,44 +36,7 @@
     </form>
   </div>
 
-  <div class="card mb-4">
-    <div class="card-header bg-dark text-white">➕ إضافة مستند/عقد</div>
-    <div class="card-body">
-      <form method="post" enctype="multipart/form-data" class="row g-3">
-        <div class="col-md-3">
-          <label class="form-label">الفرع</label>
-          <select name="branch_id" class="form-select" required>
-            {% for b in branches %}
-              <option value="{{ b.id }}">{{ b.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">العنوان</label>
-          <input type="text" name="title" class="form-control" required>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">النوع</label>
-          <input type="text" name="doc_type" class="form-control" placeholder="عقد إيجار/سجل تجاري...">
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">الملف</label>
-          <input type="file" name="file" class="form-control">
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">تاريخ الإصدار</label>
-          <input type="date" name="issued_at" class="form-control">
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">تاريخ الانتهاء</label>
-          <input type="date" name="expires_at" class="form-control">
-        </div>
-        <div class="col-md-3 d-flex align-items-end">
-          <button class="btn btn-success w-100">حفظ</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  
 
   <div class="card">
     <div class="card-header bg-dark text-white">📋 قائمة المستندات</div>

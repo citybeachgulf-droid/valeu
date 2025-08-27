@@ -47,231 +47,272 @@
   <!-- ✅ المحتوى -->
   <div class="container mt-5">
     <h2 class="text-center mb-5">📌 لوحة الموظف</h2>
+    
+    <!-- ✅ خيارات منسّقة: تبويبات للمهام الثلاث -->
+    <ul class="nav nav-pills justify-content-center mb-4" id="employeeTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tab-transaction-tab" data-bs-toggle="tab" data-bs-target="#tab-transaction" type="button" role="tab">➕ إضافة معاملة</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-bankdocs-tab" data-bs-toggle="tab" data-bs-target="#tab-bankdocs" type="button" role="tab">🏦 إضافة مستندات للبنك</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-branchdocs-tab" data-bs-toggle="tab" data-bs-target="#tab-branchdocs" type="button" role="tab">📁 إضافة مستندات للشركة</button>
+      </li>
+    </ul>
 
-    <div class="row justify-content-center">
-      <!-- 📝 قسم إدخال المعاملة -->
-      <div class="col-md-7">
-        <div class="card shadow-lg p-4">
-          <h5 class="mb-4">➕ إضافة معاملة جديدة</h5>
-          <form method="POST" action="{{ url_for('add_transaction') }}" enctype="multipart/form-data">
-            
-            <div class="mb-3">
-              <label class="form-label">👤 اسم العميل</label>
-              <input type="text" name="client_name" class="form-control" required>
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label">📂 نوع المعاملة</label>
-              <select name="transaction_type" id="transaction_type" class="form-select" required>
-                <option value="">-- اختر النوع --</option>
-                <option value="real_estate">🏠 عقار</option>
-                <option value="vehicle">🚗 مركبة</option>
-              </select>
-            </div>
-
-            <!-- 🏦 البنك وفرع البنك (مشتركة لكلا النوعين) -->
-            <div class="mb-3">
-              <label class="form-label">🏦 البنك</label>
-              <select name="bank_id" class="form-select" required>
-                  <option value="">-- اختر البنك --</option>
-                  {% for bank in banks %}
+    <div class="tab-content">
+      <!-- تبويب إضافة معاملة -->
+      <div class="tab-pane fade show active" id="tab-transaction" role="tabpanel">
+        <div class="row justify-content-center">
+          <div class="col-md-8">
+            <div class="card shadow-lg p-4">
+              <h5 class="mb-4">➕ إضافة معاملة جديدة</h5>
+              <form method="POST" action="{{ url_for('add_transaction') }}" enctype="multipart/form-data">
+                <div class="mb-3">
+                  <label class="form-label">👤 اسم العميل</label>
+                  <input type="text" name="client_name" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">📂 نوع المعاملة</label>
+                  <select name="transaction_type" id="transaction_type" class="form-select" required>
+                    <option value="">-- اختر النوع --</option>
+                    <option value="real_estate">🏠 عقار</option>
+                    <option value="vehicle">🚗 مركبة</option>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">🏦 البنك</label>
+                  <select name="bank_id" class="form-select" required>
+                    <option value="">-- اختر البنك --</option>
+                    {% for bank in banks %}
                       <option value="{{ bank.id }}">{{ bank.name }}</option>
-                  {% endfor %}
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">🏦 فرع البنك</label>
-              <input type="text" name="bank_branch" class="form-control" placeholder="اكتب اسم فرع البنك" required>
-            </div>
-
-            <!-- ✅ حقول العقار -->
-            <div id="real_estate_fields" style="display:none;">
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">الولاية</label>
-                  <input type="text" name="state" class="form-control" required>
+                    {% endfor %}
+                  </select>
                 </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">المنطقة</label>
-                  <input type="text" name="region" class="form-control" required>
+                <div class="mb-3">
+                  <label class="form-label">🏦 فرع البنك</label>
+                  <input type="text" name="bank_branch" class="form-control" placeholder="اكتب اسم فرع البنك" required>
                 </div>
-              </div>
-
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">المساحة (م²)</label>
-                  <input type="number" step="0.01" name="area" id="area" class="form-control" required>
-                </div> <!-- ✅ كان لازم يتقفل -->
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">سعر المتر المقترح</label>
-                  <div class="input-group">
-                    <input type="number" step="0.01" name="price_per_meter" id="price_per_meter" class="form-control" placeholder="يُملأ تلقائيًا إن وُجد" readonly>
-                    <span class="input-group-text">ريال/م²</span>
+                <div id="real_estate_fields" style="display:none;">
+                  <div class="row">
+                    <div class="col-md-6 mb-3">
+                      <label class="form-label">الولاية</label>
+                      <input type="text" name="state" class="form-control" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                      <label class="form-label">المنطقة</label>
+                      <input type="text" name="region" class="form-control" required>
+                    </div>
+                  </div>
+                  <div class="row">
+                    <div class="col-md-6 mb-3">
+                      <label class="form-label">المساحة (م²)</label>
+                      <input type="number" step="0.01" name="area" id="area" class="form-control" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                      <label class="form-label">سعر المتر المقترح</label>
+                      <div class="input-group">
+                        <input type="number" step="0.01" name="price_per_meter" id="price_per_meter" class="form-control" placeholder="يُملأ تلقائيًا إن وُجد" readonly>
+                        <span class="input-group-text">ريال/م²</span>
+                      </div>
+                    </div>
+                  </div>
+                  <h6 class="mt-3">🏗️ تفاصيل البناء</h6>
+                  <div class="row">
+                    <div class="col-md-6 mb-3">
+                      <label class="form-label">مساحة البناء (م²)</label>
+                      <input type="number" step="0.01" name="building_area" id="building_area" class="form-control">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                      <label class="form-label">عمر البناء (بالسنوات)</label>
+                      <input type="number" name="building_age" id="building_age" class="form-control">
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <h6 class="mt-3">🏗️ تفاصيل البناء</h6>
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">مساحة البناء (م²)</label>
-                  <input type="number" step="0.01" name="building_area" id="building_area" class="form-control">
+                <div id="vehicle_fields" style="display:none;">
+                  <div class="mb-3">
+                    <label class="form-label">🚘 نوع المركبة</label>
+                    <input type="text" name="vehicle_type" class="form-control">
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">الموديل</label>
+                    <input type="text" name="vehicle_model" class="form-control">
+                  </div>
+                  <div class="row">
+                    <div class="col-md-6 mb-3">
+                      <label class="form-label">سنة الصنع</label>
+                      <input type="number" name="vehicle_year" class="form-control">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                      <label class="form-label">قيمة المركبة</label>
+                      <input type="number" step="0.01" name="vehicle_value" class="form-control">
+                    </div>
+                  </div>
                 </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">عمر البناء (بالسنوات)</label>
-                  <input type="number" name="building_age" id="building_age" class="form-control">
+                <div class="mb-3">
+                  <label class="form-label">💵 رسوم المعاملة</label>
+                  <input type="number" step="0.01" name="fee" class="form-control">
                 </div>
-              </div>
-            </div>
-
-            <!-- ✅ حقول المركبة -->
-            <div id="vehicle_fields" style="display:none;">
-              <div class="mb-3">
-                <label class="form-label">🚘 نوع المركبة</label>
-                <input type="text" name="vehicle_type" class="form-control">
-              </div>
-              <div class="mb-3">
-                <label class="form-label">الموديل</label>
-                <input type="text" name="vehicle_model" class="form-control">
-              </div>
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">سنة الصنع</label>
-                  <input type="number" name="vehicle_year" class="form-control">
+                <div class="mb-3">
+                  <label class="form-label">📎 ملفات المعاملة</label>
+                  <input type="file" name="files" class="form-control" multiple>
                 </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">قيمة المركبة</label>
-                  <input type="number" step="0.01" name="vehicle_value" class="form-control">
+                <div id="estimate_box" class="alert alert-info" style="display:none;">
+                  <b>القيمة التقديرية للأرض:</b> <span id="land_value">0</span> ريال <br>
+                  <b>القيمة التقديرية للبناء:</b> <span id="building_value">0</span> ريال <br>
+                  <b>الإجمالي:</b> <span id="total_estimate">0</span> ريال
                 </div>
-              </div>
+                <button type="submit" class="btn btn-primary w-100 mt-3">🚀 حفظ المعاملة وإشعار المهندس</button>
+              </form>
             </div>
-
-            <div class="mb-3">
-              <label class="form-label">💵 رسوم المعاملة</label>
-              <input type="number" step="0.01" name="fee" class="form-control">
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label">📎 ملفات المعاملة</label>
-              <input type="file" name="files" class="form-control" multiple>
-            </div>
-
-            <!-- 🖩 عرض التثمين قبل الإرسال (خاص بالعقار) -->
-            <div id="estimate_box" class="alert alert-info" style="display:none;">
-              <b>القيمة التقديرية للأرض:</b> <span id="land_value">0</span> ريال <br>
-              <b>القيمة التقديرية للبناء:</b> <span id="building_value">0</span> ريال <br>
-              <b>الإجمالي:</b> <span id="total_estimate">0</span> ريال
-            </div>
-
-            <button type="submit" class="btn btn-primary w-100 mt-3">🚀 حفظ المعاملة وإشعار المهندس</button>
-          </form>
+          </div>
         </div>
       </div>
-      
-      <!-- 🗂️ قسم مستندات الشركة/الفرع -->
-      <div class="col-md-5">
-        <div class="card shadow-lg p-4">
-          <h5 class="mb-3">📁 مستندات الشركة/الفرع</h5>
-          <form method="POST" action="{{ url_for('employee_add_branch_document') }}" enctype="multipart/form-data" class="mb-3">
-            <div class="mb-2">
-              <label class="form-label">عنوان المستند</label>
-              <input type="text" name="title" class="form-control" required>
-            </div>
-            <div class="mb-2">
-              <label class="form-label">نوع المستند</label>
-              <input type="text" name="doc_type" class="form-control" placeholder="سجل تجاري، ضريبة، ..">
-            </div>
-            <div class="row">
-              <div class="col-md-6 mb-2">
-                <label class="form-label">تاريخ الإصدار</label>
-                <input type="date" name="issued_at" class="form-control">
-              </div>
-              <div class="col-md-6 mb-2">
-                <label class="form-label">تاريخ الانتهاء</label>
-                <input type="date" name="expires_at" class="form-control">
-              </div>
-            </div>
-            <div class="mb-2">
-              <label class="form-label">الملف</label>
-              <input type="file" name="file" class="form-control">
-            </div>
-            <button class="btn btn-success w-100">⬆️ رفع المستند</button>
-          </form>
 
-          <div class="table-responsive">
-            <table class="table table-sm align-middle">
-              <thead>
-                <tr>
-                  <th>العنوان</th>
-                  <th>النوع</th>
-                  <th>الإصدار</th>
-                  <th>الانتهاء</th>
-                  <th>الحالة</th>
-                  <th>الملف</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for d in docs or [] %}
-                <tr>
-                  <td>{{ d.title }}</td>
-                  <td>{{ d.doc_type or '—' }}</td>
-                  <td>{{ d.issued_at.strftime('%Y-%m-%d') if d.issued_at else '—' }}</td>
-                  <td>{{ d.expires_at.strftime('%Y-%m-%d') if d.expires_at else '—' }}</td>
-                  <td>
-                    {% set s = status_for(d) %}
-                    <span class="badge {% if s=='ساري' %}bg-success{% elif s=='قريب الانتهاء' %}bg-warning text-dark{% elif s=='منتهي' %}bg-danger{% else %}bg-secondary{% endif %}">{{ s }}</span>
-                  </td>
-                  <td>
-                    {% if d.file %}
-                      <a href="{{ url_for('uploaded_file', filename=d.file) }}" target="_blank">فتح</a>
+      <!-- تبويب مستندات البنك -->
+      <div class="tab-pane fade" id="tab-bankdocs" role="tabpanel">
+        <div class="row justify-content-center">
+          <div class="col-md-8">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <h5 class="mb-3">📤 رفع مستندات مُرسلة للبنك</h5>
+                <form class="row g-2 align-items-end" method="POST" action="/employee/upload_bank_docs/" onsubmit="return attachTidToAction(this)" enctype="multipart/form-data">
+                  <div class="col-md-3">
+                    <label class="form-label">رقم المعاملة</label>
+                    <input type="number" class="form-control" name="tid_input" placeholder="مثال: 123" required>
+                  </div>
+                  <div class="col-md-7">
+                    <label class="form-label">الملفات</label>
+                    <input type="file" class="form-control" name="bank_docs" multiple>
+                  </div>
+                  <div class="col-md-2">
+                    <button class="btn btn-success w-100">رفع</button>
+                  </div>
+                </form>
+                <script>
+                  function attachTidToAction(form){
+                    var tid = form.querySelector('[name="tid_input"]').value;
+                    if(!tid){ return false; }
+                    form.action = '/employee/upload_bank_docs/' + encodeURIComponent(tid);
+                    return true;
+                  }
+                </script>
+                <div class="form-text">الملفات تظهر ضمن تبويب "المستندات المرسلة" في صفحة تفاصيل البنك لدى المدير.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- تبويب مستندات الشركة/الفرع -->
+      <div class="tab-pane fade" id="tab-branchdocs" role="tabpanel">
+        <div class="row justify-content-center">
+          <div class="col-md-10">
+            <div class="card shadow-lg p-4">
+              <h5 class="mb-3">📁 مستندات الشركة/الفرع</h5>
+              <form method="POST" action="{{ url_for('employee_add_branch_document') }}" enctype="multipart/form-data" class="mb-3">
+                <div class="mb-2">
+                  <label class="form-label">عنوان المستند</label>
+                  <input type="text" name="title" class="form-control" required>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label">نوع المستند</label>
+                  <input type="text" name="doc_type" class="form-control" placeholder="سجل تجاري، ضريبة، ..">
+                </div>
+                <div class="row">
+                  <div class="col-md-6 mb-2">
+                    <label class="form-label">تاريخ الإصدار</label>
+                    <input type="date" name="issued_at" class="form-control">
+                  </div>
+                  <div class="col-md-6 mb-2">
+                    <label class="form-label">تاريخ الانتهاء</label>
+                    <input type="date" name="expires_at" class="form-control">
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label">الملف</label>
+                  <input type="file" name="file" class="form-control">
+                </div>
+                <button class="btn btn-success w-100">⬆️ رفع المستند</button>
+              </form>
+
+              <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                  <thead>
+                    <tr>
+                      <th>العنوان</th>
+                      <th>النوع</th>
+                      <th>الإصدار</th>
+                      <th>الانتهاء</th>
+                      <th>الحالة</th>
+                      <th>الملف</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for d in docs or [] %}
+                    <tr>
+                      <td>{{ d.title }}</td>
+                      <td>{{ d.doc_type or '—' }}</td>
+                      <td>{{ d.issued_at.strftime('%Y-%m-%d') if d.issued_at else '—' }}</td>
+                      <td>{{ d.expires_at.strftime('%Y-%m-%d') if d.expires_at else '—' }}</td>
+                      <td>
+                        {% set s = status_for(d) %}
+                        <span class="badge {% if s=='ساري' %}bg-success{% elif s=='قريب الانتهاء' %}bg-warning text-dark{% elif s=='منتهي' %}bg-danger{% else %}bg-secondary{% endif %}">{{ s }}</span>
+                      </td>
+                      <td>
+                        {% if d.file %}
+                          <a href="{{ url_for('uploaded_file', filename=d.file) }}" target="_blank">فتح</a>
+                        {% else %}
+                          —
+                        {% endif %}
+                      </td>
+                      <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#editDoc{{ d.id }}">تعديل</button>
+                        <form method="POST" action="{{ url_for('employee_delete_branch_document', doc_id=d.id) }}" style="display:inline" onsubmit="return confirm('حذف المستند نهائيًا؟');">
+                          <button class="btn btn-sm btn-outline-danger">حذف</button>
+                        </form>
+                      </td>
+                    </tr>
+                    <tr class="collapse" id="editDoc{{ d.id }}">
+                      <td colspan="7">
+                        <form method="POST" action="{{ url_for('employee_edit_branch_document', doc_id=d.id) }}" enctype="multipart/form-data" class="border rounded p-3 bg-light">
+                          <div class="row g-2">
+                            <div class="col-md-3">
+                              <label class="form-label">العنوان</label>
+                              <input type="text" name="title" class="form-control" value="{{ d.title }}" required>
+                            </div>
+                            <div class="col-md-3">
+                              <label class="form-label">النوع</label>
+                              <input type="text" name="doc_type" class="form-control" value="{{ d.doc_type or '' }}">
+                            </div>
+                            <div class="col-md-3">
+                              <label class="form-label">الإصدار</label>
+                              <input type="date" name="issued_at" class="form-control" value="{{ d.issued_at.strftime('%Y-%m-%d') if d.issued_at else '' }}">
+                            </div>
+                            <div class="col-md-3">
+                              <label class="form-label">الانتهاء</label>
+                              <input type="date" name="expires_at" class="form-control" value="{{ d.expires_at.strftime('%Y-%m-%d') if d.expires_at else '' }}">
+                            </div>
+                            <div class="col-md-6">
+                              <label class="form-label">استبدال الملف</label>
+                              <input type="file" name="file" class="form-control">
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end justify-content-end">
+                              <button class="btn btn-primary">💾 حفظ التعديلات</button>
+                            </div>
+                          </div>
+                        </form>
+                      </td>
+                    </tr>
                     {% else %}
-                      —
-                    {% endif %}
-                  </td>
-                  <td class="text-end">
-                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#editDoc{{ d.id }}">تعديل</button>
-                    <form method="POST" action="{{ url_for('employee_delete_branch_document', doc_id=d.id) }}" style="display:inline" onsubmit="return confirm('حذف المستند نهائيًا؟');">
-                      <button class="btn btn-sm btn-outline-danger">حذف</button>
-                    </form>
-                  </td>
-                </tr>
-                <tr class="collapse" id="editDoc{{ d.id }}">
-                  <td colspan="7">
-                    <form method="POST" action="{{ url_for('employee_edit_branch_document', doc_id=d.id) }}" enctype="multipart/form-data" class="border rounded p-3 bg-light">
-                      <div class="row g-2">
-                        <div class="col-md-3">
-                          <label class="form-label">العنوان</label>
-                          <input type="text" name="title" class="form-control" value="{{ d.title }}" required>
-                        </div>
-                        <div class="col-md-3">
-                          <label class="form-label">النوع</label>
-                          <input type="text" name="doc_type" class="form-control" value="{{ d.doc_type or '' }}">
-                        </div>
-                        <div class="col-md-3">
-                          <label class="form-label">الإصدار</label>
-                          <input type="date" name="issued_at" class="form-control" value="{{ d.issued_at.strftime('%Y-%m-%d') if d.issued_at else '' }}">
-                        </div>
-                        <div class="col-md-3">
-                          <label class="form-label">الانتهاء</label>
-                          <input type="date" name="expires_at" class="form-control" value="{{ d.expires_at.strftime('%Y-%m-%d') if d.expires_at else '' }}">
-                        </div>
-                        <div class="col-md-6">
-                          <label class="form-label">استبدال الملف</label>
-                          <input type="file" name="file" class="form-control">
-                        </div>
-                        <div class="col-md-6 d-flex align-items-end justify-content-end">
-                          <button class="btn btn-primary">💾 حفظ التعديلات</button>
-                        </div>
-                      </div>
-                    </form>
-                  </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="6" class="text-center text-muted">لا توجد مستندات لهذا الفرع</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
+                    <tr><td colspan="6" class="text-center text-muted">لا توجد مستندات لهذا الفرع</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>
