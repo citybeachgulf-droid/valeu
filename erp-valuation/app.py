@@ -25,6 +25,10 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///erp.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
+def generate_verification_token() -> str:
+    import secrets
+    return secrets.token_hex(16)
+
 
 # ---------------- النماذج ----------------
 class Branch(db.Model):
@@ -91,6 +95,9 @@ class Transaction(db.Model):
     branch_id   = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=False)
 
     payment_status  = db.Column(db.String(20), default="غير مدفوعة")
+
+    # رمز تحقق عام للباركود/QR
+    verification_token = db.Column(db.String(64), nullable=True, unique=True)
 
     payments = db.relationship("Payment", backref="transaction", lazy=True)
 
@@ -1201,6 +1208,34 @@ def engineer_upload_report(tid):
     filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(filepath)
 
+    # محاولة ختم التقرير برمز QR يشير إلى رابط التحقق العام
+    try:
+        verify_url = url_for('verify_report', token=t.verification_token or generate_verification_token(), _external=True)
+        # إنشئ QR كصورة مؤقتة
+        import qrcode
+        from PIL import Image as PILImage
+        qr_img = qrcode.make(verify_url)
+        qr_path = os.path.join(app.config["UPLOAD_FOLDER"], f"qr_{t.id}.png")
+        qr_img.save(qr_path)
+
+        # حاول ختم PDF عبر PyMuPDF (fitz)
+        try:
+            doc = fitz.open(filepath)
+            page = doc[0]
+            rect = fitz.Rect(page.rect.width - 150, page.rect.height - 150, page.rect.width - 10, page.rect.height - 10)
+            page.insert_image(rect, filename=qr_path)
+            # إضافة نص رابط التحقق الصغير أسفل ال QR
+            page.insert_text((rect.x0, rect.y1 + 5), verify_url, fontsize=6, color=(0, 0, 1))
+            stamped_path = os.path.join(app.config["UPLOAD_FOLDER"], f"stamped_{filename}")
+            doc.save(stamped_path)
+            doc.close()
+            os.replace(stamped_path, filepath)
+        except Exception:
+            pass
+    except Exception:
+        # تخطَ أي فشل في الختم ولا تُفشل الرفع
+        pass
+
     t.report_file = filename
     t.status = "📑 تقرير مرفوع"
 
@@ -1215,6 +1250,9 @@ def engineer_upload_report(tid):
         else:
             t.report_number = "ref1001"
 
+    # توليد رمز تحقق إن لم يوجد
+    if not t.verification_token:
+        t.verification_token = generate_verification_token()
     db.session.commit()
 
     # بعد db.session.commit() في upload_report
@@ -1707,6 +1745,14 @@ def search_report():
             results = Transaction.query.filter_by(report_number=search_number).all()
     return render_template("reports.html", reports=results, search_number=search_number)
 
+# --------- تحقق عام من التقرير عبر رمز QR ---------
+@app.route("/verify/<token>")
+def verify_report(token):
+    tx = Transaction.query.filter_by(verification_token=token).first()
+    if not tx:
+        return render_template("verify.html", ok=False, tx=None)
+    return render_template("verify.html", ok=True, tx=tx)
+
 # --------- إنشاء الجداول + ترقيعات متوافقة مع قواعد قديمة ---------
 with app.app_context():
     db.create_all()
@@ -1833,6 +1879,15 @@ with app.app_context():
         db.session.add(finance_user)
         db.session.commit()
         print("✅ تم إنشاء حساب المالية الافتراضي (username=finance, password=1234)")
+
+    # محاولة إضافة عمود verification_token إذا كان الجدول قديم
+    try:
+        if not column_exists("transaction", "verification_token"):
+            db.session.execute(text("ALTER TABLE transaction ADD COLUMN verification_token VARCHAR(64)"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود verification_token")
+    except Exception:
+        db.session.rollback()
 
 # ---------------- تقرير دخل موظف ----------------
 @app.route("/employee_income", methods=["GET", "POST"])
