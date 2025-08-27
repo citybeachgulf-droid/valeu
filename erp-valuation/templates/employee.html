@@ -69,6 +69,21 @@
               </select>
             </div>
 
+            <!-- 🏦 البنك وفرع البنك (مشتركة لكلا النوعين) -->
+            <div class="mb-3">
+              <label class="form-label">🏦 البنك</label>
+              <select name="bank_id" class="form-select" required>
+                  <option value="">-- اختر البنك --</option>
+                  {% for bank in banks %}
+                      <option value="{{ bank.id }}">{{ bank.name }}</option>
+                  {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">🏦 فرع البنك</label>
+              <input type="text" name="bank_branch" class="form-control" placeholder="اكتب اسم فرع البنك" required>
+            </div>
+
             <!-- ✅ حقول العقار -->
             <div id="real_estate_fields" style="display:none;">
               <div class="row">
@@ -80,16 +95,6 @@
                   <label class="form-label">المنطقة</label>
                   <input type="text" name="region" class="form-control">
                 </div>
-              </div>
-              
-              <div class="mb-3">
-                <label class="form-label">🏦 البنك</label>
-                <select name="bank_id" class="form-select">
-                    <option value="">-- اختر البنك --</option>
-                    {% for bank in banks %}
-                        <option value="{{ bank.id }}">{{ bank.name }}</option>
-                    {% endfor %}
-                </select>
               </div>
 
               <div class="row">

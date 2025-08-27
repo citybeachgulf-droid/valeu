@@ -79,6 +79,8 @@ class Transaction(db.Model):
     
     # 👇 هنا فقط مفتاح خارجي يربط بالجدول Bank
     bank_id = db.Column(db.Integer, db.ForeignKey("bank.id"), nullable=True)
+    # 👇 اسم فرع البنك المرتبط بالمعاملة
+    bank_branch = db.Column(db.String(120), nullable=True)
 
     price = db.Column(db.Float, nullable=True)   # سعر التثمين (اختياري)
 
@@ -116,6 +118,13 @@ class Payment(db.Model):
     received_by    = db.Column(db.String(50))
     method         = db.Column(db.String(20))   # كاش / تحويل
     receipt_file   = db.Column(db.String(200))  # صورة أو ملف الإيصال
+
+
+class ReportTemplate(db.Model):
+    __tablename__ = "report_template"
+    id = db.Column(db.Integer, primary_key=True)
+    template_type = db.Column(db.String(50), nullable=False)  # real_estate / vehicle
+    content = db.Column(db.Text, nullable=False)
 
 
 # فواتير البنك بمراحلها
@@ -329,6 +338,7 @@ def add_transaction():
         state = request.form.get("state")
         region = request.form.get("region")
         bank_id = request.form.get("bank_id")
+        bank_branch = (request.form.get("bank_branch") or "").strip()
         try:
             bank_id = int(bank_id) if bank_id else None
         except Exception:
@@ -360,6 +370,11 @@ def add_transaction():
 
         total_estimate = land_value + building_value
 
+        # تحقق أساسي: البنك وفرع البنك مطلوبان
+        if not bank_id or not bank_branch:
+            flash("⚠️ يرجى اختيار البنك وكتابة فرع البنك", "danger")
+            return redirect(url_for("employee_dashboard"))
+
         t = Transaction(
             client=client_name,
             employee=user.username,
@@ -377,6 +392,7 @@ def add_transaction():
             state=state,
             region=region,
             bank_id=bank_id,
+            bank_branch=bank_branch,
             created_by=user.id,
             payment_status="غير مدفوعة",
             transaction_type="real_estate"
@@ -388,6 +404,13 @@ def add_transaction():
         vehicle_model = request.form.get("vehicle_model")
         vehicle_year  = request.form.get("vehicle_year")
         vehicle_value = float(request.form.get("vehicle_value") or 0)
+
+        # تحقق أساسي: البنك وفرع البنك مطلوبان لمعاملات المركبات أيضًا
+        bank_id = request.form.get("bank_id")
+        bank_branch = (request.form.get("bank_branch") or "").strip()
+        if not bank_id or not bank_branch:
+            flash("⚠️ يرجى اختيار البنك وكتابة فرع البنك", "danger")
+            return redirect(url_for("employee_dashboard"))
 
         t = Transaction(
     client=client_name,
@@ -405,7 +428,8 @@ def add_transaction():
     vehicle_year=vehicle_year,
     state=None,
     region=None,
-    bank_id=None,
+    bank_id=bank_id,
+    bank_branch=bank_branch,
     assigned_to=None   # ✅
 )
 
@@ -907,6 +931,121 @@ def engineer_take(tid):
     return redirect(url_for("engineer_dashboard"))
 
 
+# ---------------- قوالب التقارير وإعداد محرر التقرير للمهندس ----------------
+def get_template_by_type(template_type: str) -> ReportTemplate | None:
+    return ReportTemplate.query.filter_by(template_type=template_type).first()
+
+
+@app.route("/manager/report_templates", methods=["GET", "POST"])
+def manage_report_templates():
+    if session.get("role") != "manager":
+        return redirect(url_for("login"))
+
+    real_estate_tpl = get_template_by_type("real_estate")
+    vehicle_tpl = get_template_by_type("vehicle")
+
+    if request.method == "POST":
+        re_content = (request.form.get("real_estate_content") or "").strip()
+        ve_content = (request.form.get("vehicle_content") or "").strip()
+
+        if re_content:
+            if not real_estate_tpl:
+                real_estate_tpl = ReportTemplate(template_type="real_estate", content=re_content)
+                db.session.add(real_estate_tpl)
+            else:
+                real_estate_tpl.content = re_content
+
+        if ve_content:
+            if not vehicle_tpl:
+                vehicle_tpl = ReportTemplate(template_type="vehicle", content=ve_content)
+                db.session.add(vehicle_tpl)
+            else:
+                vehicle_tpl.content = ve_content
+
+        db.session.commit()
+        flash("✅ تم حفظ القوالب", "success")
+        return redirect(url_for("manage_report_templates"))
+
+    return render_template(
+        "manager_report_templates.html",
+        real_estate_content=real_estate_tpl.content if real_estate_tpl else "",
+        vehicle_content=vehicle_tpl.content if vehicle_tpl else ""
+    )
+
+
+def extract_placeholders(template_text: str) -> list[str]:
+    if not template_text:
+        return []
+    return sorted(set(re.findall(r"\{([a-zA-Z0-9_]+)\}", template_text)))
+
+
+def default_values_for_placeholders(t: Transaction, placeholders: list[str]) -> dict[str, str]:
+    mapping = {
+        "client_name": t.client or "",
+        "sketch_number": "",
+        "bank_name": t.bank.name if t.bank else "",
+        "bank_branch": t.bank_branch or "",
+        "property_state": t.state or "",
+        "property_region": t.region or "",
+        "area": str(t.area or 0),
+        "building_area": str(t.building_area or 0),
+        "building_age": str(t.building_age or 0),
+        "land_value": str(t.land_value or 0),
+        "building_value": str(t.building_value or 0),
+        "total_estimate": str(t.total_estimate or 0),
+        "vehicle_type": t.vehicle_type or "",
+        "vehicle_model": t.vehicle_model or "",
+        "vehicle_year": t.vehicle_year or "",
+        "vehicle_value": str(t.total_estimate or 0),
+        "today": datetime.utcnow().strftime("%Y-%m-%d"),
+        "transaction_id": str(t.id),
+    }
+    return {ph: mapping.get(ph, "") for ph in placeholders}
+
+
+def fill_template(template_text: str, values: dict[str, str]) -> str:
+    def repl(match):
+        key = match.group(1)
+        return str(values.get(key, match.group(0)))
+    return re.sub(r"\{([a-zA-Z0-9_]+)\}", repl, template_text)
+
+
+@app.route("/engineer/report_editor/<int:tid>", methods=["GET", "POST"])
+def engineer_report_editor(tid):
+    if session.get("role") != "engineer":
+        return redirect(url_for("login"))
+
+    t = Transaction.query.get_or_404(tid)
+    template_type = t.transaction_type or "real_estate"
+    tpl = get_template_by_type(template_type)
+    template_text = tpl.content if tpl else ""
+
+    placeholders = extract_placeholders(template_text)
+
+    if request.method == "POST":
+        # جمع القيم
+        values = {ph: (request.form.get(ph) or "").strip() for ph in placeholders}
+        # توليد النص النهائي
+        final_text = fill_template(template_text, values)
+
+        t.engineer_report = final_text
+        t.status = "📑 تقرير مبدئي"  # حالة وسطية حتى الرفع النهائي PDF
+        db.session.commit()
+        flash("✅ تم حفظ نص التقرير من القالب", "success")
+        return redirect(url_for("engineer_transaction_details", tid=tid))
+
+    # قيّم افتراضية
+    defaults = default_values_for_placeholders(t, placeholders)
+
+    return render_template(
+        "engineer_report_editor.html",
+        t=t,
+        template_text=template_text,
+        placeholders=placeholders,
+        defaults=defaults,
+    )
+
+
 
 @app.route("/add_transaction_engineer", methods=["GET", "POST"])
 def add_transaction_engineer():
@@ -927,10 +1066,16 @@ def add_transaction_engineer():
             state = request.form.get("state")
             region = request.form.get("region")
             bank_id = request.form.get("bank_id")
+            bank_branch = (request.form.get("bank_branch") or "").strip()
 
             area = float(request.form.get("area") or 0)
             building_area = float(request.form.get("building_area") or 0)
             building_age = int(request.form.get("building_age") or 0)
+
+            # تحقق أساسي: البنك وفرع البنك مطلوبان
+            if not bank_id or not bank_branch:
+                flash("⚠️ يرجى اختيار البنك وكتابة فرع البنك", "danger")
+                return redirect(url_for("add_transaction_engineer"))
 
             t = Transaction(
                 client=client_name,
@@ -946,6 +1091,7 @@ def add_transaction_engineer():
                 state=state,
                 region=region,
                 bank_id=bank_id,
+                bank_branch=bank_branch,
                 created_by=user.id,
                 transaction_type="real_estate",
                 payment_status="غير مدفوعة",
@@ -958,6 +1104,13 @@ def add_transaction_engineer():
             vehicle_model = request.form.get("vehicle_model")
             vehicle_year  = request.form.get("vehicle_year")
             vehicle_value = float(request.form.get("vehicle_value") or 0)
+
+            # تحقق أساسي: البنك وفرع البنك مطلوبان لمعاملات المركبات أيضًا
+            bank_id = request.form.get("bank_id")
+            bank_branch = (request.form.get("bank_branch") or "").strip()
+            if not bank_id or not bank_branch:
+                flash("⚠️ يرجى اختيار البنك وكتابة فرع البنك", "danger")
+                return redirect(url_for("add_transaction_engineer"))
 
             t = Transaction(
                 client=client_name,
@@ -974,6 +1127,8 @@ def add_transaction_engineer():
                 vehicle_model=vehicle_model,
                 vehicle_year=vehicle_year,
                 valuation_amount = vehicle_value,
+                bank_id=bank_id,
+                bank_branch=bank_branch,
 
                 assigned_to=None   # ✅
             )
@@ -1439,6 +1594,34 @@ with app.app_context():
             ))
             db.session.commit()
             print("✅ تم إنشاء جدول bank_invoice")
+        except Exception:
+            db.session.rollback()
+
+    # محاولة إضافة عمود bank_branch للمعاملات إذا كان الجدول قديم
+    try:
+        if not column_exists("transaction", "bank_branch"):
+            db.session.execute(text("ALTER TABLE transaction ADD COLUMN bank_branch VARCHAR(120)"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود bank_branch")
+    except Exception:
+        db.session.rollback()
+
+    # محاولة إنشاء جدول report_template إن لم يكن موجودًا
+    try:
+        db.session.execute(text("SELECT 1 FROM report_template LIMIT 1"))
+    except Exception:
+        try:
+            db.session.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS report_template (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    template_type VARCHAR(50) NOT NULL,
+                    content TEXT NOT NULL
+                )
+                """
+            ))
+            db.session.commit()
+            print("✅ تم إنشاء جدول report_template")
         except Exception:
             db.session.rollback()
 
