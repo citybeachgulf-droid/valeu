@@ -1167,7 +1167,7 @@ def add_transaction_engineer():
                 client=client_name,
                 employee=user.username,
                 date=datetime.utcnow(),
-                status="📌 أنشأها المهندس",
+                status="بانتظار المهندس",
                 fee=fee,
                 branch_id=user.branch_id,
                 total_estimate=0.0,
