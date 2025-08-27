@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>🧩 قوالب تقارير المهندسين</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">لوحة المدير</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('manager_dashboard') }}">🏠 الرئيسية</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container py-4">
+  <h3 class="mb-4">🧩 قوالب تقارير المهندسين</h3>
+  <p class="text-muted">استخدم أقواس مثل {client_name}، {sketch_number}، {property_state} ... ليقوم النظام باستبدالها آليًا.</p>
+
+  <form method="POST" class="row g-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header bg-success text-white">🏠 قالب تقرير العقار</div>
+        <div class="card-body">
+          <textarea name="real_estate_content" class="form-control" rows="10">{{ real_estate_content }}</textarea>
+          <small class="text-muted">أمثلة للمتغيرات: {client_name}, {sketch_number}, {property_state}, {property_region}, {bank_name}, {bank_branch}, {area}, {building_area}, {building_age}, {land_value}, {building_value}, {total_estimate}, {today}, {transaction_id}</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header bg-warning">🚗 قالب تقرير المركبة</div>
+        <div class="card-body">
+          <textarea name="vehicle_content" class="form-control" rows="10">{{ vehicle_content }}</textarea>
+          <small class="text-muted">أمثلة للمتغيرات: {client_name}, {sketch_number}, {bank_name}, {bank_branch}, {vehicle_type}, {vehicle_model}, {vehicle_year}, {vehicle_value}, {today}, {transaction_id}</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <button class="btn btn-primary">💾 حفظ القوالب</button>
+      <a class="btn btn-secondary" href="{{ url_for('manager_dashboard') }}">رجوع</a>
+    </div>
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+

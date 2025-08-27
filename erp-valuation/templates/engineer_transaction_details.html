@@ -98,6 +98,9 @@
   <div class="card mb-3">
     <div class="card-header bg-info text-white">📑 رفع تقرير</div>
     <div class="card-body">
+    <div class="mb-3">
+      <a href="{{ url_for('engineer_report_editor', tid=t.id) }}" class="btn btn-outline-primary">✍️ تحرير التقرير من القالب</a>
+    </div>
 <form action="{{ url_for('engineer_upload_report', tid=t.id) }}" method="POST" enctype="multipart/form-data">
   <div class="mb-3">
     <label for="report_file" class="form-label">اختر ملف التقرير:</label>
