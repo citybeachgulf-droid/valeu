@@ -180,6 +180,13 @@ class BranchDocument(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     branch = db.relationship("Branch", backref="documents")
 
+# ✅ جدول بسيط لحفظ العملاء (اسم ورقم)
+class Customer(db.Model):
+    __tablename__ = "customer"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False)
+    phone = db.Column(db.String(50), nullable=False)
+
 # ---------------- دوال مساعدة ----------------
 def save_price(state, region, bank, price):
     record = ValuationMemory.query.filter_by(
@@ -1809,6 +1816,61 @@ def employee_upload_bank_docs_lookup():
         flash("⚠️ لم يتم اختيار أي ملف", "warning")
 
     return redirect(url_for("employee_dashboard"))
+
+# ---------------- صفحة العملاء (إضافة/قائمة وتصدير CSV) ----------------
+@app.route("/customers", methods=["GET", "POST"])
+def customers_page():
+    if session.get("role") not in ["manager", "employee", "finance"]:
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        phone = (request.form.get("phone") or "").strip()
+        if not name or not phone:
+            flash("⚠️ يرجى إدخال الاسم والرقم", "warning")
+            return redirect(url_for("customers_page"))
+        c = Customer(name=name, phone=phone)
+        db.session.add(c)
+        db.session.commit()
+        flash("✅ تم إضافة العميل", "success")
+        return redirect(url_for("customers_page"))
+
+    q = (request.args.get("q") or "").strip()
+    query = Customer.query
+    if q:
+        query = query.filter(or_(Customer.name.ilike(f"%{q}%"), Customer.phone.ilike(f"%{q}%")))
+    customers = query.order_by(Customer.id.desc()).all()
+    return render_template("customers.html", customers=customers, q=q)
+
+
+@app.route("/customers/export.csv")
+def customers_export_csv():
+    if session.get("role") not in ["manager", "employee", "finance"]:
+        return redirect(url_for("login"))
+    import csv
+    from io import StringIO
+
+    q = (request.args.get("q") or "").strip()
+    query = Customer.query
+    if q:
+        query = query.filter(or_(Customer.name.ilike(f"%{q}%"), Customer.phone.ilike(f"%{q}%")))
+    customers = query.order_by(Customer.id.desc()).all()
+
+    si = StringIO()
+    writer = csv.writer(si)
+    writer.writerow(["id", "name", "phone"])  # header
+    for c in customers:
+        writer.writerow([c.id, c.name, c.phone])
+
+    output = si.getvalue().encode("utf-8-sig")  # with BOM for Excel
+    from flask import Response
+    return Response(
+        output,
+        mimetype="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename=customers.csv"
+        },
+    )
 
 # ✅ رفع مستندات الشركة بواسطة الموظف لفرعه
 @app.route("/employee/branch_documents", methods=["POST"])
