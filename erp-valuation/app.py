@@ -159,6 +159,18 @@ class Expense(db.Model):
     branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"))
     branch = db.relationship("Branch", backref="expenses")
 
+class BranchDocument(db.Model):
+    __tablename__ = "branch_document"
+    id = db.Column(db.Integer, primary_key=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    doc_type = db.Column(db.String(100), nullable=True)
+    file = db.Column(db.String(255), nullable=True)
+    issued_at = db.Column(db.DateTime, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    branch = db.relationship("Branch", backref="documents")
+
 # ---------------- دوال مساعدة ----------------
 def save_price(state, region, bank, price):
     record = ValuationMemory.query.filter_by(
@@ -626,13 +638,20 @@ def manager_dashboard():
             "banks": banks_list
         })
 
+    # 🔔 مستندات على وشك الانتهاء خلال 30 يومًا (كل الفروع)
+    expiring_docs = BranchDocument.query.filter(
+        BranchDocument.expires_at != None,
+        BranchDocument.expires_at <= (now + timedelta(days=30))
+    ).order_by(BranchDocument.expires_at.asc()).all()
+
     return render_template(
         "manager_dashboard.html",
         transactions=transactions,
         users=users,
         branches=branches_data,
         vapid_public_key=VAPID_PUBLIC_KEY,
-        net_profit=sum(b["profit"] for b in branches_data)
+        net_profit=sum(b["profit"] for b in branches_data),
+        expiring_docs=expiring_docs
     )
 
 
@@ -1481,6 +1500,68 @@ def bank_detail(bank_id):
     )
 
 
+# ---------------- مستندات وفواتير الفروع ----------------
+@app.route("/branch_documents", methods=["GET", "POST"])
+def branch_documents():
+    if session.get("role") != "manager":
+        return redirect(url_for("login"))
+
+    branches = Branch.query.order_by(Branch.name.asc()).all()
+
+    if request.method == "POST":
+        branch_id = request.form.get("branch_id")
+        title = (request.form.get("title") or "").strip()
+        doc_type = (request.form.get("doc_type") or "").strip()
+        issued_at = request.form.get("issued_at")
+        expires_at = request.form.get("expires_at")
+        file = request.files.get("file")
+
+        filename = None
+        if file and file.filename:
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+
+        doc = BranchDocument(
+            branch_id=int(branch_id) if branch_id else None,
+            title=title,
+            doc_type=doc_type,
+            file=filename,
+            issued_at=datetime.fromisoformat(issued_at) if issued_at else None,
+            expires_at=datetime.fromisoformat(expires_at) if expires_at else None,
+        )
+        db.session.add(doc)
+        db.session.commit()
+        flash("✅ تم إضافة المستند بنجاح", "success")
+        return redirect(url_for("branch_documents"))
+
+    # فلترة اختيارية بالفرع
+    selected_branch_id = request.args.get("branch_id")
+    q = BranchDocument.query
+    if selected_branch_id:
+        q = q.filter_by(branch_id=int(selected_branch_id))
+    docs = q.order_by(BranchDocument.expires_at.asc().nulls_last()).all()
+
+    # تصنيف المستندات
+    now = datetime.utcnow()
+    def status_for(doc):
+        if not doc.expires_at:
+            return "بدون انتهاء"
+        delta = (doc.expires_at - now).days
+        if delta < 0:
+            return "منتهي"
+        if delta <= 30:
+            return "قريب الانتهاء"
+        return "ساري"
+
+    return render_template(
+        "branch_documents.html",
+        branches=branches,
+        docs=docs,
+        selected_branch_id=selected_branch_id,
+        status_for=status_for,
+    )
+
+
 # تحديث مراحل فاتورة بنك
 @app.route("/banks/<int:bank_id>/invoice_stage", methods=["POST"]) 
 def update_bank_invoice_stage(bank_id):
@@ -1701,6 +1782,30 @@ with app.app_context():
             db.session.rollback()
 
     # إنشاء مدير افتراضي إن أمكن (تجنب الأعمدة الناقصة)
+    # محاولة إنشاء جدول branch_document إذا غير موجود
+    try:
+        db.session.execute(text("SELECT 1 FROM branch_document LIMIT 1"))
+    except Exception:
+        try:
+            db.session.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS branch_document (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    branch_id INTEGER NOT NULL,
+                    title VARCHAR(200) NOT NULL,
+                    doc_type VARCHAR(100),
+                    file VARCHAR(255),
+                    issued_at TIMESTAMP,
+                    expires_at TIMESTAMP,
+                    created_at TIMESTAMP
+                )
+                """
+            ))
+            db.session.commit()
+            print("✅ تم إنشاء جدول branch_document")
+        except Exception:
+            db.session.rollback()
+
     try:
         mgr = User.query.filter_by(role="manager").first()
     except OperationalError:
