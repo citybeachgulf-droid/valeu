@@ -161,6 +161,27 @@ class Quote(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
 
+class CustomerInvoice(db.Model):
+    __tablename__ = "customer_invoice"
+    id = db.Column(db.Integer, primary_key=True)
+    customer_name = db.Column(db.String(150), nullable=False)
+    amount = db.Column(db.Float, default=0)
+    issued_at = db.Column(db.DateTime, default=datetime.utcnow)
+    transaction_id = db.Column(db.Integer, db.ForeignKey("transaction.id"), nullable=True)
+    note = db.Column(db.String(255))
+    created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
+class CustomerQuote(db.Model):
+    __tablename__ = "customer_quote"
+    id = db.Column(db.Integer, primary_key=True)
+    customer_name = db.Column(db.String(150), nullable=False)
+    amount = db.Column(db.Float, default=0)
+    valid_until = db.Column(db.DateTime, nullable=True)
+    transaction_id = db.Column(db.Integer, db.ForeignKey("transaction.id"), nullable=True)
+    note = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
 class ValuationMemory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     state = db.Column(db.String(100), nullable=False)   # الولاية
@@ -1411,6 +1432,8 @@ def finance_dashboard():
     banks = Bank.query.order_by(Bank.name.asc()).all()
     recent_quotes = Quote.query.order_by(Quote.id.desc()).limit(20).all()
     recent_bank_invoices = BankInvoice.query.order_by(BankInvoice.id.desc()).limit(20).all()
+    recent_customer_quotes = CustomerQuote.query.order_by(CustomerQuote.id.desc()).limit(20).all()
+    recent_customer_invoices = CustomerInvoice.query.order_by(CustomerInvoice.id.desc()).limit(20).all()
 
     return render_template(
         "finance.html",
@@ -1423,6 +1446,8 @@ def finance_dashboard():
         banks=banks,
         recent_quotes=recent_quotes,
         recent_bank_invoices=recent_bank_invoices,
+        recent_customer_quotes=recent_customer_quotes,
+        recent_customer_invoices=recent_customer_invoices,
     )
 
 # ✅ إضافة دفعة جديدة
@@ -1517,6 +1542,69 @@ def finance_create_bank_invoice():
     db.session.add(inv)
     db.session.commit()
     flash("✅ تم إنشاء فاتورة البنك", "success")
+    return redirect(url_for("finance_dashboard"))
+
+# ✅ إنشاء عرض سعر للعميل (من المالية)
+@app.route("/finance/customer_quotes", methods=["POST"])
+def finance_create_customer_quote():
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+
+    customer_name = (request.form.get("customer_name") or "").strip()
+    amount = float(request.form.get("amount") or 0)
+    valid_until_str = request.form.get("valid_until")
+    note = request.form.get("note")
+    transaction_id = request.form.get("transaction_id")
+
+    if not customer_name:
+        flash("⛔ اسم العميل مطلوب", "danger")
+        return redirect(url_for("finance_dashboard"))
+
+    valid_until_dt = None
+    if valid_until_str:
+        try:
+            valid_until_dt = datetime.fromisoformat(valid_until_str)
+        except Exception:
+            valid_until_dt = None
+
+    q = CustomerQuote(
+        customer_name=customer_name,
+        amount=amount,
+        valid_until=valid_until_dt,
+        note=note,
+        transaction_id=int(transaction_id) if transaction_id else None,
+        created_by=session.get("user_id"),
+    )
+    db.session.add(q)
+    db.session.commit()
+    flash("✅ تم إنشاء عرض السعر للعميل", "success")
+    return redirect(url_for("finance_dashboard"))
+
+# ✅ إنشاء فاتورة للعميل (من المالية)
+@app.route("/finance/customer_invoices", methods=["POST"])
+def finance_create_customer_invoice():
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+
+    customer_name = (request.form.get("customer_name") or "").strip()
+    amount = float(request.form.get("amount") or 0)
+    note = request.form.get("note")
+    transaction_id = request.form.get("transaction_id")
+
+    if not customer_name:
+        flash("⛔ اسم العميل مطلوب", "danger")
+        return redirect(url_for("finance_dashboard"))
+
+    inv = CustomerInvoice(
+        customer_name=customer_name,
+        amount=amount,
+        note=note,
+        transaction_id=int(transaction_id) if transaction_id else None,
+        created_by=session.get("user_id"),
+    )
+    db.session.add(inv)
+    db.session.commit()
+    flash("✅ تم إنشاء فاتورة العميل", "success")
     return redirect(url_for("finance_dashboard"))
 
 # ---------------- صفحة البنوك: نظرة عامة ----------------
@@ -2009,6 +2097,53 @@ with app.app_context():
             ))
             db.session.commit()
             print("✅ تم إنشاء جدول quote")
+        except Exception:
+            db.session.rollback()
+
+    # محاولة إنشاء جدول customer_quote إذا غير موجود
+    try:
+        db.session.execute(text("SELECT 1 FROM customer_quote LIMIT 1"))
+    except Exception:
+        try:
+            db.session.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS customer_quote (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    customer_name VARCHAR(150) NOT NULL,
+                    amount FLOAT DEFAULT 0,
+                    valid_until TIMESTAMP,
+                    transaction_id INTEGER,
+                    note VARCHAR(255),
+                    created_at TIMESTAMP,
+                    created_by INTEGER
+                )
+                """
+            ))
+            db.session.commit()
+            print("✅ تم إنشاء جدول customer_quote")
+        except Exception:
+            db.session.rollback()
+
+    # محاولة إنشاء جدول customer_invoice إذا غير موجود
+    try:
+        db.session.execute(text("SELECT 1 FROM customer_invoice LIMIT 1"))
+    except Exception:
+        try:
+            db.session.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS customer_invoice (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    customer_name VARCHAR(150) NOT NULL,
+                    amount FLOAT DEFAULT 0,
+                    issued_at TIMESTAMP,
+                    transaction_id INTEGER,
+                    note VARCHAR(255),
+                    created_by INTEGER
+                )
+                """
+            ))
+            db.session.commit()
+            print("✅ تم إنشاء جدول customer_invoice")
         except Exception:
             db.session.rollback()
 
