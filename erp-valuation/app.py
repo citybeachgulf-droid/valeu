@@ -1434,6 +1434,23 @@ def bank_detail(bank_id):
         )
     invoices = inv_query.order_by(BankInvoice.id.desc()).all()
 
+    # ✅ ملخص للفواتير والمراحل (للإظهار كملخص عند المدير)
+    total_invoices = len(invoices)
+    total_amount = sum((inv.amount or 0) for inv in invoices)
+    issued_count = sum(1 for inv in invoices if inv.issued_at)
+    delivered_count = sum(1 for inv in invoices if inv.delivered_at)
+    received_count = sum(1 for inv in invoices if inv.received_at)
+    pending_count = total_invoices - received_count
+
+    invoice_summary = {
+        "total_invoices": total_invoices,
+        "total_amount": total_amount,
+        "issued_count": issued_count,
+        "delivered_count": delivered_count,
+        "received_count": received_count,
+        "pending_count": pending_count,
+    }
+
     return render_template(
         "bank_detail.html",
         bank=bank,
@@ -1442,6 +1459,7 @@ def bank_detail(bank_id):
         payments=payments,
         documents=documents,
         invoices=invoices,
+        invoice_summary=invoice_summary,
         start=start_date_str,
         end=end_date_str,
     )
@@ -1450,7 +1468,8 @@ def bank_detail(bank_id):
 # تحديث مراحل فاتورة بنك
 @app.route("/banks/<int:bank_id>/invoice_stage", methods=["POST"]) 
 def update_bank_invoice_stage(bank_id):
-    if session.get("role") not in ["manager", "finance"]:
+    # ✅ حصر إدخال وتحديث مراحل فواتير البنك على قسم المالية فقط
+    if session.get("role") != "finance":
         return redirect(url_for("login"))
 
     action = request.form.get("action")  # issue/deliver/receive
@@ -1635,6 +1654,24 @@ with app.app_context():
         db.session.add(admin)
         db.session.commit()
         print("✅ تم إنشاء حساب المدير الافتراضي (username=admin, password=1234)")
+
+    # ✅ إنشاء حساب افتراضي لقسم المالية إن لم يكن موجودًا
+    try:
+        fin = User.query.filter_by(role="finance").first()
+    except OperationalError:
+        fin = None
+    if not fin:
+        # ربطه بأول فرع إن وجد
+        first_branch = Branch.query.first()
+        finance_user = User(
+            username="finance",
+            password=generate_password_hash("1234"),
+            role="finance",
+            branch_id=first_branch.id if first_branch else None
+        )
+        db.session.add(finance_user)
+        db.session.commit()
+        print("✅ تم إنشاء حساب المالية الافتراضي (username=finance, password=1234)")
 
 # ---------------- تقرير دخل موظف ----------------
 @app.route("/employee_income", methods=["GET", "POST"])

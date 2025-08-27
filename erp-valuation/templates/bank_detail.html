@@ -15,8 +15,12 @@
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto">
         <li class="nav-item"><a class="nav-link" href="{{ url_for('banks_overview') }}">🏦 البنوك</a></li>
+        {% if session.get('role') == 'manager' %}
         <li class="nav-item"><a class="nav-link" href="{{ url_for('manager_dashboard') }}">👨‍💼 المدير</a></li>
+        {% endif %}
+        {% if session.get('role') == 'finance' %}
         <li class="nav-item"><a class="nav-link" href="{{ url_for('finance_dashboard') }}">💰 المالية</a></li>
+        {% endif %}
         <li class="nav-item"><a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 خروج</a></li>
       </ul>
     </div>
@@ -153,6 +157,7 @@
               <div class="card">
                 <div class="card-body">
                   <h6 class="mb-3">تحديث مرحلة فاتورة</h6>
+                  {% if session.get('role') == 'finance' %}
                   <form method="post" action="{{ url_for('update_bank_invoice_stage', bank_id=bank.id, start=start, end=end) }}" class="row g-2">
                     <div class="col-md-2">
                       <label class="form-label">معاملة (اختياري)</label>
@@ -178,6 +183,11 @@
                       <button class="btn btn-success w-100">حفظ</button>
                     </div>
                   </form>
+                  {% else %}
+                  <div class="alert alert-info mb-0">
+                    🛈 هذا القسم لإدخال مراحل الفواتير ويخص قسم المالية فقط. يظهر لديك ملخص الفواتير أدناه.
+                  </div>
+                  {% endif %}
                 </div>
               </div>
             </div>
@@ -185,7 +195,19 @@
             <div class="col-12">
               <div class="card">
                 <div class="card-body">
-                  <h6 class="mb-3">قائمة فواتير البنك</h6>
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0">قائمة فواتير البنك</h6>
+                    {% if invoice_summary %}
+                    <div class="small">
+                      <span class="badge bg-secondary">الإجمالي: {{ invoice_summary.total_invoices }}</span>
+                      <span class="badge bg-primary">المبلغ: {{ "{:,.2f}".format(invoice_summary.total_amount) }}</span>
+                      <span class="badge bg-info text-dark">المُصدرة: {{ invoice_summary.issued_count }}</span>
+                      <span class="badge bg-warning text-dark">المُسلمة: {{ invoice_summary.delivered_count }}</span>
+                      <span class="badge bg-success">المُستلمة: {{ invoice_summary.received_count }}</span>
+                      <span class="badge bg-dark">قيد التحصيل: {{ invoice_summary.pending_count }}</span>
+                    </div>
+                    {% endif %}
+                  </div>
                   <div class="table-responsive">
                     <table class="table table-bordered table-striped">
                       <thead class="table-dark">
