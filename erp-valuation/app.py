@@ -1157,6 +1157,84 @@ def add_payment(tid):
         flash("✅ تم تسجيل الدفعة بنجاح", "success")
     return redirect(url_for("finance_dashboard"))
 
+# ---------------- صفحة البنوك: نظرة عامة ----------------
+@app.route("/banks")
+def banks_overview():
+    if session.get("role") not in ["manager", "finance"]:
+        return redirect(url_for("login"))
+
+    banks_stats = (
+        db.session.query(Bank.id, Bank.name, func.count(Transaction.id))
+        .outerjoin(Transaction, Transaction.bank_id == Bank.id)
+        .group_by(Bank.id, Bank.name)
+        .order_by(Bank.name.asc())
+        .all()
+    )
+
+    banks_list = [
+        {"id": b_id, "name": b_name, "count": tx_count}
+        for (b_id, b_name, tx_count) in banks_stats
+    ]
+
+    return render_template("banks.html", banks=banks_list)
+
+
+# ---------------- صفحة بنك محدد: تفاصيل وإحصائيات ----------------
+@app.route("/banks/<int:bank_id>")
+def bank_detail(bank_id):
+    if session.get("role") not in ["manager", "finance"]:
+        return redirect(url_for("login"))
+
+    bank = Bank.query.get_or_404(bank_id)
+
+    # إحصائية عدد المعاملات لكل فرع لهذا البنك
+    branch_rows = (
+        db.session.query(Branch.id, Branch.name, func.count(Transaction.id))
+        .join(Transaction, Transaction.branch_id == Branch.id)
+        .filter(Transaction.bank_id == bank_id)
+        .group_by(Branch.id, Branch.name)
+        .order_by(Branch.name.asc())
+        .all()
+    )
+    branch_stats = [
+        {"id": bid, "name": bname, "count": bcount}
+        for (bid, bname, bcount) in branch_rows
+    ]
+
+    total_tx = sum(b["count"] for b in branch_stats)
+
+    # الفواتير المرتبطة بمعاملات هذا البنك (اعتماداً على جدول Payments)
+    payments = (
+        Payment.query
+        .join(Transaction, Payment.transaction_id == Transaction.id)
+        .filter(Transaction.bank_id == bank_id)
+        .order_by(Payment.date_received.desc())
+        .all()
+    )
+
+    # المستندات المرتبطة بمعاملات هذا البنك (ملفات المعاملة + ملف التقرير)
+    txs = Transaction.query.filter(Transaction.bank_id == bank_id).order_by(Transaction.id.desc()).all()
+    documents = []
+    for t in txs:
+        # ملفات متعددة محفوظة كسلسلة مفصولة بفواصل
+        if t.files:
+            for fname in (t.files or "").split(","):
+                fname = (fname or "").strip()
+                if fname:
+                    documents.append({"transaction_id": t.id, "filename": fname})
+        # ملف التقرير (إن وجد)
+        if t.report_file:
+            documents.append({"transaction_id": t.id, "filename": t.report_file})
+
+    return render_template(
+        "bank_detail.html",
+        bank=bank,
+        branches=branch_stats,
+        total_tx=total_tx,
+        payments=payments,
+        documents=documents,
+    )
+
 # ---------------- إدارة الموظفين ----------------
 @app.route("/manage_employees", methods=["GET", "POST"])
 def manage_employees():

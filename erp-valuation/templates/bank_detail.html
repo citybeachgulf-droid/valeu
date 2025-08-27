@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>🏦 تفاصيل البنك</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">🛠️ نظام التثمين</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('banks_overview') }}">🏦 البنوك</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('manager_dashboard') }}">👨‍💼 المدير</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('finance_dashboard') }}">💰 المالية</a></li>
+        <li class="nav-item"><a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 خروج</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">🏦 {{ bank.name }}</h3>
+    <span class="badge bg-primary">إجمالي المعاملات: {{ total_tx }}</span>
+  </div>
+
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-dark text-white">📊 عدد المعاملات لكل فرع</div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-bordered table-striped align-middle">
+          <thead class="table-dark">
+            <tr>
+              <th>الفرع</th>
+              <th>عدد المعاملات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in branches %}
+            <tr>
+              <td>{{ b.name }}</td>
+              <td><span class="badge bg-secondary">{{ b.count }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="2" class="text-center">لا توجد معاملات</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-dark text-white d-flex">
+      <ul class="nav nav-tabs card-header-tabs" id="bankTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices" type="button" role="tab">📄 الفواتير المرسلة</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="docs-tab" data-bs-toggle="tab" data-bs-target="#docs" type="button" role="tab">📎 المستندات المرسلة</button>
+        </li>
+      </ul>
+    </div>
+    <div class="card-body">
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="invoices" role="tabpanel">
+          <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+              <thead class="table-dark">
+                <tr>
+                  <th>#</th>
+                  <th>المعاملة</th>
+                  <th>المبلغ</th>
+                  <th>الطريقة</th>
+                  <th>التاريخ</th>
+                  <th>الإيصال</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in payments %}
+                <tr>
+                  <td>{{ p.id }}</td>
+                  <td>{{ p.transaction_id }}</td>
+                  <td>{{ p.amount }}</td>
+                  <td>{{ p.method }}</td>
+                  <td>{{ p.date_received.strftime('%Y-%m-%d') if p.date_received else '-' }}</td>
+                  <td>
+                    {% if p.receipt_file %}
+                      <a href="{{ url_for('static', filename='uploads/' ~ p.receipt_file) }}" target="_blank">📎 عرض</a>
+                    {% else %}-{% endif %}
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center">لا توجد فواتير</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="docs" role="tabpanel">
+          <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+              <thead class="table-dark">
+                <tr>
+                  <th>المعاملة</th>
+                  <th>الملف</th>
+                  <th>عرض</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for d in documents %}
+                <tr>
+                  <td>{{ d.transaction_id }}</td>
+                  <td>{{ d.filename }}</td>
+                  <td><a href="{{ url_for('uploaded_file', filename=d.filename) }}" target="_blank" class="btn btn-sm btn-outline-primary">فتح</a></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="3" class="text-center">لا توجد مستندات</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
