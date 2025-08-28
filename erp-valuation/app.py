@@ -1806,6 +1806,38 @@ def download_invoice_doc(transaction_id: int):
         branch_id=t.branch_id,
     )
 
+# ✅ طباعة فاتورة HTML احترافية للمعاملة
+@app.route("/finance/print/invoice/<int:transaction_id>")
+def print_invoice_html(transaction_id: int):
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+    t = Transaction.query.get_or_404(transaction_id)
+    bank_name = None
+    if t.bank_id:
+        bank = Bank.query.get(t.bank_id)
+        bank_name = bank.name if bank else None
+
+    amount = float(t.fee or 0)
+    tax, total_with_tax = _compute_tax_and_total(amount)
+
+    # معلومات المؤسسة الافتراضية (يمكن لاحقًا ربطها من الإعدادات/الفرع)
+    org_name = "شركة التثمين"
+    org_meta = "العنوان · الهاتف · البريد الإلكتروني"
+
+    return render_template(
+        "print_invoice.html",
+        transaction=t,
+        bank_name=bank_name,
+        amount=amount,
+        tax=tax,
+        total_with_tax=total_with_tax,
+        vat_rate=_get_vat_rate(),
+        date_str=(datetime.utcnow().strftime("%Y-%m-%d")),
+        org_name=org_name,
+        org_meta=org_meta,
+        notes=t.status or "",
+    )
+
 # ✅ تنزيل فاتورة بنك (من جدول BankInvoice)
 @app.route("/finance/download/bank_invoice/<int:invoice_id>")
 def download_bank_invoice_doc(invoice_id: int):
