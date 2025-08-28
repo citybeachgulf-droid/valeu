@@ -229,21 +229,52 @@ class TemplateDoc(db.Model):
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 def replace_placeholders_in_docx(doc: Document, replacements: dict) -> None:
-    # فقرات
-    for paragraph in doc.paragraphs:
+    # استبدال على مستوى الفقرة بالكامل لضمان التقاط المتغيرات المقسومة بين runs
+    def replace_in_paragraph(paragraph) -> None:
+        # جمع النص من جميع الـ runs لتفادي مشكلة انقسام المتغيرات
+        combined_text = "".join(run.text for run in paragraph.runs) or paragraph.text
+        if not combined_text:
+            return
+        new_text = combined_text
         for key, val in replacements.items():
-            if key in paragraph.text:
-                for run in paragraph.runs:
-                    run.text = run.text.replace(key, val)
-    # الجداول
-    for table in doc.tables:
+            if key in new_text:
+                new_text = new_text.replace(key, val)
+        if new_text != combined_text:
+            # هذا يُعيد بناء الفقرة بنص واحد (قد يفقد أنماط runs المتعددة وهو مقبول لقوالبنا)
+            paragraph.text = new_text
+
+    # استبدال داخل جدول (خلايا تحتوي فقرات)
+    def replace_in_table(table) -> None:
         for row in table.rows:
             for cell in row.cells:
-                for key, val in replacements.items():
-                    if key in cell.text:
-                        for p in cell.paragraphs:
-                            for r in p.runs:
-                                r.text = r.text.replace(key, val)
+                for p in cell.paragraphs:
+                    replace_in_paragraph(p)
+                # جداول متداخلة داخل الخلايا إن وجدت
+                for nested in getattr(cell, "tables", []):
+                    replace_in_table(nested)
+
+    # فقرات المستند
+    for paragraph in doc.paragraphs:
+        replace_in_paragraph(paragraph)
+
+    # الجداول في المستند
+    for table in doc.tables:
+        replace_in_table(table)
+
+    # الرؤوس والتذييلات لكل Section
+    for section in getattr(doc, "sections", []):
+        header = getattr(section, "header", None)
+        if header:
+            for p in header.paragraphs:
+                replace_in_paragraph(p)
+            for t in header.tables:
+                replace_in_table(t)
+        footer = getattr(section, "footer", None)
+        if footer:
+            for p in footer.paragraphs:
+                replace_in_paragraph(p)
+            for t in footer.tables:
+                replace_in_table(t)
 
 def get_template_filename(doc_type: str) -> str | None:
     rec = TemplateDoc.query.filter_by(doc_type=doc_type).order_by(TemplateDoc.uploaded_at.desc()).first()
