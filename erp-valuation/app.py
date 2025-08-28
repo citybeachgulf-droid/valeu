@@ -1586,6 +1586,7 @@ def finance_dashboard():
         recent_bank_invoices=recent_bank_invoices,
         recent_customer_quotes=recent_customer_quotes,
         recent_customer_invoices=recent_customer_invoices,
+        vat_default_percent=int(_get_vat_rate() * 100)
     )
 
 # ---------------- صفحة المعاملات المدفوعة (مالية) ----------------
@@ -1833,7 +1834,16 @@ def download_quote_doc(transaction_id: int):
         bank = Bank.query.get(t.bank_id)
         bank_name = bank.name if bank else None
     amount = float(t.fee or 0)
-    tax, total_with_tax = _compute_tax_and_total(amount)
+    # تخصيص الوصف والضريبة
+    details_override = (request.args.get("details") or "").strip()
+    apply_vat = (request.args.get("apply_vat") or "1") == "1"
+    vat_percent = request.args.get("vat")
+    if vat_percent is not None:
+        try:
+            os.environ["VAT_RATE"] = str(float(vat_percent) / 100.0)
+        except Exception:
+            pass
+    tax, total_with_tax = _compute_tax_and_total(amount) if apply_vat else (0.0, amount)
     placeholders = {
         "NAME": t.client or "",
         "CLIENT_NAME": t.client or "",
@@ -1844,7 +1854,7 @@ def download_quote_doc(transaction_id: int):
         # للحفاظ على التوافق مع القوالب القديمة
         "TOTAL": f"{amount:.2f}",
         "DATE": datetime.utcnow().strftime("%Y-%m-%d"),
-        "DETAILS": t.status or "",
+        "DETAILS": details_override or (t.status or ""),
         "QUOTE_NO": f"QUOTE-{t.id}",
         "QUTE_NO": f"QUOTE-{t.id}",
         "TRANSACTION_ID": str(t.id),
@@ -1878,7 +1888,16 @@ def download_invoice_doc(transaction_id: int):
         bank = Bank.query.get(t.bank_id)
         bank_name = bank.name if bank else None
     amount = float(t.fee or 0)
-    tax, total_with_tax = _compute_tax_and_total(amount)
+    # تخصيص الوصف والضريبة
+    details_override = (request.args.get("details") or "").strip()
+    apply_vat = (request.args.get("apply_vat") or "1") == "1"
+    vat_percent = request.args.get("vat")
+    if vat_percent is not None:
+        try:
+            os.environ["VAT_RATE"] = str(float(vat_percent) / 100.0)
+        except Exception:
+            pass
+    tax, total_with_tax = _compute_tax_and_total(amount) if apply_vat else (0.0, amount)
     placeholders = {
         "NAME": t.client or "",
         "CLIENT_NAME": t.client or "",
@@ -1889,7 +1908,7 @@ def download_invoice_doc(transaction_id: int):
         # للتوافق مع القوالب القديمة
         "TOTAL": f"{amount:.2f}",
         "DATE": datetime.utcnow().strftime("%Y-%m-%d"),
-        "DETAILS": t.status or "",
+        "DETAILS": details_override or (t.status or ""),
         "INVOICE_NO": f"INV-{t.id}",
         "TRANSACTION_ID": str(t.id),
         "EMPLOYEE": t.employee or "",
