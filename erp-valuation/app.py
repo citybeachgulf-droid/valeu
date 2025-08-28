@@ -1674,32 +1674,79 @@ def download_quote_doc(transaction_id: int):
     if session.get("role") != "finance":
         return redirect(url_for("login"))
     t = Transaction.query.get_or_404(transaction_id)
-    out_name = f"quote_{t.id}.pdf"
-    output_path = os.path.join(app.config["UPLOAD_FOLDER"], out_name)
-    title = "عرض سعر"
-    client_name = t.client or "—"
-    date_str = datetime.utcnow().strftime("%Y-%m-%d")
-    doc_no = f"QUOTE-{t.id}"
-    fee = float(t.fee or 0)
-    items = [{"name": "خدمة تقييم", "qty": 1, "unit_price": fee}]
-    create_pdf(output_path, title, client_name, date_str, doc_no, items)
-    return send_file(output_path, as_attachment=True, download_name=out_name)
+    bank_name = None
+    if t.bank_id:
+        bank = Bank.query.get(t.bank_id)
+        bank_name = bank.name if bank else None
+    placeholders = {
+        "NAME": t.client or "",
+        "CLIENT_NAME": t.client or "",
+        "AMOUNT": f"{float(t.fee or 0):.2f}",
+        "PRICE": f"{float(t.fee or 0):.2f}",
+        "TOTAL": f"{float(t.fee or 0):.2f}",
+        "DATE": datetime.utcnow().strftime("%Y-%m-%d"),
+        "DETAILS": t.status or "",
+        "QUOTE_NO": f"QUOTE-{t.id}",
+        "QUTE_NO": f"QUOTE-{t.id}",
+        "TRANSACTION_ID": str(t.id),
+        "EMPLOYEE": t.employee or "",
+        "BANK_NAME": bank_name or "",
+        "BANK_BRANCH": t.bank_branch or "",
+        "STATE": t.state or "",
+        "REGION": t.region or "",
+        "AREA": str(t.area or 0),
+        "BUILDING_AREA": str(t.building_area or 0),
+        "BUILDING_AGE": str(t.building_age or 0),
+        "LAND_VALUE": f"{float(t.land_value or 0):.2f}",
+        "BUILDING_VALUE": f"{float(t.building_value or 0):.2f}",
+        "TOTAL_ESTIMATE": f"{float(t.total_estimate or 0):.2f}",
+    }
+    out_name = f"quote_{t.id}.docx"
+    return _render_docx_from_template(
+        "quote",
+        placeholders,
+        out_name,
+        branch_id=t.branch_id,
+    )
 
 @app.route("/finance/templates/invoice/<int:transaction_id>")
 def download_invoice_doc(transaction_id: int):
     if session.get("role") != "finance":
         return redirect(url_for("login"))
     t = Transaction.query.get_or_404(transaction_id)
-    out_name = f"invoice_{t.id}.pdf"
-    output_path = os.path.join(app.config["UPLOAD_FOLDER"], out_name)
-    title = "فاتورة"
-    client_name = t.client or "—"
-    date_str = datetime.utcnow().strftime("%Y-%m-%d")
-    doc_no = f"INV-{t.id}"
-    fee = float(t.fee or 0)
-    items = [{"name": "خدمة تقييم", "qty": 1, "unit_price": fee}]
-    create_pdf(output_path, title, client_name, date_str, doc_no, items)
-    return send_file(output_path, as_attachment=True, download_name=out_name)
+    bank_name = None
+    if t.bank_id:
+        bank = Bank.query.get(t.bank_id)
+        bank_name = bank.name if bank else None
+    placeholders = {
+        "NAME": t.client or "",
+        "CLIENT_NAME": t.client or "",
+        "AMOUNT": f"{float(t.fee or 0):.2f}",
+        "PRICE": f"{float(t.fee or 0):.2f}",
+        "TOTAL": f"{float(t.fee or 0):.2f}",
+        "DATE": datetime.utcnow().strftime("%Y-%m-%d"),
+        "DETAILS": t.status or "",
+        "INVOICE_NO": f"INV-{t.id}",
+        "TRANSACTION_ID": str(t.id),
+        "EMPLOYEE": t.employee or "",
+        "BANK_NAME": bank_name or "",
+        "BANK_BRANCH": t.bank_branch or "",
+        "STATE": t.state or "",
+        "REGION": t.region or "",
+        "AREA": str(t.area or 0),
+        "BUILDING_AREA": str(t.building_area or 0),
+        "BUILDING_AGE": str(t.building_age or 0),
+        "LAND_VALUE": f"{float(t.land_value or 0):.2f}",
+        "BUILDING_VALUE": f"{float(t.building_value or 0):.2f}",
+        "TOTAL_ESTIMATE": f"{float(t.total_estimate or 0):.2f}",
+    }
+    out_name = f"invoice_{t.id}.docx"
+    return _render_docx_from_template(
+        "invoice",
+        placeholders,
+        out_name,
+        branch_id=t.branch_id,
+    )
 
 # ✅ تنزيل فاتورة بنك (من جدول BankInvoice)
 @app.route("/finance/download/bank_invoice/<int:invoice_id>")
@@ -1710,22 +1757,49 @@ def download_bank_invoice_doc(invoice_id: int):
     bank = Bank.query.get(inv.bank_id)
     # اختيار الفرع: إن وجدت معاملة مرتبطة نستخدم فرعها، وإلا فرع موظف المالية
     preferred_branch_id = None
+    transaction = None
     if inv.transaction_id:
-        t = Transaction.query.get(inv.transaction_id)
-        preferred_branch_id = t.branch_id if t else None
+        transaction = Transaction.query.get(inv.transaction_id)
+        preferred_branch_id = transaction.branch_id if transaction else None
     if preferred_branch_id is None:
         user = User.query.get(session.get("user_id"))
         preferred_branch_id = getattr(user, "branch_id", None)
-    out_name = f"bank_invoice_{inv.id}.pdf"
-    output_path = os.path.join(app.config["UPLOAD_FOLDER"], out_name)
-    title = "فاتورة"
-    client_name = (bank.name if bank else f"Bank #{inv.bank_id}")
-    date_str = (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d")
-    doc_no = f"INV-BANK-{inv.id}"
-    amount = float(inv.amount or 0)
-    items = [{"name": "خدمة تقييم", "qty": 1, "unit_price": amount}]
-    create_pdf(output_path, title, client_name, date_str, doc_no, items)
-    return send_file(output_path, as_attachment=True, download_name=out_name)
+
+    placeholders = {
+        "NAME": (bank.name if bank else f"Bank #{inv.bank_id}"),
+        "CLIENT_NAME": (bank.name if bank else f"Bank #{inv.bank_id}"),
+        "AMOUNT": f"{float(inv.amount or 0):.2f}",
+        "PRICE": f"{float(inv.amount or 0):.2f}",
+        "TOTAL": f"{float(inv.amount or 0):.2f}",
+        "DATE": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
+        "DETAILS": inv.note or "",
+        "INVOICE_NO": f"INV-BANK-{inv.id}",
+        "TRANSACTION_ID": str(inv.transaction_id or ""),
+        "BANK_NAME": (bank.name if bank else ""),
+    }
+    # لو عندنا معاملة، نضيف تفاصيل إضافية
+    if transaction:
+        placeholders.update({
+            "CLIENT_NAME": transaction.client or placeholders.get("CLIENT_NAME", ""),
+            "BANK_BRANCH": transaction.bank_branch or "",
+            "EMPLOYEE": transaction.employee or "",
+            "STATE": transaction.state or "",
+            "REGION": transaction.region or "",
+            "AREA": str(transaction.area or 0),
+            "BUILDING_AREA": str(transaction.building_area or 0),
+            "BUILDING_AGE": str(transaction.building_age or 0),
+            "LAND_VALUE": f"{float(transaction.land_value or 0):.2f}",
+            "BUILDING_VALUE": f"{float(transaction.building_value or 0):.2f}",
+            "TOTAL_ESTIMATE": f"{float(transaction.total_estimate or 0):.2f}",
+        })
+
+    out_name = f"bank_invoice_{inv.id}.docx"
+    return _render_docx_from_template(
+        "invoice",
+        placeholders,
+        out_name,
+        branch_id=preferred_branch_id,
+    )
 
 # ✅ تنزيل فاتورة عميل (من جدول CustomerInvoice)
 @app.route("/finance/download/customer_invoice/<int:invoice_id>")
@@ -1734,22 +1808,50 @@ def download_customer_invoice_doc(invoice_id: int):
         return redirect(url_for("login"))
     inv = CustomerInvoice.query.get_or_404(invoice_id)
     preferred_branch_id = None
+    transaction = None
     if inv.transaction_id:
-        t = Transaction.query.get(inv.transaction_id)
-        preferred_branch_id = t.branch_id if t else None
+        transaction = Transaction.query.get(inv.transaction_id)
+        preferred_branch_id = transaction.branch_id if transaction else None
     if preferred_branch_id is None:
         user = User.query.get(session.get("user_id"))
         preferred_branch_id = getattr(user, "branch_id", None)
-    out_name = f"customer_invoice_{inv.id}.pdf"
-    output_path = os.path.join(app.config["UPLOAD_FOLDER"], out_name)
-    title = "فاتورة"
-    client_name = inv.customer_name or "—"
-    date_str = (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d")
-    doc_no = f"INV-CUST-{inv.id}"
-    amount = float(inv.amount or 0)
-    items = [{"name": "خدمة تقييم", "qty": 1, "unit_price": amount}]
-    create_pdf(output_path, title, client_name, date_str, doc_no, items)
-    return send_file(output_path, as_attachment=True, download_name=out_name)
+
+    placeholders = {
+        "NAME": inv.customer_name or "",
+        "CLIENT_NAME": inv.customer_name or "",
+        "AMOUNT": f"{float(inv.amount or 0):.2f}",
+        "PRICE": f"{float(inv.amount or 0):.2f}",
+        "TOTAL": f"{float(inv.amount or 0):.2f}",
+        "DATE": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
+        "DETAILS": inv.note or "",
+        "INVOICE_NO": f"INV-CUST-{inv.id}",
+        "TRANSACTION_ID": str(inv.transaction_id or ""),
+    }
+    if transaction:
+        bank_name = None
+        if transaction.bank_id:
+            bank = Bank.query.get(transaction.bank_id)
+            bank_name = bank.name if bank else None
+        placeholders.update({
+            "BANK_NAME": bank_name or "",
+            "BANK_BRANCH": transaction.bank_branch or "",
+            "STATE": transaction.state or "",
+            "REGION": transaction.region or "",
+            "AREA": str(transaction.area or 0),
+            "BUILDING_AREA": str(transaction.building_area or 0),
+            "BUILDING_AGE": str(transaction.building_age or 0),
+            "LAND_VALUE": f"{float(transaction.land_value or 0):.2f}",
+            "BUILDING_VALUE": f"{float(transaction.building_value or 0):.2f}",
+            "TOTAL_ESTIMATE": f"{float(transaction.total_estimate or 0):.2f}",
+        })
+
+    out_name = f"customer_invoice_{inv.id}.docx"
+    return _render_docx_from_template(
+        "invoice",
+        placeholders,
+        out_name,
+        branch_id=preferred_branch_id,
+    )
 
 # ✅ تنزيل عرض سعر عميل (من جدول CustomerQuote)
 @app.route("/finance/download/customer_quote/<int:quote_id>")
@@ -1758,22 +1860,52 @@ def download_customer_quote_doc(quote_id: int):
         return redirect(url_for("login"))
     q = CustomerQuote.query.get_or_404(quote_id)
     preferred_branch_id = None
+    transaction = None
     if q.transaction_id:
-        t = Transaction.query.get(q.transaction_id)
-        preferred_branch_id = t.branch_id if t else None
+        transaction = Transaction.query.get(q.transaction_id)
+        preferred_branch_id = transaction.branch_id if transaction else None
     if preferred_branch_id is None:
         user = User.query.get(session.get("user_id"))
         preferred_branch_id = getattr(user, "branch_id", None)
-    out_name = f"customer_quote_{q.id}.pdf"
-    output_path = os.path.join(app.config["UPLOAD_FOLDER"], out_name)
-    title = "عرض سعر"
-    client_name = q.customer_name or "—"
-    date_str = datetime.utcnow().strftime("%Y-%m-%d")
-    doc_no = f"QUOTE-CUST-{q.id}"
-    amount = float(q.amount or 0)
-    items = [{"name": "خدمة تقييم", "qty": 1, "unit_price": amount}]
-    create_pdf(output_path, title, client_name, date_str, doc_no, items)
-    return send_file(output_path, as_attachment=True, download_name=out_name)
+
+    placeholders = {
+        "NAME": q.customer_name or "",
+        "CLIENT_NAME": q.customer_name or "",
+        "AMOUNT": f"{float(q.amount or 0):.2f}",
+        "PRICE": f"{float(q.amount or 0):.2f}",
+        "TOTAL": f"{float(q.amount or 0):.2f}",
+        "DATE": datetime.utcnow().strftime("%Y-%m-%d"),
+        "DETAILS": q.note or "",
+        "QUOTE_NO": f"QUOTE-CUST-{q.id}",
+        "QUTE_NO": f"QUOTE-CUST-{q.id}",
+        "TRANSACTION_ID": str(q.transaction_id or ""),
+        "VALID_UNTIL": q.valid_until.strftime("%Y-%m-%d") if q.valid_until else "",
+    }
+    if transaction:
+        bank_name = None
+        if transaction.bank_id:
+            bank = Bank.query.get(transaction.bank_id)
+            bank_name = bank.name if bank else None
+        placeholders.update({
+            "BANK_NAME": bank_name or "",
+            "BANK_BRANCH": transaction.bank_branch or "",
+            "STATE": transaction.state or "",
+            "REGION": transaction.region or "",
+            "AREA": str(transaction.area or 0),
+            "BUILDING_AREA": str(transaction.building_area or 0),
+            "BUILDING_AGE": str(transaction.building_age or 0),
+            "LAND_VALUE": f"{float(transaction.land_value or 0):.2f}",
+            "BUILDING_VALUE": f"{float(transaction.building_value or 0):.2f}",
+            "TOTAL_ESTIMATE": f"{float(transaction.total_estimate or 0):.2f}",
+        })
+
+    out_name = f"customer_quote_{q.id}.docx"
+    return _render_docx_from_template(
+        "quote",
+        placeholders,
+        out_name,
+        branch_id=preferred_branch_id,
+    )
 
 # ✅ إضافة دفعة جديدة
 @app.route("/add_payment/<int:tid>", methods=["POST"])
