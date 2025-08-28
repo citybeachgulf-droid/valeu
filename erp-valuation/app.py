@@ -367,7 +367,7 @@ def save_price(state, region, bank, price):
     ).first()
     if record:
         record.price_per_meter = price
-        record.last_updated = datetime.utcnow()   # ✅ استبدال updated_at بـ last_updated
+        record.updated_at = datetime.utcnow()
     else:
         record = ValuationMemory(state=state, region=region, bank_id=bank, price_per_meter=price)
         db.session.add(record)
@@ -396,7 +396,7 @@ def send_notification(user_id, title, body):
 def get_last_price(state, region, bank):
     record = ValuationMemory.query.filter_by(
         state=state, region=region, bank_id=bank
-    ).order_by(ValuationMemory.last_updated.desc()).first()   # ✅
+    ).order_by(ValuationMemory.updated_at.desc()).first()
     return record.price_per_meter if record else None
 
 
@@ -1134,15 +1134,22 @@ def get_price():
 
     price_per_meter = 0.0
     if state and region and bank_id:
-        vm = ValuationMemory.query.filter_by(
-            state=state, region=region, bank_id=bank_id
-        ).order_by(ValuationMemory.updated_at.desc()).first()
+        try:
+            bank_id_int = int(bank_id)
+        except Exception:
+            bank_id_int = None
+
+        vm = None
+        if bank_id_int is not None:
+            vm = ValuationMemory.query.filter_by(
+                state=state, region=region, bank_id=bank_id_int
+            ).order_by(ValuationMemory.updated_at.desc()).first()
 
         if vm:
             price_per_meter = vm.price_per_meter
         else:
             lp = LandPrice.query.filter_by(
-                state=state, region=region, bank_id=bank_id
+                state=state, region=region, bank_id=bank_id_int
             ).first()
             if lp:
                 price_per_meter = lp.price_per_meter
