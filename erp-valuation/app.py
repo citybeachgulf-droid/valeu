@@ -1371,6 +1371,31 @@ def add_transaction_engineer():
                 flash("⚠️ يرجى اختيار البنك وكتابة فرع البنك", "danger")
                 return redirect(url_for("add_transaction_engineer"))
 
+            # احسب سعر المتر من الذاكرة أو من جدول الأسعار إن وُجد
+            price_per_meter = 0.0
+            try:
+                bank_id_int = int(bank_id)
+            except Exception:
+                bank_id_int = None
+
+            if state and region and bank_id_int is not None:
+                vm = ValuationMemory.query.filter_by(
+                    state=state, region=region, bank_id=bank_id_int
+                ).order_by(ValuationMemory.updated_at.desc()).first()
+                if vm:
+                    price_per_meter = vm.price_per_meter or 0.0
+                else:
+                    lp = LandPrice.query.filter_by(state=state, region=region, bank_id=bank_id_int).first()
+                    if lp:
+                        price_per_meter = lp.price_per_meter or 0.0
+
+            # حساب التثمين الابتدائي
+            land_value = (area * price_per_meter) if price_per_meter else 0.0
+            building_value = 0.0
+            if building_area > 0 and building_age > 0:
+                building_value = building_area * (185 / 50) * building_age
+            total_estimate = land_value + building_value
+
             t = Transaction(
                 client=client_name,
                 employee=user.username,
@@ -1378,10 +1403,10 @@ def add_transaction_engineer():
                 status="بانتظار المهندس",
                 fee=fee,
                 branch_id=user.branch_id,
-                land_value=0.0,
-                building_value=0.0,
-                total_estimate=0.0,
-                valuation_amount=0.0,
+                land_value=land_value,
+                building_value=building_value,
+                total_estimate=total_estimate,
+                valuation_amount=total_estimate,
                 area=area,
                 building_area=building_area,
                 building_age=building_age,
