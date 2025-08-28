@@ -811,8 +811,9 @@ def manager_dashboard():
     branches_data = []
     branches = Branch.query.all()
     for b in branches:
-        income = db.session.query(func.coalesce(func.sum(Transaction.fee), 0.0))\
-            .filter(Transaction.branch_id == b.id, Transaction.payment_status == "مدفوعة")\
+        income = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0))\
+            .join(Transaction, Payment.transaction_id == Transaction.id)\
+            .filter(Transaction.branch_id == b.id)\
             .scalar() or 0.0
         expenses = db.session.query(func.coalesce(func.sum(Expense.amount), 0.0))\
             .filter(Expense.branch_id == b.id)\
@@ -846,6 +847,11 @@ def manager_dashboard():
         BranchDocument.expires_at <= (now + timedelta(days=30))
     ).order_by(BranchDocument.expires_at.asc()).all()
 
+    # بيانات مساعدة لرفع قوالب الفواتير مباشرة من لوحة المدير
+    current_user = User.query.get(session.get("user_id"))
+    current_branch_id = getattr(current_user, "branch_id", None)
+    template_branches = Branch.query.order_by(Branch.name.asc()).all()
+
     return render_template(
         "manager_dashboard.html",
         transactions=transactions,
@@ -853,7 +859,9 @@ def manager_dashboard():
         branches=branches_data,
         vapid_public_key=VAPID_PUBLIC_KEY,
         net_profit=sum(b["profit"] for b in branches_data),
-        expiring_docs=expiring_docs
+        expiring_docs=expiring_docs,
+        template_branches=template_branches,
+        current_branch_id=current_branch_id
     )
 
 
@@ -1645,6 +1653,10 @@ def finance_templates():
         db.session.add(TemplateDoc(doc_type=doc_type, filename=fname, branch_id=branch_id_val))
         db.session.commit()
         flash("✅ تم رفع القالب", "success")
+        # دعم العودة لصفحة سابقة إن تم تمريرها
+        next_url = (request.form.get("next") or "").strip()
+        if next_url.startswith("/"):
+            return redirect(next_url)
         return redirect(url_for("finance_templates"))
 
     # 🆕 عرض القالب الحالي للفرع الحالي لموظف المالية + العام
@@ -2041,6 +2053,12 @@ def finance_update_bank_invoice_status(invoice_id: int):
                     db.session.add(p)
                     db.session.commit()
                     created_income = True
+
+                # ✅ بعد تسجيل/تأكيد الدفعة، نعيد احتساب حالة الدفع للمعاملة
+                total_paid = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0))\
+                    .filter_by(transaction_id=t.id).scalar() or 0.0
+                t.payment_status = "مدفوعة" if total_paid >= t.fee else "غير مدفوعة"
+                db.session.commit()
 
         if created_income:
             flash("✅ تم تحديث الحالة وإضافة الدخل للفرع", "success")
