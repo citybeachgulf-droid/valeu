@@ -811,8 +811,9 @@ def manager_dashboard():
     branches_data = []
     branches = Branch.query.all()
     for b in branches:
-        income = db.session.query(func.coalesce(func.sum(Transaction.fee), 0.0))\
-            .filter(Transaction.branch_id == b.id, Transaction.payment_status == "مدفوعة")\
+        income = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0))\
+            .join(Transaction, Payment.transaction_id == Transaction.id)\
+            .filter(Transaction.branch_id == b.id)\
             .scalar() or 0.0
         expenses = db.session.query(func.coalesce(func.sum(Expense.amount), 0.0))\
             .filter(Expense.branch_id == b.id)\
@@ -2041,6 +2042,12 @@ def finance_update_bank_invoice_status(invoice_id: int):
                     db.session.add(p)
                     db.session.commit()
                     created_income = True
+
+                # ✅ بعد تسجيل/تأكيد الدفعة، نعيد احتساب حالة الدفع للمعاملة
+                total_paid = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0))\
+                    .filter_by(transaction_id=t.id).scalar() or 0.0
+                t.payment_status = "مدفوعة" if total_paid >= t.fee else "غير مدفوعة"
+                db.session.commit()
 
         if created_income:
             flash("✅ تم تحديث الحالة وإضافة الدخل للفرع", "success")
