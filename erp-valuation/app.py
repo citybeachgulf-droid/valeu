@@ -1669,17 +1669,53 @@ def finance_templates():
     branches = Branch.query.order_by(Branch.name.asc()).all()
     return render_template("finance_templates.html", templates=templates, branches=branches, current_branch_id=current_branch_id)
 
+def _replace_placeholders_in_xml_bytes(xml_bytes: bytes, mapping: dict) -> bytes:
+    try:
+        text = xml_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        text = xml_bytes.decode("latin-1")
+    for key, value in mapping.items():
+        placeholder = "{" + str(key) + "}"
+        replacement = str(value)
+        if placeholder in text:
+            text = text.replace(placeholder, replacement)
+    return text.encode("utf-8")
+
+
+def _fill_docx_from_template_xml(template_path: str, out_path: str, mapping: dict) -> None:
+    import zipfile
+    with zipfile.ZipFile(template_path, "r") as zin:
+        with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_DEFLATED) as zout:
+            for info in zin.infolist():
+                data = zin.read(info.filename)
+                if info.filename.startswith("word/") and info.filename.lower().endswith(".xml"):
+                    data = _replace_placeholders_in_xml_bytes(data, mapping)
+                zout.writestr(info, data)
+
+
 def _render_docx_from_template(doc_type: str, placeholders: dict, out_name: str, branch_id: int | None = None):
     template_filename = get_template_filename(doc_type, branch_id)
     if not template_filename:
         flash("⚠️ لم يتم رفع قالب لهذا النوع بعد", "warning")
         return redirect(url_for("finance_templates"))
     path = os.path.join(app.config["UPLOAD_FOLDER"], template_filename)
-    doc = Document(path)
-    replace_placeholders_in_docx(doc, placeholders)
     output_path = os.path.join(app.config["UPLOAD_FOLDER"], out_name)
-    doc.save(output_path)
+    _fill_docx_from_template_xml(path, output_path, placeholders)
     return send_file(output_path, as_attachment=True, download_name=out_name)
+
+
+def _get_vat_rate() -> float:
+    try:
+        return float(os.getenv("VAT_RATE", "0.15"))
+    except Exception:
+        return 0.15
+
+
+def _compute_tax_and_total(base_amount: float) -> tuple[float, float]:
+    vat = _get_vat_rate()
+    tax = round((base_amount or 0.0) * vat, 2)
+    total = round((base_amount or 0.0) + tax, 2)
+    return tax, total
 
 @app.route("/finance/templates/quote/<int:transaction_id>")
 def download_quote_doc(transaction_id: int):
@@ -1690,12 +1726,17 @@ def download_quote_doc(transaction_id: int):
     if t.bank_id:
         bank = Bank.query.get(t.bank_id)
         bank_name = bank.name if bank else None
+    amount = float(t.fee or 0)
+    tax, total_with_tax = _compute_tax_and_total(amount)
     placeholders = {
         "NAME": t.client or "",
         "CLIENT_NAME": t.client or "",
-        "AMOUNT": f"{float(t.fee or 0):.2f}",
-        "PRICE": f"{float(t.fee or 0):.2f}",
-        "TOTAL": f"{float(t.fee or 0):.2f}",
+        "AMOUNT": f"{amount:.2f}",
+        "PRICE": f"{amount:.2f}",
+        "TAX": f"{tax:.2f}",
+        "TOTAL_PRICE": f"{total_with_tax:.2f}",
+        # للحفاظ على التوافق مع القوالب القديمة
+        "TOTAL": f"{amount:.2f}",
         "DATE": datetime.utcnow().strftime("%Y-%m-%d"),
         "DETAILS": t.status or "",
         "QUOTE_NO": f"QUOTE-{t.id}",
@@ -1730,12 +1771,17 @@ def download_invoice_doc(transaction_id: int):
     if t.bank_id:
         bank = Bank.query.get(t.bank_id)
         bank_name = bank.name if bank else None
+    amount = float(t.fee or 0)
+    tax, total_with_tax = _compute_tax_and_total(amount)
     placeholders = {
         "NAME": t.client or "",
         "CLIENT_NAME": t.client or "",
-        "AMOUNT": f"{float(t.fee or 0):.2f}",
-        "PRICE": f"{float(t.fee or 0):.2f}",
-        "TOTAL": f"{float(t.fee or 0):.2f}",
+        "AMOUNT": f"{amount:.2f}",
+        "PRICE": f"{amount:.2f}",
+        "TAX": f"{tax:.2f}",
+        "TOTAL_PRICE": f"{total_with_tax:.2f}",
+        # للتوافق مع القوالب القديمة
+        "TOTAL": f"{amount:.2f}",
         "DATE": datetime.utcnow().strftime("%Y-%m-%d"),
         "DETAILS": t.status or "",
         "INVOICE_NO": f"INV-{t.id}",
@@ -1777,12 +1823,17 @@ def download_bank_invoice_doc(invoice_id: int):
         user = User.query.get(session.get("user_id"))
         preferred_branch_id = getattr(user, "branch_id", None)
 
+    amount = float(inv.amount or 0)
+    tax, total_with_tax = _compute_tax_and_total(amount)
     placeholders = {
         "NAME": (bank.name if bank else f"Bank #{inv.bank_id}"),
         "CLIENT_NAME": (bank.name if bank else f"Bank #{inv.bank_id}"),
-        "AMOUNT": f"{float(inv.amount or 0):.2f}",
-        "PRICE": f"{float(inv.amount or 0):.2f}",
-        "TOTAL": f"{float(inv.amount or 0):.2f}",
+        "AMOUNT": f"{amount:.2f}",
+        "PRICE": f"{amount:.2f}",
+        "TAX": f"{tax:.2f}",
+        "TOTAL_PRICE": f"{total_with_tax:.2f}",
+        # توافق قديم
+        "TOTAL": f"{amount:.2f}",
         "DATE": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
         "DETAILS": inv.note or "",
         "INVOICE_NO": f"INV-BANK-{inv.id}",
@@ -1828,12 +1879,17 @@ def download_customer_invoice_doc(invoice_id: int):
         user = User.query.get(session.get("user_id"))
         preferred_branch_id = getattr(user, "branch_id", None)
 
+    amount = float(inv.amount or 0)
+    tax, total_with_tax = _compute_tax_and_total(amount)
     placeholders = {
         "NAME": inv.customer_name or "",
         "CLIENT_NAME": inv.customer_name or "",
-        "AMOUNT": f"{float(inv.amount or 0):.2f}",
-        "PRICE": f"{float(inv.amount or 0):.2f}",
-        "TOTAL": f"{float(inv.amount or 0):.2f}",
+        "AMOUNT": f"{amount:.2f}",
+        "PRICE": f"{amount:.2f}",
+        "TAX": f"{tax:.2f}",
+        "TOTAL_PRICE": f"{total_with_tax:.2f}",
+        # توافق قديم
+        "TOTAL": f"{amount:.2f}",
         "DATE": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
         "DETAILS": inv.note or "",
         "INVOICE_NO": f"INV-CUST-{inv.id}",
