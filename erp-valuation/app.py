@@ -231,39 +231,67 @@ class TemplateDoc(db.Model):
     branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=True)
 
 def replace_placeholders_in_docx(doc: Document, replacements: dict) -> None:
-    # استبدال على مستوى الفقرة بالكامل لضمان التقاط المتغيرات المقسومة بين runs
+    # يدعم الاستبدال حتى لو وُجدت مسافات/علامات RTL داخل الأقواس
+    # نبني خريطة بالاسم بدون الأقواس وبحروف كبيرة
+    import re
+    zero_width = "\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+    def strip_braces_and_controls(s: str) -> str:
+        s = str(s)
+        s = s.replace("{", "").replace("}", "")
+        s = re.sub(rf"[{zero_width}]", "", s)
+        return s
+
+    # ابنِ قاموسًا بمتغيرات متعددة الأشكال لنفس المفتاح
+    token_to_value = {}
+    for k, v in replacements.items():
+        base = strip_braces_and_controls(k).strip()
+        variants = set()
+        variants.add(base)
+        variants.add(base.replace(" ", ""))
+        variants.add(base.replace("_", " "))
+        variants.add(base.replace("_", ""))
+        for var in variants:
+            token_to_value[var.upper()] = str(v)
+    # نمط يلتقط { TOKEN } مع احتمالية وجود مسافات/علامات اتجاه داخل الأقواس
+    # يدعم {TOKEN} و {{TOKEN}} ويستثني الأقواس داخل الاسم
+    token_pattern = re.compile(rf"\{{{1,2}}[\s{zero_width}]*([^{{}}]+?)[\s{zero_width}]*\}}{{{1,2}}")
+
     def replace_in_paragraph(paragraph) -> None:
-        # جمع النص من جميع الـ runs لتفادي مشكلة انقسام المتغيرات
         combined_text = "".join(run.text for run in paragraph.runs) or paragraph.text
         if not combined_text:
             return
-        new_text = combined_text
-        for key, val in replacements.items():
-            if key in new_text:
-                new_text = new_text.replace(key, val)
+        def _repl(m):
+            raw_name = strip_braces_and_controls(m.group(1)).strip().upper()
+            return (
+                token_to_value.get(raw_name)
+                or token_to_value.get(raw_name.replace(" ", ""))
+                or token_to_value.get(raw_name.replace(" ", "_"))
+                or token_to_value.get(raw_name.replace("_", ""))
+                or m.group(0)
+            )
+        new_text = token_pattern.sub(_repl, combined_text)
+        # تمرير احتياطي: استبدال مباشر لأي مفاتيح مقدَّمة كما هي
+        if new_text == combined_text:
+            for raw_key, raw_val in replacements.items():
+                if raw_key and isinstance(raw_key, str) and raw_key in new_text:
+                    new_text = new_text.replace(raw_key, str(raw_val))
         if new_text != combined_text:
-            # هذا يُعيد بناء الفقرة بنص واحد (قد يفقد أنماط runs المتعددة وهو مقبول لقوالبنا)
             paragraph.text = new_text
 
-    # استبدال داخل جدول (خلايا تحتوي فقرات)
     def replace_in_table(table) -> None:
         for row in table.rows:
             for cell in row.cells:
                 for p in cell.paragraphs:
                     replace_in_paragraph(p)
-                # جداول متداخلة داخل الخلايا إن وجدت
                 for nested in getattr(cell, "tables", []):
                     replace_in_table(nested)
 
-    # فقرات المستند
     for paragraph in doc.paragraphs:
         replace_in_paragraph(paragraph)
 
-    # الجداول في المستند
     for table in doc.tables:
         replace_in_table(table)
 
-    # الرؤوس والتذييلات لكل Section
     for section in getattr(doc, "sections", []):
         header = getattr(section, "header", None)
         if header:
@@ -1588,10 +1616,14 @@ def finance_paid():
 # ---------------- إدارة قوالب وورد (مالية) ----------------
 @app.route("/finance/templates", methods=["GET", "POST"])
 def finance_templates():
-    if session.get("role") != "finance":
+    if session.get("role") not in ["finance", "manager"]:
         return redirect(url_for("login"))
 
     if request.method == "POST":
+        # 🛡️ السماح للمدير فقط برفع/تحديث القوالب
+        if session.get("role") != "manager":
+            flash("🚫 مسموح للمدير فقط برفع القوالب", "danger")
+            return redirect(url_for("finance_templates"))
         doc_type = request.form.get("doc_type")  # invoice | quote
         file = request.files.get("file")
         # 🆕 تحديد الفرع المستهدف (اختياري)

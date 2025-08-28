@@ -30,6 +30,7 @@
       <div class="card">
         <div class="card-body">
           <h5 class="mb-3">رفع قالب عرض سعر</h5>
+          {% if session.get('role') == 'manager' %}
           <form method="post" enctype="multipart/form-data">
             <input type="hidden" name="doc_type" value="quote">
             <div class="mb-2">
@@ -51,6 +52,12 @@
               <span class="ms-2 text-muted">الحالي: {{ templates.quote }}</span>
             {% endif %}
           </form>
+          {% else %}
+            {% if templates.quote %}
+              <div class="text-muted">القالب الحالي: {{ templates.quote }}</div>
+            {% endif %}
+            <div class="alert alert-warning mt-2 mb-0">رفع القوالب مسموح للمدير فقط</div>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -58,6 +65,7 @@
       <div class="card">
         <div class="card-body">
           <h5 class="mb-3">رفع قالب فاتورة</h5>
+          {% if session.get('role') == 'manager' %}
           <form method="post" enctype="multipart/form-data">
             <input type="hidden" name="doc_type" value="invoice">
             <div class="mb-2">
@@ -79,6 +87,12 @@
               <span class="ms-2 text-muted">الحالي: {{ templates.invoice }}</span>
             {% endif %}
           </form>
+          {% else %}
+            {% if templates.invoice %}
+              <div class="text-muted">القالب الحالي: {{ templates.invoice }}</div>
+            {% endif %}
+            <div class="alert alert-warning mt-2 mb-0">رفع القوالب مسموح للمدير فقط</div>
+          {% endif %}
         </div>
       </div>
     </div>
