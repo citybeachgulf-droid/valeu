@@ -1669,16 +1669,38 @@ def finance_templates():
     branches = Branch.query.order_by(Branch.name.asc()).all()
     return render_template("finance_templates.html", templates=templates, branches=branches, current_branch_id=current_branch_id)
 
+def _replace_placeholders_in_xml_bytes(xml_bytes: bytes, mapping: dict) -> bytes:
+    try:
+        text = xml_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        text = xml_bytes.decode("latin-1")
+    for key, value in mapping.items():
+        placeholder = "{" + str(key) + "}"
+        replacement = str(value)
+        if placeholder in text:
+            text = text.replace(placeholder, replacement)
+    return text.encode("utf-8")
+
+
+def _fill_docx_from_template_xml(template_path: str, out_path: str, mapping: dict) -> None:
+    import zipfile
+    with zipfile.ZipFile(template_path, "r") as zin:
+        with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_DEFLATED) as zout:
+            for info in zin.infolist():
+                data = zin.read(info.filename)
+                if info.filename.startswith("word/") and info.filename.lower().endswith(".xml"):
+                    data = _replace_placeholders_in_xml_bytes(data, mapping)
+                zout.writestr(info, data)
+
+
 def _render_docx_from_template(doc_type: str, placeholders: dict, out_name: str, branch_id: int | None = None):
     template_filename = get_template_filename(doc_type, branch_id)
     if not template_filename:
         flash("⚠️ لم يتم رفع قالب لهذا النوع بعد", "warning")
         return redirect(url_for("finance_templates"))
     path = os.path.join(app.config["UPLOAD_FOLDER"], template_filename)
-    doc = Document(path)
-    replace_placeholders_in_docx(doc, placeholders)
     output_path = os.path.join(app.config["UPLOAD_FOLDER"], out_name)
-    doc.save(output_path)
+    _fill_docx_from_template_xml(path, output_path, placeholders)
     return send_file(output_path, as_attachment=True, download_name=out_name)
 
 @app.route("/finance/templates/quote/<int:transaction_id>")
