@@ -48,18 +48,18 @@
         <table class="items">
           <thead>
             <tr>
-              <th>الوصف</th>
-              <th style="width:120px">الكمية</th>
-              <th style="width:160px">سعر الوحدة</th>
               <th style="width:160px">الإجمالي</th>
+              <th style="width:160px">سعر الوحدة</th>
+              <th style="width:120px">الكمية</th>
+              <th>الوصف</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>رسوم التثمين{% if transaction.status %} - {{ transaction.status }}{% endif %}</td>
+              <td>{{ amount | round(2) }}</td>
+              <td>{{ amount | round(2) }}</td>
               <td>1</td>
-              <td>{{ amount | round(2) }}</td>
-              <td>{{ amount | round(2) }}</td>
+              <td>رسوم التثمين{% if transaction.status %} - {{ transaction.status }}{% endif %}</td>
             </tr>
           </tbody>
           <tfoot>
