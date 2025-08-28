@@ -1184,7 +1184,7 @@ def manage_report_templates():
     vehicle_tpl = get_template_by_type("vehicle")
 
     if request.method == "POST":
-        # حفظ النصوص
+        # حفظ النصوص فقط (تم تعطيل رفع القوالب)
         re_content = (request.form.get("real_estate_content") or "").strip()
         ve_content = (request.form.get("vehicle_content") or "").strip()
 
@@ -1202,34 +1202,16 @@ def manage_report_templates():
             else:
                 vehicle_tpl.content = ve_content
 
-        # رفع ملفات DOCX متعددة: 6 للعقار و1 للمركبات
-        if 're_files' in request.files:
-            re_files = request.files.getlist('re_files')
-            for f in re_files:
-                if f and f.filename:
-                    fname = secure_filename(f.filename)
-                    f.save(os.path.join(app.config['UPLOAD_FOLDER'], fname))
-                    # نخزن سجل لكل ملف كقالب عقار
-                    db.session.add(ReportTemplate(template_type='real_estate', title=fname, file=fname))
-
-        if 've_file' in request.files:
-            ve_file = request.files['ve_file']
-            if ve_file and ve_file.filename:
-                fname = secure_filename(ve_file.filename)
-                ve_file.save(os.path.join(app.config['UPLOAD_FOLDER'], fname))
-                # نخزن سجل قالب مركبات (واحد)
-                db.session.add(ReportTemplate(template_type='vehicle', title=fname, file=fname))
-
         db.session.commit()
-        flash("✅ تم حفظ القوالب", "success")
+        flash("✅ تم حفظ القوالب النصية (تم تعطيل الرفع)", "success")
         return redirect(url_for("manage_report_templates"))
 
     return render_template(
         "manager_report_templates.html",
         real_estate_content=real_estate_tpl.content if real_estate_tpl else "",
         vehicle_content=vehicle_tpl.content if vehicle_tpl else "",
-        real_estate_files=ReportTemplate.query.filter_by(template_type='real_estate').filter(ReportTemplate.file.isnot(None)).all(),
-        vehicle_files=ReportTemplate.query.filter_by(template_type='vehicle').filter(ReportTemplate.file.isnot(None)).all()
+        real_estate_files=[],
+        vehicle_files=[]
     )
 
 
@@ -1626,38 +1608,10 @@ def finance_paid():
     return render_template("finance_paid.html", payments=payments, total_income=total_income)
 
 # ---------------- إدارة قوالب وورد (مالية) ----------------
-@app.route("/finance/templates", methods=["GET", "POST"])
+@app.route("/finance/templates")
 def finance_templates():
     if session.get("role") not in ["finance", "manager"]:
         return redirect(url_for("login"))
-
-    if request.method == "POST":
-        # 🛡️ السماح للمدير فقط برفع/تحديث القوالب
-        if session.get("role") != "manager":
-            flash("🚫 مسموح للمدير فقط برفع القوالب", "danger")
-            return redirect(url_for("finance_templates"))
-        doc_type = request.form.get("doc_type")  # invoice | quote
-        file = request.files.get("file")
-        # 🆕 تحديد الفرع المستهدف (اختياري)
-        branch_id_val = request.form.get("branch_id")
-        try:
-            branch_id_val = int(branch_id_val) if branch_id_val else None
-        except Exception:
-            branch_id_val = None
-        if doc_type not in ["invoice", "quote"] or not file or not file.filename.lower().endswith('.docx'):
-            flash("⚠️ اختر النوع الصحيح وارفع ملف DOCX", "danger")
-            return redirect(url_for("finance_templates"))
-        fname = secure_filename(file.filename)
-        file.save(os.path.join(app.config["UPLOAD_FOLDER"], fname))
-        ensure_template_doc_branch_column()
-        db.session.add(TemplateDoc(doc_type=doc_type, filename=fname, branch_id=branch_id_val))
-        db.session.commit()
-        flash("✅ تم رفع القالب", "success")
-        # دعم العودة لصفحة سابقة إن تم تمريرها
-        next_url = (request.form.get("next") or "").strip()
-        if next_url.startswith("/"):
-            return redirect(next_url)
-        return redirect(url_for("finance_templates"))
 
     # 🆕 عرض القالب الحالي للفرع الحالي لموظف المالية + العام
     user = User.query.get(session.get("user_id"))

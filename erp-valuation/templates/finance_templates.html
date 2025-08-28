@@ -29,34 +29,11 @@
     <div class="col-md-6">
       <div class="card">
         <div class="card-body">
-          <h5 class="mb-3">رفع قالب عرض سعر</h5>
-          {% if session.get('role') == 'manager' %}
-          <form method="post" enctype="multipart/form-data">
-            <input type="hidden" name="doc_type" value="quote">
-            <div class="mb-2">
-              <input type="file" name="file" accept=".docx" class="form-control" required>
-            </div>
-            {% if branches %}
-            <div class="mb-2">
-              <label class="form-label">الفرع (اختياري)</label>
-              <select name="branch_id" class="form-select">
-                <option value="">قالب عام لكل الفروع</option>
-                {% for b in branches %}
-                  <option value="{{ b.id }}" {% if current_branch_id and current_branch_id==b.id %}selected{% endif %}>{{ b.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            {% endif %}
-            <button class="btn btn-primary">رفع</button>
-            {% if templates.quote %}
-              <span class="ms-2 text-muted">الحالي: {{ templates.quote }}</span>
-            {% endif %}
-          </form>
+          <h5 class="mb-3">قالب عرض سعر (عرض فقط)</h5>
+          {% if templates.quote %}
+            <div class="text-muted">القالب الحالي: {{ templates.quote }}</div>
           {% else %}
-            {% if templates.quote %}
-              <div class="text-muted">القالب الحالي: {{ templates.quote }}</div>
-            {% endif %}
-            <div class="alert alert-warning mt-2 mb-0">رفع القوالب مسموح للمدير فقط</div>
+            <div class="alert alert-warning mb-0">لا يوجد قالب معرف حاليًا</div>
           {% endif %}
         </div>
       </div>
@@ -64,34 +41,11 @@
     <div class="col-md-6">
       <div class="card">
         <div class="card-body">
-          <h5 class="mb-3">رفع قالب فاتورة</h5>
-          {% if session.get('role') == 'manager' %}
-          <form method="post" enctype="multipart/form-data">
-            <input type="hidden" name="doc_type" value="invoice">
-            <div class="mb-2">
-              <input type="file" name="file" accept=".docx" class="form-control" required>
-            </div>
-            {% if branches %}
-            <div class="mb-2">
-              <label class="form-label">الفرع (اختياري)</label>
-              <select name="branch_id" class="form-select">
-                <option value="">قالب عام لكل الفروع</option>
-                {% for b in branches %}
-                  <option value="{{ b.id }}" {% if current_branch_id and current_branch_id==b.id %}selected{% endif %}>{{ b.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            {% endif %}
-            <button class="btn btn-primary">رفع</button>
-            {% if templates.invoice %}
-              <span class="ms-2 text-muted">الحالي: {{ templates.invoice }}</span>
-            {% endif %}
-          </form>
+          <h5 class="mb-3">قالب فاتورة (عرض فقط)</h5>
+          {% if templates.invoice %}
+            <div class="text-muted">القالب الحالي: {{ templates.invoice }}</div>
           {% else %}
-            {% if templates.invoice %}
-              <div class="text-muted">القالب الحالي: {{ templates.invoice }}</div>
-            {% endif %}
-            <div class="alert alert-warning mt-2 mb-0">رفع القوالب مسموح للمدير فقط</div>
+            <div class="alert alert-warning mb-0">لا يوجد قالب معرف حاليًا</div>
           {% endif %}
         </div>
       </div>

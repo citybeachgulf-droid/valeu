@@ -64,58 +64,7 @@
   </div>
   {% endif %}
 
-  <!-- 🔹 رفع قوالب الفواتير من لوحة المدير -->
-  <div class="card mb-4">
-    <div class="card-body">
-      <h5 class="mb-3">📄 رفع قالب فاتورة/عرض سعر</h5>
-      <div class="row g-3">
-        <div class="col-md-6">
-          <form method="post" enctype="multipart/form-data" action="{{ url_for('finance_templates') }}">
-            <input type="hidden" name="doc_type" value="invoice">
-            <input type="hidden" name="next" value="{{ url_for('manager_dashboard') }}">
-            <div class="mb-2">
-              <label class="form-label">ملف DOCX لقالب الفاتورة</label>
-              <input type="file" name="file" accept=".docx" class="form-control" required>
-            </div>
-            {% if template_branches %}
-            <div class="mb-2">
-              <label class="form-label">الفرع (اختياري)</label>
-              <select name="branch_id" class="form-select">
-                <option value="">قالب عام لكل الفروع</option>
-                {% for b in template_branches %}
-                  <option value="{{ b.id }}" {% if current_branch_id and current_branch_id==b.id %}selected{% endif %}>{{ b.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            {% endif %}
-            <button class="btn btn-primary">رفع قالب فاتورة</button>
-          </form>
-        </div>
-        <div class="col-md-6">
-          <form method="post" enctype="multipart/form-data" action="{{ url_for('finance_templates') }}">
-            <input type="hidden" name="doc_type" value="quote">
-            <input type="hidden" name="next" value="{{ url_for('manager_dashboard') }}">
-            <div class="mb-2">
-              <label class="form-label">ملف DOCX لقالب عرض السعر</label>
-              <input type="file" name="file" accept=".docx" class="form-control" required>
-            </div>
-            {% if template_branches %}
-            <div class="mb-2">
-              <label class="form-label">الفرع (اختياري)</label>
-              <select name="branch_id" class="form-select">
-                <option value="">قالب عام لكل الفروع</option>
-                {% for b in template_branches %}
-                  <option value="{{ b.id }}" {% if current_branch_id and current_branch_id==b.id %}selected{% endif %}>{{ b.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            {% endif %}
-            <button class="btn btn-secondary">رفع قالب عرض سعر</button>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- ⛔ تم تعطيل رفع القوالب -->
 
   <!-- 🔹 قائمة المعاملات -->
   <h4 class="mb-3 text-center">📋 جميع المعاملات</h4>
