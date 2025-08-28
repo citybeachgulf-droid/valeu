@@ -1647,15 +1647,167 @@ def _fill_docx_from_template_xml(template_path: str, out_path: str, mapping: dic
                 zout.writestr(info, data)
 
 
+def _set_paragraph_rtl(paragraph, rtl: bool = True) -> None:
+    try:
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+        pPr = paragraph._p.get_or_add_pPr()
+        bidi = OxmlElement('w:bidi')
+        bidi.set(qn('w:val'), '1' if rtl else '0')
+        pPr.append(bidi)
+    except Exception:
+        pass
+
+
+def _generate_default_docx(doc_type: str, placeholders: dict, out_path: str) -> None:
+    # ينشئ ملف DOCX افتراضي عربي منسق كجدول لفاتورة/عرض سعر
+    from docx import Document as DocxDocument
+    from docx.shared import Pt
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.table import WD_TABLE_ALIGNMENT
+
+    document = DocxDocument()
+
+    # ترويسة
+    title = "فاتورة" if doc_type == "invoice" else "عرض سعر"
+    header_p = document.add_paragraph()
+    run = header_p.add_run(f"نظام التثمين — {title}")
+    run.bold = True
+    try:
+        run.font.size = Pt(16)
+        run.font.name = "Arial"
+    except Exception:
+        pass
+    header_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _set_paragraph_rtl(header_p, True)
+
+    document.add_paragraph().add_run(" ")
+
+    # ملخص أساسي
+    meta_pairs = [
+        ("رقم العملية", placeholders.get("TRANSACTION_ID", "")),
+        ("التاريخ", placeholders.get("DATE", "")),
+        ("العميل", placeholders.get("CLIENT_NAME", placeholders.get("NAME", ""))),
+        ("الموظف", placeholders.get("EMPLOYEE", "")),
+        ("البنك", placeholders.get("BANK_NAME", "")),
+        ("فرع البنك", placeholders.get("BANK_BRANCH", "")),
+    ]
+
+    table = document.add_table(rows=0, cols=2)
+    try:
+        table.style = 'Table Grid'
+        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    except Exception:
+        pass
+
+    for label, value in meta_pairs:
+        row_cells = table.add_row().cells
+        lc = row_cells[0].paragraphs[0]
+        lr = lc.add_run(str(label))
+        lr.bold = True
+        try:
+            lr.font.name = "Arial"; lr.font.size = Pt(11)
+        except Exception:
+            pass
+        _set_paragraph_rtl(lc, True)
+        lc.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+        rc = row_cells[1].paragraphs[0]
+        rr = rc.add_run(str(value))
+        try:
+            rr.font.name = "Arial"; rr.font.size = Pt(11)
+        except Exception:
+            pass
+        _set_paragraph_rtl(rc, True)
+        rc.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+    document.add_paragraph().add_run(" ")
+
+    # جدول المبلغ والضريبة والإجمالي
+    amounts = [
+        ("السعر قبل الضريبة", placeholders.get("PRICE", placeholders.get("AMOUNT", "0.00"))),
+        ("الضريبة", placeholders.get("TAX", "0.00")),
+        ("الإجمالي بعد الضريبة", placeholders.get("TOTAL_PRICE", placeholders.get("TOTAL", "0.00"))),
+    ]
+
+    amt_table = document.add_table(rows=1, cols=3)
+    try:
+        amt_table.style = 'Table Grid'
+        amt_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    except Exception:
+        pass
+
+    hdr_cells = amt_table.rows[0].cells
+    headers = ["البند", "القيمة", "العملة"]
+    for idx, text in enumerate(headers):
+        p = hdr_cells[idx].paragraphs[0]
+        r = p.add_run(text)
+        r.bold = True
+        try:
+            r.font.name = "Arial"; r.font.size = Pt(11)
+        except Exception:
+            pass
+        _set_paragraph_rtl(p, True)
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    for label, value in amounts:
+        row = amt_table.add_row().cells
+        p0 = row[0].paragraphs[0]
+        r0 = p0.add_run(label)
+        r0.bold = True
+        _set_paragraph_rtl(p0, True)
+        p0.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+        p1 = row[1].paragraphs[0]
+        p1.add_run(str(value))
+        _set_paragraph_rtl(p1, True)
+        p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        p2 = row[2].paragraphs[0]
+        p2.add_run("ريال")
+        _set_paragraph_rtl(p2, True)
+        p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    document.add_paragraph().add_run(" ")
+
+    # تفاصيل إضافية
+    details_title = document.add_paragraph()
+    dr = details_title.add_run("التفاصيل")
+    dr.bold = True
+    _set_paragraph_rtl(details_title, True)
+    details_title.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+    details_p = document.add_paragraph()
+    details_p.add_run(placeholders.get("DETAILS", ""))
+    _set_paragraph_rtl(details_p, True)
+    details_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+    # أرقام المستند
+    ref_p = document.add_paragraph()
+    ref_text = placeholders.get("INVOICE_NO") or placeholders.get("QUOTE_NO") or placeholders.get("QUTE_NO")
+    if ref_text:
+        ref_run = ref_p.add_run(f"المرجع: {ref_text}")
+        ref_run.bold = True
+    _set_paragraph_rtl(ref_p, True)
+    ref_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+    # حفظ
+    document.save(out_path)
 def _render_docx_from_template(doc_type: str, placeholders: dict, out_name: str, branch_id: int | None = None):
     template_filename = get_template_filename(doc_type, branch_id)
-    if not template_filename:
-        flash("⚠️ لم يتم رفع قالب لهذا النوع بعد", "warning")
-        return redirect(url_for("finance_templates"))
-    path = os.path.join(app.config["UPLOAD_FOLDER"], template_filename)
     output_path = os.path.join(app.config["UPLOAD_FOLDER"], out_name)
-    _fill_docx_from_template_xml(path, output_path, placeholders)
-    return send_file(output_path, as_attachment=True, download_name=out_name)
+    if not template_filename:
+        # لا يوجد قالب مرفوع: أنشئ ملف DOCX افتراضي عربي منسق
+        try:
+            _generate_default_docx(doc_type, placeholders, output_path)
+            return send_file(output_path, as_attachment=True, download_name=out_name)
+        except Exception:
+            flash("⚠️ تعذر إنشاء القالب الافتراضي", "warning")
+            return redirect(url_for("finance_templates"))
+    else:
+        path = os.path.join(app.config["UPLOAD_FOLDER"], template_filename)
+        _fill_docx_from_template_xml(path, output_path, placeholders)
+        return send_file(output_path, as_attachment=True, download_name=out_name)
 
 
 def _get_vat_rate() -> float:
