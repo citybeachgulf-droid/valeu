@@ -1691,6 +1691,28 @@ def finance_create_bank_invoice():
     flash("✅ تم إنشاء فاتورة البنك", "success")
     return redirect(url_for("finance_dashboard"))
 
+# ✅ تحديث حالة فاتورة البنك (تسليم / استلام)
+@app.route("/finance/bank_invoices/<int:invoice_id>/status", methods=["POST"])
+def finance_update_bank_invoice_status(invoice_id: int):
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+
+    action = (request.form.get("action") or "").strip().lower()
+    invoice = BankInvoice.query.get_or_404(invoice_id)
+
+    if action == "deliver":
+        invoice.delivered_at = datetime.utcnow()
+        db.session.commit()
+        flash("✅ تم تحديث حالة الفاتورة: تم التسليم", "success")
+    elif action == "receive":
+        invoice.received_at = datetime.utcnow()
+        db.session.commit()
+        flash("✅ تم تحديث حالة الفاتورة: تم الاستلام", "success")
+    else:
+        flash("⚠️ إجراء غير معروف", "warning")
+
+    return redirect(url_for("finance_dashboard"))
+
 # ✅ إنشاء عرض سعر للعميل (من المالية)
 @app.route("/finance/customer_quotes", methods=["POST"])
 def finance_create_customer_quote():

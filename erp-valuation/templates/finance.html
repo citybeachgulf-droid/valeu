@@ -241,6 +241,7 @@
                   <th>إصدار</th>
                   <th>تسليم</th>
                   <th>استلام</th>
+                  <th>إجراءات</th>
                 </tr>
               </thead>
               <tbody>
@@ -252,6 +253,22 @@
                   <td>{{ inv.issued_at.strftime('%Y-%m-%d') if inv.issued_at else '-' }}</td>
                   <td>{{ inv.delivered_at.strftime('%Y-%m-%d') if inv.delivered_at else '-' }}</td>
                   <td>{{ inv.received_at.strftime('%Y-%m-%d') if inv.received_at else '-' }}</td>
+                  <td class="text-nowrap">
+                    <div class="d-flex gap-2">
+                      {% if not inv.delivered_at %}
+                      <form method="post" action="{{ url_for('finance_update_bank_invoice_status', invoice_id=inv.id) }}">
+                        <input type="hidden" name="action" value="deliver">
+                        <button class="btn btn-sm btn-warning">تسليم</button>
+                      </form>
+                      {% endif %}
+                      {% if inv.delivered_at and not inv.received_at %}
+                      <form method="post" action="{{ url_for('finance_update_bank_invoice_status', invoice_id=inv.id) }}">
+                        <input type="hidden" name="action" value="receive">
+                        <button class="btn btn-sm btn-success">استلام</button>
+                      </form>
+                      {% endif %}
+                    </div>
+                  </td>
                 </tr>
                 {% else %}
                 <tr><td colspan="6" class="text-center">لا توجد فواتير بعد</td></tr>
