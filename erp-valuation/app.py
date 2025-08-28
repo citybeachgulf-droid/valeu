@@ -254,7 +254,10 @@ def replace_placeholders_in_docx(doc: Document, replacements: dict) -> None:
             token_to_value[var.upper()] = str(v)
     # نمط يلتقط { TOKEN } مع احتمالية وجود مسافات/علامات اتجاه داخل الأقواس
     # يدعم {TOKEN} و {{TOKEN}} ويستثني الأقواس داخل الاسم
-    token_pattern = re.compile(rf"\{{{1,2}}[\s{zero_width}]*([^{{}}]+?)[\s{zero_width}]*\}}{{{1,2}}")
+    # ملاحظة: نتجنب استخدام f-string هنا بسبب الأقواس المتداخلة في regex
+    token_pattern = re.compile(
+        r"\{{{1,2}}[\s" + zero_width + r"]*([^{}]+?)[\s" + zero_width + r"]*\}}{{{1,2}}"
+    )
 
     def replace_in_paragraph(paragraph) -> None:
         combined_text = "".join(run.text for run in paragraph.runs) or paragraph.text
