@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>🧾 طباعة فاتورة عميل</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/print-invoice.css') }}">
+</head>
+<body>
+  <div class="invoice-container">
+    <div class="card">
+      <div class="header">
+        <div class="brand">
+          <div class="logo" aria-hidden="true"></div>
+          <div>
+            <div class="org-name">{{ org_name or 'شركة التثمين' }}</div>
+            <div class="org-meta">{{ org_meta or 'العنوان · الهاتف · البريد الإلكتروني' }}</div>
+          </div>
+        </div>
+        <div class="text-end">
+          <div class="badge">فاتورة</div>
+          <div class="meta-grid mt-2">
+            <div><span class="section-title">رقم الفاتورة</span><div class="fw-bold">INV-CUST-{{ invoice.id }}</div></div>
+            <div><span class="section-title">التاريخ</span><div class="fw-bold">{{ date_str }}</div></div>
+            <div><span class="section-title">المرجع</span><div class="fw-bold">INV-CUST</div></div>
+            <div><span class="section-title">الموظف</span><div class="fw-bold">{{ transaction.employee if transaction else '-' }}</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="grid-2">
+          <div class="info-box">
+            <div class="label">تفاصيل العميل</div>
+            <div class="value">{{ invoice.customer_name or (transaction.client if transaction else '-') }}</div>
+            {% if bank_name %}<div class="org-meta">البنك: {{ bank_name }}{% if transaction and transaction.bank_branch %} · الفرع: {{ transaction.bank_branch }}{% endif %}</div>{% endif %}
+          </div>
+          <div class="info-box">
+            <div class="label">تفاصيل العقار/المعاملة</div>
+            {% if transaction %}
+              <div class="org-meta">الولاية: {{ transaction.state or '-' }} · المنطقة: {{ transaction.region or '-' }}</div>
+              <div class="org-meta">المساحة: {{ transaction.area or 0 }} م² · المبنى: {{ transaction.building_area or 0 }} م² · عمر المبنى: {{ transaction.building_age or 0 }}</div>
+            {% else %}
+              <div class="org-meta">—</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <table class="items">
+          <thead>
+            <tr>
+              <th style="width:160px">الإجمالي</th>
+              <th style="width:160px">سعر الوحدة</th>
+              <th style="width:120px">الكمية</th>
+              <th>الوصف</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{{ amount | round(2) }}</td>
+              <td>{{ amount | round(2) }}</td>
+              <td>1</td>
+              <td>رسوم التثمين{% if transaction and transaction.status %} - {{ transaction.status }}{% elif notes %} - {{ notes }}{% endif %}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4">
+                <div class="totals">
+                  <div>
+                    <div class="section-title mb-2">ملخص</div>
+                    <div class="summary-row"><span>الإجمالي الفرعي</span><span>{{ amount | round(2) }}</span></div>
+                    <div class="summary-row"><span>الضريبة ({{ (vat_rate * 100) | round(2) }}%)</span><span>{{ tax | round(2) }}</span></div>
+                    <div class="summary-row" style="font-weight:700"><span>الإجمالي النهائي</span><span>{{ total_with_tax | round(2) }}</span></div>
+                  </div>
+                  <div>
+                    {% if transaction and transaction.total_estimate %}
+                      <div class="section-title mb-2">تفاصيل التقدير</div>
+                      <div class="summary-row"><span>قيمة الأرض</span><span>{{ (transaction.land_value or 0) | round(2) }}</span></div>
+                      <div class="summary-row"><span>قيمة المبنى</span><span>{{ (transaction.building_value or 0) | round(2) }}</span></div>
+                      <div class="summary-row"><span>إجمالي التقدير</span><span>{{ (transaction.total_estimate or 0) | round(2) }}</span></div>
+                    {% else %}
+                      <div class="section-title">ملاحظات</div>
+                      <div class="org-meta">{{ notes or '—' }}</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="panel no-print">
+        <div class="actions">
+          <button class="btn" onclick="window.print()">🖨️ طباعة</button>
+          <a class="btn secondary" href="{{ url_for('finance_dashboard') }}">↩️ الرجوع للمالية</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function(){
+      try {
+        var usp = new URLSearchParams(window.location.search);
+        if (usp.get('auto') === '1') { setTimeout(function(){ window.print(); }, 300); }
+      } catch (e) {}
+    })();
+  </script>
+</body>
+</html>
+
