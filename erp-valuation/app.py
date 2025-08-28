@@ -1588,10 +1588,14 @@ def finance_paid():
 # ---------------- إدارة قوالب وورد (مالية) ----------------
 @app.route("/finance/templates", methods=["GET", "POST"])
 def finance_templates():
-    if session.get("role") != "finance":
+    if session.get("role") not in ["finance", "manager"]:
         return redirect(url_for("login"))
 
     if request.method == "POST":
+        # 🛡️ السماح للمدير فقط برفع/تحديث القوالب
+        if session.get("role") != "manager":
+            flash("🚫 مسموح للمدير فقط برفع القوالب", "danger")
+            return redirect(url_for("finance_templates"))
         doc_type = request.form.get("doc_type")  # invoice | quote
         file = request.files.get("file")
         # 🆕 تحديد الفرع المستهدف (اختياري)
