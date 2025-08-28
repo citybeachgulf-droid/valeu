@@ -1981,8 +1981,8 @@ def print_bank_invoice_html(invoice_id: int):
     org_meta = "العنوان · الهاتف · البريد الإلكتروني"
 
     return render_template(
-        "print_bank_invoice.html",
-        invoice=inv,
+        "print_invoice.html",
+        # unified template
         transaction=transaction,
         bank_name=bank_name,
         amount=amount,
@@ -1993,6 +1993,12 @@ def print_bank_invoice_html(invoice_id: int):
         org_name=org_name,
         org_meta=org_meta,
         notes=inv.note or "",
+        # metadata for header
+        badge_label="فاتورة",
+        invoice_code=f"INV-BANK-{inv.id}",
+        reference_code="INV-BANK",
+        client_name=(transaction.client if transaction else (bank_name or "")),
+        employee_name=(transaction.employee if transaction else "-"),
     )
 
 # ✅ طباعة فاتورة عميل HTML بنفس تصميم الطباعة
@@ -2016,8 +2022,8 @@ def print_customer_invoice_html(invoice_id: int):
     org_meta = "العنوان · الهاتف · البريد الإلكتروني"
 
     return render_template(
-        "print_customer_invoice.html",
-        invoice=inv,
+        "print_invoice.html",
+        # unified template
         transaction=transaction,
         bank_name=bank_name,
         amount=amount,
@@ -2028,6 +2034,53 @@ def print_customer_invoice_html(invoice_id: int):
         org_name=org_name,
         org_meta=org_meta,
         notes=inv.note or "",
+        # metadata for header
+        badge_label="فاتورة",
+        invoice_code=f"INV-CUST-{inv.id}",
+        reference_code="INV-CUST",
+        client_name=(inv.customer_name or (transaction.client if transaction else "")),
+        employee_name=(transaction.employee if transaction else "-"),
+    )
+
+# ✅ طباعة عرض سعر عميل HTML بنفس تصميم الطباعة
+@app.route("/finance/print/customer_quote/<int:quote_id>")
+def print_customer_quote_html(quote_id: int):
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+
+    q = CustomerQuote.query.get_or_404(quote_id)
+    transaction = Transaction.query.get(q.transaction_id) if q.transaction_id else None
+
+    bank_name = None
+    if transaction and transaction.bank_id:
+        bank = Bank.query.get(transaction.bank_id)
+        bank_name = bank.name if bank else None
+
+    amount = float(q.amount or 0)
+    tax, total_with_tax = _compute_tax_and_total(amount)
+
+    org_name = "شركة التثمين"
+    org_meta = "العنوان · الهاتف · البريد الإلكتروني"
+
+    return render_template(
+        "print_invoice.html",
+        # unified template
+        transaction=transaction,
+        bank_name=bank_name,
+        amount=amount,
+        tax=tax,
+        total_with_tax=total_with_tax,
+        vat_rate=_get_vat_rate(),
+        date_str=(q.valid_until or datetime.utcnow()).strftime("%Y-%m-%d"),
+        org_name=org_name,
+        org_meta=org_meta,
+        notes=q.note or "",
+        # metadata for header
+        badge_label="عرض سعر",
+        invoice_code=f"QUOTE-CUST-{q.id}",
+        reference_code="QUOTE-CUST",
+        client_name=(q.customer_name or (transaction.client if transaction else "")),
+        employee_name=(transaction.employee if transaction else "-"),
     )
 
 # ✅ تنزيل فاتورة بنك (من جدول BankInvoice)
@@ -2383,7 +2436,7 @@ def finance_create_customer_quote():
     db.session.add(q)
     db.session.commit()
     flash("✅ تم إنشاء عرض السعر للعميل", "success")
-    return redirect(url_for("finance_dashboard"))
+    return redirect(url_for("print_customer_quote_html", quote_id=q.id) + "?auto=1")
 
 # ✅ إنشاء فاتورة للعميل (من المالية)
 @app.route("/finance/customer_invoices", methods=["POST"])
