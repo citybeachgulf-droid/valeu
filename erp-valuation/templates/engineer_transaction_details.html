@@ -58,20 +58,20 @@
       <p><strong>المساحة:</strong> {{ t.area }} م²</p>
       <p><strong>مساحة المبنى:</strong> {{ t.building_area }} م²</p>
       <p><strong>عمر المبنى:</strong> {{ t.building_age }} سنة</p>
-      <p><strong>قيمة الأرض:</strong> {{ t.land_value }} ريال</p>
-      <p><strong>قيمة المبنى:</strong> {{ t.building_value }} ريال</p>
-      <p><strong>إجمالي التثمين:</strong> <span class="fw-bold text-success">{{ t.total_estimate }}</span> ريال</p>
+      <p><strong>قيمة الأرض:</strong> {{ "{:,.0f}".format(t.land_value or 0) }} ريال</p>
+      <p><strong>قيمة المبنى:</strong> {{ "{:,.0f}".format(t.building_value or 0) }} ريال</p>
+      <p><strong>إجمالي التثمين:</strong> <span class="fw-bold text-success">{{ "{:,.0f}".format(t.total_estimate or 0) }}</span> ريال</p>
 
       {% if session.get('role') == 'engineer' %}
       <hr>
       <form method="POST" action="{{ url_for('engineer_valuate_transaction', tid=t.id) }}" class="row g-3">
         <div class="col-md-4">
           <label class="form-label">قيمة الأرض</label>
-          <input type="number" step="0.01" name="land_value" class="form-control" value="{{ t.land_value or '' }}" required>
+          <input type="number" step="0.01" name="land_value" class="form-control" value="{{ t.land_value or 0 }}" required>
         </div>
         <div class="col-md-4">
           <label class="form-label">قيمة المبنى</label>
-          <input type="number" step="0.01" name="building_value" class="form-control" value="{{ t.building_value or '' }}">
+          <input type="number" step="0.01" name="building_value" class="form-control" value="{{ t.building_value or 0 }}">
         </div>
         <div class="col-md-4 d-flex align-items-end">
           <button class="btn btn-primary w-100">💾 حفظ التثمين</button>
