@@ -526,7 +526,10 @@ def add_transaction():
     if session.get("role") != "employee":
         return redirect(url_for("login"))
     
-    user = User.query.get(session["user_id"])
+    user = User.query.get(session.get("user_id"))
+    if not user or getattr(user, "branch_id", None) is None:
+        flash("⛔ لا يوجد مستخدم صالح أو فرع مرتبط بالمستخدم", "danger")
+        return redirect(url_for("employee_dashboard"))
     transaction_type = request.form.get("transaction_type")  # ✅ نحدد نوع المعاملة
     client_name = (request.form.get("client_name") or "").strip()
     client_phone = (request.form.get("client_phone") or "").strip()
@@ -1304,7 +1307,10 @@ def add_transaction_engineer():
     if session.get("role") != "engineer":
         return redirect(url_for("login"))
 
-    user = User.query.get(session["user_id"])
+    user = User.query.get(session.get("user_id"))
+    if not user or getattr(user, "branch_id", None) is None:
+        flash("⛔ لا يوجد مستخدم صالح أو فرع مرتبط بالمستخدم", "danger")
+        return redirect(url_for("engineer_dashboard"))
     banks = Bank.query.all()
 
     if request.method == "POST":
@@ -1528,7 +1534,10 @@ def finance_dashboard():
     if session.get("role") != "finance":
         return redirect(url_for("login"))
 
-    user = User.query.get(session["user_id"])
+    user = User.query.get(session.get("user_id"))
+    if not user or getattr(user, "branch_id", None) is None:
+        flash("⛔ لا يوجد مستخدم صالح أو فرع مرتبط بالمستخدم", "danger")
+        return redirect(url_for("login"))
 
     # ✅ المعاملات الخاصة بالفرع
     transactions = Transaction.query.filter_by(branch_id=user.branch_id).all()
@@ -1604,7 +1613,10 @@ def finance_paid():
     if session.get("role") != "finance":
         return redirect(url_for("login"))
 
-    user = User.query.get(session["user_id"])
+    user = User.query.get(session.get("user_id"))
+    if not user or getattr(user, "branch_id", None) is None:
+        flash("⛔ لا يوجد مستخدم صالح أو فرع مرتبط بالمستخدم", "danger")
+        return redirect(url_for("login"))
 
     # معاملات هذا الفرع التي لديها مدفوعات
     payments = Payment.query.join(Transaction).filter(
@@ -1649,7 +1661,7 @@ def finance_templates():
 
     # 🆕 عرض القالب الحالي للفرع الحالي لموظف المالية + العام
     user = User.query.get(session.get("user_id"))
-    current_branch_id = getattr(user, "branch_id", None)
+    current_branch_id = getattr(user, "branch_id", None) if user else None
     templates = {
         "invoice": get_template_filename("invoice", current_branch_id) or get_template_filename("invoice", None),
         "quote": get_template_filename("quote", current_branch_id) or get_template_filename("quote", None),
@@ -1763,7 +1775,7 @@ def download_bank_invoice_doc(invoice_id: int):
         preferred_branch_id = transaction.branch_id if transaction else None
     if preferred_branch_id is None:
         user = User.query.get(session.get("user_id"))
-        preferred_branch_id = getattr(user, "branch_id", None)
+        preferred_branch_id = getattr(user, "branch_id", None) if user else None
 
     placeholders = {
         "NAME": (bank.name if bank else f"Bank #{inv.bank_id}"),
@@ -1814,7 +1826,7 @@ def download_customer_invoice_doc(invoice_id: int):
         preferred_branch_id = transaction.branch_id if transaction else None
     if preferred_branch_id is None:
         user = User.query.get(session.get("user_id"))
-        preferred_branch_id = getattr(user, "branch_id", None)
+        preferred_branch_id = getattr(user, "branch_id", None) if user else None
 
     placeholders = {
         "NAME": inv.customer_name or "",
@@ -1866,7 +1878,7 @@ def download_customer_quote_doc(quote_id: int):
         preferred_branch_id = transaction.branch_id if transaction else None
     if preferred_branch_id is None:
         user = User.query.get(session.get("user_id"))
-        preferred_branch_id = getattr(user, "branch_id", None)
+        preferred_branch_id = getattr(user, "branch_id", None) if user else None
 
     placeholders = {
         "NAME": q.customer_name or "",
@@ -1913,7 +1925,10 @@ def add_payment(tid):
     if session.get("role") != "finance":
         return redirect(url_for("login"))
 
-    user = User.query.get(session["user_id"])
+    user = User.query.get(session.get("user_id"))
+    if not user or getattr(user, "branch_id", None) is None:
+        flash("⛔ لا يوجد مستخدم صالح أو فرع مرتبط بالمستخدم", "danger")
+        return redirect(url_for("finance_dashboard"))
     transaction = Transaction.query.get_or_404(tid)
 
     # 🚨 منع التلاعب: لازم تكون المعاملة لنفس فرع موظف المالية
@@ -2392,7 +2407,10 @@ def employee_upload_bank_docs(tid):
         return redirect(url_for("login"))
 
     t = Transaction.query.get_or_404(tid)
-    user = User.query.get(session["user_id"])
+    user = User.query.get(session.get("user_id"))
+    if not user or getattr(user, "branch_id", None) is None:
+        flash("⛔ لا يوجد مستخدم صالح أو فرع مرتبط بالمستخدم", "danger")
+        return redirect(url_for("employee_dashboard"))
     # منع رفع ملفات لمعاملة من فرع آخر
     if t.branch_id != user.branch_id:
         flash("⛔ لا يمكنك رفع مستندات لمعالجة من فرع آخر", "danger")
@@ -2450,8 +2468,9 @@ def employee_upload_bank_docs_lookup():
         return redirect(url_for("employee_dashboard"))
 
     user = User.query.get(session.get("user_id"))
-    if not user:
-        return redirect(url_for("login"))
+    if not user or getattr(user, "branch_id", None) is None:
+        flash("⛔ لا يوجد مستخدم صالح أو فرع مرتبط بالمستخدم", "danger")
+        return redirect(url_for("employee_dashboard"))
 
     # منع رفع ملفات لمعاملة من فرع آخر
     if t.branch_id != user.branch_id:
