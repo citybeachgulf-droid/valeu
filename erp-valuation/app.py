@@ -1580,8 +1580,15 @@ def download_quote_doc(transaction_id: int):
     t = Transaction.query.get_or_404(transaction_id)
     placeholders = {
         "{NAME}": t.client or "—",
+        "{CLIENT_NAME}": t.client or "—",
         "{PRICE}": f"{t.fee or 0:.2f}",
+        "{AMOUNT}": f"{t.fee or 0:.2f}",
+        "{TOTAL}": f"{t.fee or 0:.2f}",
         "{DATE}": datetime.utcnow().strftime("%Y-%m-%d"),
+        "{DETAILS}": "—",
+        "{QUOTE_NO}": str(t.id),
+        "{QUTE_NO}": str(t.id),
+        "{INVOICE_NO}": "",
     }
     return _render_docx_from_template("quote", placeholders, f"quote_{t.id}.docx")
 
@@ -1592,8 +1599,15 @@ def download_invoice_doc(transaction_id: int):
     t = Transaction.query.get_or_404(transaction_id)
     placeholders = {
         "{NAME}": t.client or "—",
+        "{CLIENT_NAME}": t.client or "—",
         "{PRICE}": f"{t.fee or 0:.2f}",
+        "{AMOUNT}": f"{t.fee or 0:.2f}",
+        "{TOTAL}": f"{t.fee or 0:.2f}",
         "{DATE}": datetime.utcnow().strftime("%Y-%m-%d"),
+        "{DETAILS}": "—",
+        "{INVOICE_NO}": str(t.id),
+        "{QUOTE_NO}": "",
+        "{QUTE_NO}": "",
     }
     return _render_docx_from_template("invoice", placeholders, f"invoice_{t.id}.docx")
 
@@ -1606,8 +1620,15 @@ def download_bank_invoice_doc(invoice_id: int):
     bank = Bank.query.get(inv.bank_id)
     placeholders = {
         "{NAME}": (bank.name if bank else f"Bank #{inv.bank_id}"),
+        "{CLIENT_NAME}": (bank.name if bank else f"Bank #{inv.bank_id}"),
         "{PRICE}": f"{inv.amount or 0:.2f}",
+        "{AMOUNT}": f"{inv.amount or 0:.2f}",
+        "{TOTAL}": f"{inv.amount or 0:.2f}",
         "{DATE}": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
+        "{DETAILS}": (inv.note or "—"),
+        "{INVOICE_NO}": str(inv.id),
+        "{QUOTE_NO}": "",
+        "{QUTE_NO}": "",
     }
     return _render_docx_from_template("invoice", placeholders, f"bank_invoice_{inv.id}.docx")
 
@@ -1619,8 +1640,15 @@ def download_customer_invoice_doc(invoice_id: int):
     inv = CustomerInvoice.query.get_or_404(invoice_id)
     placeholders = {
         "{NAME}": inv.customer_name or "—",
+        "{CLIENT_NAME}": inv.customer_name or "—",
         "{PRICE}": f"{inv.amount or 0:.2f}",
+        "{AMOUNT}": f"{inv.amount or 0:.2f}",
+        "{TOTAL}": f"{inv.amount or 0:.2f}",
         "{DATE}": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
+        "{DETAILS}": (inv.note or "—"),
+        "{INVOICE_NO}": str(inv.id),
+        "{QUOTE_NO}": "",
+        "{QUTE_NO}": "",
     }
     return _render_docx_from_template("invoice", placeholders, f"customer_invoice_{inv.id}.docx")
 
@@ -1632,8 +1660,15 @@ def download_customer_quote_doc(quote_id: int):
     q = CustomerQuote.query.get_or_404(quote_id)
     placeholders = {
         "{NAME}": q.customer_name or "—",
+        "{CLIENT_NAME}": q.customer_name or "—",
         "{PRICE}": f"{q.amount or 0:.2f}",
+        "{AMOUNT}": f"{q.amount or 0:.2f}",
+        "{TOTAL}": f"{q.amount or 0:.2f}",
         "{DATE}": datetime.utcnow().strftime("%Y-%m-%d"),
+        "{DETAILS}": (q.note or "—"),
+        "{QUOTE_NO}": str(q.id),
+        "{QUTE_NO}": str(q.id),
+        "{INVOICE_NO}": "",
     }
     return _render_docx_from_template("quote", placeholders, f"customer_quote_{q.id}.docx")
 
