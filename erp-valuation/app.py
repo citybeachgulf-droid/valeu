@@ -12,6 +12,7 @@ from sqlalchemy import func, or_, text
 from sqlalchemy.exc import OperationalError
 from pywebpush import webpush, WebPushException
 from docx import Document
+from pdf_templates import create_pdf
 
 # ---------------- إعداد Flask ----------------
 app = Flask(__name__)
@@ -1673,38 +1674,32 @@ def download_quote_doc(transaction_id: int):
     if session.get("role") != "finance":
         return redirect(url_for("login"))
     t = Transaction.query.get_or_404(transaction_id)
-    placeholders = {
-        "{NAME}": t.client or "—",
-        "{CLIENT_NAME}": t.client or "—",
-        "{PRICE}": f"{t.fee or 0:.2f}",
-        "{AMOUNT}": f"{t.fee or 0:.2f}",
-        "{TOTAL}": f"{t.fee or 0:.2f}",
-        "{DATE}": datetime.utcnow().strftime("%Y-%m-%d"),
-        "{DETAILS}": "—",
-        "{QUOTE_NO}": str(t.id),
-        "{QUTE_NO}": str(t.id),
-        "{INVOICE_NO}": "",
-    }
-    return _render_docx_from_template("quote", placeholders, f"quote_{t.id}.docx", branch_id=t.branch_id)
+    out_name = f"quote_{t.id}.pdf"
+    output_path = os.path.join(app.config["UPLOAD_FOLDER"], out_name)
+    title = "عرض سعر"
+    client_name = t.client or "—"
+    date_str = datetime.utcnow().strftime("%Y-%m-%d")
+    doc_no = f"QUOTE-{t.id}"
+    fee = float(t.fee or 0)
+    items = [{"name": "خدمة تقييم", "qty": 1, "unit_price": fee}]
+    create_pdf(output_path, title, client_name, date_str, doc_no, items)
+    return send_file(output_path, as_attachment=True, download_name=out_name)
 
 @app.route("/finance/templates/invoice/<int:transaction_id>")
 def download_invoice_doc(transaction_id: int):
     if session.get("role") != "finance":
         return redirect(url_for("login"))
     t = Transaction.query.get_or_404(transaction_id)
-    placeholders = {
-        "{NAME}": t.client or "—",
-        "{CLIENT_NAME}": t.client or "—",
-        "{PRICE}": f"{t.fee or 0:.2f}",
-        "{AMOUNT}": f"{t.fee or 0:.2f}",
-        "{TOTAL}": f"{t.fee or 0:.2f}",
-        "{DATE}": datetime.utcnow().strftime("%Y-%m-%d"),
-        "{DETAILS}": "—",
-        "{INVOICE_NO}": str(t.id),
-        "{QUOTE_NO}": "",
-        "{QUTE_NO}": "",
-    }
-    return _render_docx_from_template("invoice", placeholders, f"invoice_{t.id}.docx", branch_id=t.branch_id)
+    out_name = f"invoice_{t.id}.pdf"
+    output_path = os.path.join(app.config["UPLOAD_FOLDER"], out_name)
+    title = "فاتورة"
+    client_name = t.client or "—"
+    date_str = datetime.utcnow().strftime("%Y-%m-%d")
+    doc_no = f"INV-{t.id}"
+    fee = float(t.fee or 0)
+    items = [{"name": "خدمة تقييم", "qty": 1, "unit_price": fee}]
+    create_pdf(output_path, title, client_name, date_str, doc_no, items)
+    return send_file(output_path, as_attachment=True, download_name=out_name)
 
 # ✅ تنزيل فاتورة بنك (من جدول BankInvoice)
 @app.route("/finance/download/bank_invoice/<int:invoice_id>")
@@ -1721,19 +1716,16 @@ def download_bank_invoice_doc(invoice_id: int):
     if preferred_branch_id is None:
         user = User.query.get(session.get("user_id"))
         preferred_branch_id = getattr(user, "branch_id", None)
-    placeholders = {
-        "{NAME}": (bank.name if bank else f"Bank #{inv.bank_id}"),
-        "{CLIENT_NAME}": (bank.name if bank else f"Bank #{inv.bank_id}"),
-        "{PRICE}": f"{inv.amount or 0:.2f}",
-        "{AMOUNT}": f"{inv.amount or 0:.2f}",
-        "{TOTAL}": f"{inv.amount or 0:.2f}",
-        "{DATE}": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
-        "{DETAILS}": (inv.note or "—"),
-        "{INVOICE_NO}": str(inv.id),
-        "{QUOTE_NO}": "",
-        "{QUTE_NO}": "",
-    }
-    return _render_docx_from_template("invoice", placeholders, f"bank_invoice_{inv.id}.docx", branch_id=preferred_branch_id)
+    out_name = f"bank_invoice_{inv.id}.pdf"
+    output_path = os.path.join(app.config["UPLOAD_FOLDER"], out_name)
+    title = "فاتورة"
+    client_name = (bank.name if bank else f"Bank #{inv.bank_id}")
+    date_str = (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d")
+    doc_no = f"INV-BANK-{inv.id}"
+    amount = float(inv.amount or 0)
+    items = [{"name": "خدمة تقييم", "qty": 1, "unit_price": amount}]
+    create_pdf(output_path, title, client_name, date_str, doc_no, items)
+    return send_file(output_path, as_attachment=True, download_name=out_name)
 
 # ✅ تنزيل فاتورة عميل (من جدول CustomerInvoice)
 @app.route("/finance/download/customer_invoice/<int:invoice_id>")
@@ -1748,19 +1740,16 @@ def download_customer_invoice_doc(invoice_id: int):
     if preferred_branch_id is None:
         user = User.query.get(session.get("user_id"))
         preferred_branch_id = getattr(user, "branch_id", None)
-    placeholders = {
-        "{NAME}": inv.customer_name or "—",
-        "{CLIENT_NAME}": inv.customer_name or "—",
-        "{PRICE}": f"{inv.amount or 0:.2f}",
-        "{AMOUNT}": f"{inv.amount or 0:.2f}",
-        "{TOTAL}": f"{inv.amount or 0:.2f}",
-        "{DATE}": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
-        "{DETAILS}": (inv.note or "—"),
-        "{INVOICE_NO}": str(inv.id),
-        "{QUOTE_NO}": "",
-        "{QUTE_NO}": "",
-    }
-    return _render_docx_from_template("invoice", placeholders, f"customer_invoice_{inv.id}.docx", branch_id=preferred_branch_id)
+    out_name = f"customer_invoice_{inv.id}.pdf"
+    output_path = os.path.join(app.config["UPLOAD_FOLDER"], out_name)
+    title = "فاتورة"
+    client_name = inv.customer_name or "—"
+    date_str = (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d")
+    doc_no = f"INV-CUST-{inv.id}"
+    amount = float(inv.amount or 0)
+    items = [{"name": "خدمة تقييم", "qty": 1, "unit_price": amount}]
+    create_pdf(output_path, title, client_name, date_str, doc_no, items)
+    return send_file(output_path, as_attachment=True, download_name=out_name)
 
 # ✅ تنزيل عرض سعر عميل (من جدول CustomerQuote)
 @app.route("/finance/download/customer_quote/<int:quote_id>")
@@ -1775,19 +1764,16 @@ def download_customer_quote_doc(quote_id: int):
     if preferred_branch_id is None:
         user = User.query.get(session.get("user_id"))
         preferred_branch_id = getattr(user, "branch_id", None)
-    placeholders = {
-        "{NAME}": q.customer_name or "—",
-        "{CLIENT_NAME}": q.customer_name or "—",
-        "{PRICE}": f"{q.amount or 0:.2f}",
-        "{AMOUNT}": f"{q.amount or 0:.2f}",
-        "{TOTAL}": f"{q.amount or 0:.2f}",
-        "{DATE}": datetime.utcnow().strftime("%Y-%m-%d"),
-        "{DETAILS}": (q.note or "—"),
-        "{QUOTE_NO}": str(q.id),
-        "{QUTE_NO}": str(q.id),
-        "{INVOICE_NO}": "",
-    }
-    return _render_docx_from_template("quote", placeholders, f"customer_quote_{q.id}.docx", branch_id=preferred_branch_id)
+    out_name = f"customer_quote_{q.id}.pdf"
+    output_path = os.path.join(app.config["UPLOAD_FOLDER"], out_name)
+    title = "عرض سعر"
+    client_name = q.customer_name or "—"
+    date_str = datetime.utcnow().strftime("%Y-%m-%d")
+    doc_no = f"QUOTE-CUST-{q.id}"
+    amount = float(q.amount or 0)
+    items = [{"name": "خدمة تقييم", "qty": 1, "unit_price": amount}]
+    create_pdf(output_path, title, client_name, date_str, doc_no, items)
+    return send_file(output_path, as_attachment=True, download_name=out_name)
 
 # ✅ إضافة دفعة جديدة
 @app.route("/add_payment/<int:tid>", methods=["POST"])
