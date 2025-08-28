@@ -6,7 +6,7 @@
 {% block content %}
   <div class="card shadow p-4 animate__animated animate__fadeInUp" data-aos="zoom-in" style="min-width:350px">
     <h4 class="mb-3 text-center fw-bold">👨‍💼 دخول الموظف</h4>
-    <form method="post" action="/login">
+    <form method="post" action="{{ url_for('login') }}">
       <div class="mb-3">
         <label class="form-label">اسم المستخدم</label>
         <input type="text" name="username" class="form-control" required>
