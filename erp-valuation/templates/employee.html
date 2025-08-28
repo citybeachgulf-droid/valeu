@@ -1,58 +1,41 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <title>🏗️ لوحة الموظف</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <!-- Bootstrap -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  
+{% extends 'base.html' %}
+{% set title = '🏗️ لوحة الموظف' %}
+
+{% block head_extra %}
   <style>
-    body { background-color: #f8f9fa; font-family: "Tajawal", sans-serif; }
     .navbar-brand { font-weight: bold; }
     .card { border-radius: 15px; }
     h2, h5 { font-weight: bold; }
     .form-label { font-weight: 500; }
     .alert-info { border-radius: 12px; }
   </style>
-</head>
-<body>
-  
-  <!-- ✅ شريط التنقل -->
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+{% endblock %}
+
+{% block navbar %}
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm animate__animated animate__fadeInDown">
     <div class="container-fluid">
       <a class="navbar-brand" href="#">🛠️ نظام التثمين</a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
         <span class="navbar-toggler-icon"></span>
       </button>
-      
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto">
-          <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('employee_dashboard') }}">🏠 الصفحة الرئيسية</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('customers_page') }}">👥 العملاء</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-warning" href="/reports">📑 التقارير</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 تسجيل الخروج</a>
-          </li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('employee_dashboard') }}">🏠 الصفحة الرئيسية</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('customers_page') }}">👥 العملاء</a></li>
+          <li class="nav-item"><a class="nav-link text-warning" href="/reports">📑 التقارير</a></li>
+          <li class="nav-item"><a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 تسجيل الخروج</a></li>
         </ul>
       </div>
     </div>
   </nav>
+{% endblock %}
 
-  <!-- ✅ المحتوى -->
+{% block content %}
   <div class="container mt-5">
-    <h2 class="text-center mb-5">📌 لوحة الموظف</h2>
+    <h2 class="text-center mb-5" data-aos="fade-up">📌 لوحة الموظف</h2>
     
     <!-- ✅ خيارات منسّقة: تبويبات للمهام الثلاث -->
-    <ul class="nav nav-pills justify-content-center mb-4" id="employeeTabs" role="tablist">
+    <ul class="nav nav-pills justify-content-center mb-4" id="employeeTabs" role="tablist" data-aos="zoom-in">
       <li class="nav-item" role="presentation">
         <button class="nav-link active" id="tab-transaction-tab" data-bs-toggle="tab" data-bs-target="#tab-transaction" type="button" role="tab">➕ إضافة معاملة</button>
       </li>
@@ -68,7 +51,7 @@
       <!-- تبويب إضافة معاملة -->
       <div class="tab-pane fade show active" id="tab-transaction" role="tabpanel">
         <div class="row justify-content-center">
-          <div class="col-md-8">
+          <div class="col-md-8" data-aos="fade-up">
             <div class="card shadow-lg p-4">
               <h5 class="mb-4">➕ إضافة معاملة جديدة</h5>
               <form method="POST" action="{{ url_for('add_transaction') }}" enctype="multipart/form-data">
@@ -180,7 +163,7 @@
       <!-- تبويب مستندات البنك -->
       <div class="tab-pane fade" id="tab-bankdocs" role="tabpanel">
         <div class="row justify-content-center">
-          <div class="col-md-8">
+          <div class="col-md-8" data-aos="fade-up">
             <div class="card shadow-sm">
               <div class="card-body">
                 <h5 class="mb-3">📤 رفع مستندات مُرسلة للبنك</h5>
@@ -207,7 +190,7 @@
       <!-- تبويب مستندات الشركة/الفرع -->
       <div class="tab-pane fade" id="tab-branchdocs" role="tabpanel">
         <div class="row justify-content-center">
-          <div class="col-md-10">
+          <div class="col-md-10" data-aos="fade-up">
             <div class="card shadow-lg p-4">
               <h5 class="mb-3">📁 مستندات الشركة/الفرع</h5>
               <form method="POST" action="{{ url_for('employee_add_branch_document') }}" enctype="multipart/form-data" class="mb-3">
@@ -318,7 +301,10 @@
     </div>
   </div>
 
-  <!-- ✅ سكربت الحساب -->
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script>
   function calculateEstimate() {
     let area            = parseFloat(document.getElementById("area")?.value) || 0;
@@ -398,8 +384,6 @@
   calculateEstimate();
   </script>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
   <script>
   if ("serviceWorker" in navigator && "PushManager" in window) {
     navigator.serviceWorker.register("/static/service-worker.js")
@@ -434,12 +418,5 @@
   }
   </script>
 
-  <!-- زر تفعيل الإشعارات -->
-  <button onclick="subscribeUser()" class="btn btn-warning">
-    🔔 تفعيل الإشعارات
-  </button>
-
-  
-
-</body>
-</html>
+  <div class="container mt-3"><button onclick="subscribeUser()" class="btn btn-warning">🔔 تفعيل الإشعارات</button></div>
+{% endblock %}
