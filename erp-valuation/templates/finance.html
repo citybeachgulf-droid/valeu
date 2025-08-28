@@ -266,7 +266,8 @@
                     {% endif %}
                   </td>
                   <td class="text-nowrap">
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 flex-wrap">
+                      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('download_bank_invoice_doc', invoice_id=inv.id) }}">تنزيل</a>
                       {% if not inv.delivered_at %}
                       <form method="post" action="{{ url_for('finance_update_bank_invoice_status', invoice_id=inv.id) }}">
                         <input type="hidden" name="action" value="deliver">
@@ -317,7 +318,10 @@
                   <td>{{ q.customer_name }}</td>
                   <td>{{ q.amount }}</td>
                   <td>{{ q.valid_until.strftime('%Y-%m-%d') if q.valid_until else '-' }}</td>
-                  <td>{{ q.note or '-' }}</td>
+                  <td class="d-flex gap-2">
+                    <span>{{ q.note or '-' }}</span>
+                    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('download_customer_quote_doc', quote_id=q.id) }}">تنزيل</a>
+                  </td>
                 </tr>
                 {% else %}
                 <tr><td colspan="5" class="text-center">لا توجد عروض عملاء بعد</td></tr>
@@ -350,7 +354,10 @@
                   <td>{{ inv.customer_name }}</td>
                   <td>{{ inv.amount }}</td>
                   <td>{{ inv.issued_at.strftime('%Y-%m-%d') if inv.issued_at else '-' }}</td>
-                  <td>{{ inv.note or '-' }}</td>
+                  <td class="d-flex gap-2">
+                    <span>{{ inv.note or '-' }}</span>
+                    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('download_customer_invoice_doc', invoice_id=inv.id) }}">تنزيل</a>
+                  </td>
                 </tr>
                 {% else %}
                 <tr><td colspan="5" class="text-center">لا توجد فواتير عملاء بعد</td></tr>
@@ -412,7 +419,7 @@
             <td>{{ e.date }}</td>
             <td>
               {% if e.file %}
-                <a href="{{ url_for('static', filename='uploads/' ~ e.file) }}" target="_blank">📎 عرض</a>
+                <a href="{{ url_for('uploaded_file', filename=e.file) }}" target="_blank">📎 عرض</a>
               {% else %}
                 -
               {% endif %}
