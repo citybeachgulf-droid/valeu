@@ -35,6 +35,17 @@
             <div class="mb-2">
               <input type="file" name="file" accept=".docx" class="form-control" required>
             </div>
+            {% if branches %}
+            <div class="mb-2">
+              <label class="form-label">الفرع (اختياري)</label>
+              <select name="branch_id" class="form-select">
+                <option value="">قالب عام لكل الفروع</option>
+                {% for b in branches %}
+                  <option value="{{ b.id }}" {% if current_branch_id and current_branch_id==b.id %}selected{% endif %}>{{ b.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
             <button class="btn btn-primary">رفع</button>
             {% if templates.quote %}
               <span class="ms-2 text-muted">الحالي: {{ templates.quote }}</span>
@@ -52,6 +63,17 @@
             <div class="mb-2">
               <input type="file" name="file" accept=".docx" class="form-control" required>
             </div>
+            {% if branches %}
+            <div class="mb-2">
+              <label class="form-label">الفرع (اختياري)</label>
+              <select name="branch_id" class="form-select">
+                <option value="">قالب عام لكل الفروع</option>
+                {% for b in branches %}
+                  <option value="{{ b.id }}" {% if current_branch_id and current_branch_id==b.id %}selected{% endif %}>{{ b.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
             <button class="btn btn-primary">رفع</button>
             {% if templates.invoice %}
               <span class="ms-2 text-muted">الحالي: {{ templates.invoice }}</span>
