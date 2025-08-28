@@ -31,6 +31,36 @@ def generate_verification_token() -> str:
     import secrets
     return secrets.token_hex(16)
 
+# -------- أدوات مساعدة للأرقام (تقبل أرقام عربية وفواصل) --------
+def parse_float_input(value) -> float:
+    """تحويل مدخل نصي إلى رقم عشري مع دعم الأرقام العربية والفواصل.
+
+    أمثلة مدعومة:
+    "12,345.67"  "12.345,67"  "١٢٣٤٥٫٦٧"  "١٢٬٣٤٥٫٦٧"
+    تعاد 0.0 في حال الفشل.
+    """
+    if value is None:
+        return 0.0
+    try:
+        s = str(value).strip()
+        if not s:
+            return 0.0
+        # خريطة الأرقام العربية إلى الإنجليزية
+        arabic_to_ascii = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+        s = s.translate(arabic_to_ascii)
+        # رموز الفواصل العربية
+        arabic_thousands = "\u066C"  # ٬
+        arabic_decimal   = "\u066B"  # ٫
+        # إزالة المسافات وأنواع المسافات غير القابلة للكسر
+        s = s.replace(" ", "").replace("\u00A0", "").replace("\u202F", "")
+        # أزل فواصل الآلاف (عربية أو إنجليزية)
+        s = s.replace(",", "").replace(arabic_thousands, "")
+        # وحّد الفاصلة العشرية إلى نقطة
+        s = s.replace(arabic_decimal, ".")
+        return float(s)
+    except Exception:
+        return 0.0
+
 
 # ---------------- النماذج ----------------
 class Branch(db.Model):
@@ -980,8 +1010,8 @@ def engineer_valuate_transaction(tid):
     t = Transaction.query.get_or_404(tid)
 
     if t.transaction_type == "real_estate":
-        land_value     = float(request.form.get("land_value", 0) or 0)
-        building_value = float(request.form.get("building_value", 0) or 0)
+        land_value     = parse_float_input(request.form.get("land_value", 0))
+        building_value = parse_float_input(request.form.get("building_value", 0))
         total_estimate = land_value + building_value
 
         t.land_value      = land_value
@@ -1007,7 +1037,7 @@ def engineer_valuate_transaction(tid):
             db.session.add(memory)
 
     elif t.transaction_type == "vehicle":
-        vehicle_value = float(request.form.get("vehicle_value", 0) or 0)
+        vehicle_value = parse_float_input(request.form.get("vehicle_value", 0))
         t.total_estimate = vehicle_value
         t.valuation_amount = vehicle_value
         t.status = "قيد المعاينة"
