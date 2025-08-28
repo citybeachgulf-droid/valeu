@@ -1597,6 +1597,46 @@ def download_invoice_doc(transaction_id: int):
     }
     return _render_docx_from_template("invoice", placeholders, f"invoice_{t.id}.docx")
 
+# ✅ تنزيل فاتورة بنك (من جدول BankInvoice)
+@app.route("/finance/download/bank_invoice/<int:invoice_id>")
+def download_bank_invoice_doc(invoice_id: int):
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+    inv = BankInvoice.query.get_or_404(invoice_id)
+    bank = Bank.query.get(inv.bank_id)
+    placeholders = {
+        "{NAME}": (bank.name if bank else f"Bank #{inv.bank_id}"),
+        "{PRICE}": f"{inv.amount or 0:.2f}",
+        "{DATE}": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
+    }
+    return _render_docx_from_template("invoice", placeholders, f"bank_invoice_{inv.id}.docx")
+
+# ✅ تنزيل فاتورة عميل (من جدول CustomerInvoice)
+@app.route("/finance/download/customer_invoice/<int:invoice_id>")
+def download_customer_invoice_doc(invoice_id: int):
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+    inv = CustomerInvoice.query.get_or_404(invoice_id)
+    placeholders = {
+        "{NAME}": inv.customer_name or "—",
+        "{PRICE}": f"{inv.amount or 0:.2f}",
+        "{DATE}": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
+    }
+    return _render_docx_from_template("invoice", placeholders, f"customer_invoice_{inv.id}.docx")
+
+# ✅ تنزيل عرض سعر عميل (من جدول CustomerQuote)
+@app.route("/finance/download/customer_quote/<int:quote_id>")
+def download_customer_quote_doc(quote_id: int):
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+    q = CustomerQuote.query.get_or_404(quote_id)
+    placeholders = {
+        "{NAME}": q.customer_name or "—",
+        "{PRICE}": f"{q.amount or 0:.2f}",
+        "{DATE}": datetime.utcnow().strftime("%Y-%m-%d"),
+    }
+    return _render_docx_from_template("quote", placeholders, f"customer_quote_{q.id}.docx")
+
 # ✅ إضافة دفعة جديدة
 @app.route("/add_payment/<int:tid>", methods=["POST"])
 def add_payment(tid):
@@ -1666,7 +1706,7 @@ def finance_create_quote():
     db.session.add(q)
     db.session.commit()
     flash("✅ تم إنشاء عرض السعر", "success")
-    return redirect(url_for("finance_dashboard"))
+    return redirect(url_for("download_customer_quote_doc", quote_id=q.id))
 
 # ✅ إنشاء فاتورة بنك بمبلغ محدد (مرحلة الإصدار)
 @app.route("/finance/bank_invoices", methods=["POST"])
@@ -1689,6 +1729,56 @@ def finance_create_bank_invoice():
     db.session.add(inv)
     db.session.commit()
     flash("✅ تم إنشاء فاتورة البنك", "success")
+    return redirect(url_for("download_bank_invoice_doc", invoice_id=inv.id))
+
+# ✅ تحديث حالة فاتورة البنك (تسليم / استلام)
+@app.route("/finance/bank_invoices/<int:invoice_id>/status", methods=["POST"])
+def finance_update_bank_invoice_status(invoice_id: int):
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+
+    action = (request.form.get("action") or "").strip().lower()
+    invoice = BankInvoice.query.get_or_404(invoice_id)
+
+    if action == "deliver":
+        invoice.delivered_at = datetime.utcnow()
+        db.session.commit()
+        flash("✅ تم تحديث حالة الفاتورة: تم التسليم", "success")
+    elif action == "receive":
+        invoice.received_at = datetime.utcnow()
+        db.session.commit()
+
+        # عند تأكيد الاستلام، نسجل الدخل كـ Payment لفرع المعاملة (إن وُجدت)
+        created_income = False
+        if invoice.transaction_id:
+            t = Transaction.query.get(invoice.transaction_id)
+            user = User.query.get(session.get("user_id"))
+            if t and user and t.branch_id == user.branch_id:
+                # نتجنب التكرار: نتحقق من وجود دفعة بنفس المبلغ والطريقة "بنك"
+                existing_payment = Payment.query.filter_by(
+                    transaction_id=t.id,
+                    amount=invoice.amount,
+                    method="بنك",
+                ).first()
+                if not existing_payment:
+                    p = Payment(
+                        transaction_id=t.id,
+                        amount=invoice.amount,
+                        method="بنك",
+                        date_received=datetime.utcnow(),
+                        received_by=session.get("username"),
+                    )
+                    db.session.add(p)
+                    db.session.commit()
+                    created_income = True
+
+        if created_income:
+            flash("✅ تم تحديث الحالة وإضافة الدخل للفرع", "success")
+        else:
+            flash("✅ تم تحديث الحالة. ⚠️ لم يُسجل دخل تلقائيًا (لا توجد معاملة مرتبطة أو اختلاف فرع)", "warning")
+    else:
+        flash("⚠️ إجراء غير معروف", "warning")
+
     return redirect(url_for("finance_dashboard"))
 
 # ✅ إنشاء عرض سعر للعميل (من المالية)
@@ -1752,7 +1842,7 @@ def finance_create_customer_invoice():
     db.session.add(inv)
     db.session.commit()
     flash("✅ تم إنشاء فاتورة العميل", "success")
-    return redirect(url_for("finance_dashboard"))
+    return redirect(url_for("download_customer_invoice_doc", invoice_id=inv.id))
 
 # ---------------- صفحة البنوك: نظرة عامة ----------------
 @app.route("/banks")
