@@ -1670,9 +1670,9 @@ def _generate_default_docx(doc_type: str, placeholders: dict, out_path: str) -> 
     document = DocxDocument()
 
     # ترويسة
-    title = "فاتورة" if doc_type == "invoice" else "عرض سعر"
     header_p = document.add_paragraph()
-    run = header_p.add_run(f"نظام التثمين — {title}")
+    header_text = "invoice" if doc_type == "invoice" else "عرض سعر"
+    run = header_p.add_run(header_text)
     run.bold = True
     try:
         run.font.size = Pt(16)
