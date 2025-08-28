@@ -227,26 +227,75 @@ class TemplateDoc(db.Model):
     doc_type = db.Column(db.String(50), nullable=False)  # invoice | quote
     filename = db.Column(db.String(255), nullable=False)  # اسم الملف داخل uploads
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # 🆕 قالب خاص بفرع معين (اختياري). لو كانت NULL فهو قالب عام
+    branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=True)
 
 def replace_placeholders_in_docx(doc: Document, replacements: dict) -> None:
-    # فقرات
-    for paragraph in doc.paragraphs:
+    # استبدال على مستوى الفقرة بالكامل لضمان التقاط المتغيرات المقسومة بين runs
+    def replace_in_paragraph(paragraph) -> None:
+        # جمع النص من جميع الـ runs لتفادي مشكلة انقسام المتغيرات
+        combined_text = "".join(run.text for run in paragraph.runs) or paragraph.text
+        if not combined_text:
+            return
+        new_text = combined_text
         for key, val in replacements.items():
-            if key in paragraph.text:
-                for run in paragraph.runs:
-                    run.text = run.text.replace(key, val)
-    # الجداول
-    for table in doc.tables:
+            if key in new_text:
+                new_text = new_text.replace(key, val)
+        if new_text != combined_text:
+            # هذا يُعيد بناء الفقرة بنص واحد (قد يفقد أنماط runs المتعددة وهو مقبول لقوالبنا)
+            paragraph.text = new_text
+
+    # استبدال داخل جدول (خلايا تحتوي فقرات)
+    def replace_in_table(table) -> None:
         for row in table.rows:
             for cell in row.cells:
-                for key, val in replacements.items():
-                    if key in cell.text:
-                        for p in cell.paragraphs:
-                            for r in p.runs:
-                                r.text = r.text.replace(key, val)
+                for p in cell.paragraphs:
+                    replace_in_paragraph(p)
+                # جداول متداخلة داخل الخلايا إن وجدت
+                for nested in getattr(cell, "tables", []):
+                    replace_in_table(nested)
 
-def get_template_filename(doc_type: str) -> str | None:
-    rec = TemplateDoc.query.filter_by(doc_type=doc_type).order_by(TemplateDoc.uploaded_at.desc()).first()
+    # فقرات المستند
+    for paragraph in doc.paragraphs:
+        replace_in_paragraph(paragraph)
+
+    # الجداول في المستند
+    for table in doc.tables:
+        replace_in_table(table)
+
+    # الرؤوس والتذييلات لكل Section
+    for section in getattr(doc, "sections", []):
+        header = getattr(section, "header", None)
+        if header:
+            for p in header.paragraphs:
+                replace_in_paragraph(p)
+            for t in header.tables:
+                replace_in_table(t)
+        footer = getattr(section, "footer", None)
+        if footer:
+            for p in footer.paragraphs:
+                replace_in_paragraph(p)
+            for t in footer.tables:
+                replace_in_table(t)
+
+def ensure_template_doc_branch_column():
+    # إضافة العمود branch_id إن لم يكن موجودًا (SQLite: ALTER TABLE ADD COLUMN)
+    try:
+        if not column_exists("template_doc", "branch_id"):
+            db.session.execute(text("ALTER TABLE template_doc ADD COLUMN branch_id INTEGER"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+def get_template_filename(doc_type: str, branch_id: int | None = None) -> str | None:
+    # يفضّل القالب الخاص بالفرع إن وجد، ثم يعود للقالب العام
+    ensure_template_doc_branch_column()
+    base_q = TemplateDoc.query.filter(TemplateDoc.doc_type == doc_type)
+    if branch_id is not None:
+        rec = base_q.filter(TemplateDoc.branch_id == branch_id).order_by(TemplateDoc.uploaded_at.desc()).first()
+        if rec:
+            return rec.filename
+    rec = base_q.filter(TemplateDoc.branch_id == None).order_by(TemplateDoc.uploaded_at.desc()).first()
     return rec.filename if rec else None
 
 # ---------------- دوال مساعدة ----------------
@@ -1545,24 +1594,35 @@ def finance_templates():
     if request.method == "POST":
         doc_type = request.form.get("doc_type")  # invoice | quote
         file = request.files.get("file")
+        # 🆕 تحديد الفرع المستهدف (اختياري)
+        branch_id_val = request.form.get("branch_id")
+        try:
+            branch_id_val = int(branch_id_val) if branch_id_val else None
+        except Exception:
+            branch_id_val = None
         if doc_type not in ["invoice", "quote"] or not file or not file.filename.lower().endswith('.docx'):
             flash("⚠️ اختر النوع الصحيح وارفع ملف DOCX", "danger")
             return redirect(url_for("finance_templates"))
         fname = secure_filename(file.filename)
         file.save(os.path.join(app.config["UPLOAD_FOLDER"], fname))
-        db.session.add(TemplateDoc(doc_type=doc_type, filename=fname))
+        ensure_template_doc_branch_column()
+        db.session.add(TemplateDoc(doc_type=doc_type, filename=fname, branch_id=branch_id_val))
         db.session.commit()
         flash("✅ تم رفع القالب", "success")
         return redirect(url_for("finance_templates"))
 
+    # 🆕 عرض القالب الحالي للفرع الحالي لموظف المالية + العام
+    user = User.query.get(session.get("user_id"))
+    current_branch_id = getattr(user, "branch_id", None)
     templates = {
-        "invoice": get_template_filename("invoice"),
-        "quote": get_template_filename("quote"),
+        "invoice": get_template_filename("invoice", current_branch_id) or get_template_filename("invoice", None),
+        "quote": get_template_filename("quote", current_branch_id) or get_template_filename("quote", None),
     }
-    return render_template("finance_templates.html", templates=templates)
+    branches = Branch.query.order_by(Branch.name.asc()).all()
+    return render_template("finance_templates.html", templates=templates, branches=branches, current_branch_id=current_branch_id)
 
-def _render_docx_from_template(doc_type: str, placeholders: dict, out_name: str):
-    template_filename = get_template_filename(doc_type)
+def _render_docx_from_template(doc_type: str, placeholders: dict, out_name: str, branch_id: int | None = None):
+    template_filename = get_template_filename(doc_type, branch_id)
     if not template_filename:
         flash("⚠️ لم يتم رفع قالب لهذا النوع بعد", "warning")
         return redirect(url_for("finance_templates"))
@@ -1590,7 +1650,7 @@ def download_quote_doc(transaction_id: int):
         "{QUTE_NO}": str(t.id),
         "{INVOICE_NO}": "",
     }
-    return _render_docx_from_template("quote", placeholders, f"quote_{t.id}.docx")
+    return _render_docx_from_template("quote", placeholders, f"quote_{t.id}.docx", branch_id=t.branch_id)
 
 @app.route("/finance/templates/invoice/<int:transaction_id>")
 def download_invoice_doc(transaction_id: int):
@@ -1609,7 +1669,7 @@ def download_invoice_doc(transaction_id: int):
         "{QUOTE_NO}": "",
         "{QUTE_NO}": "",
     }
-    return _render_docx_from_template("invoice", placeholders, f"invoice_{t.id}.docx")
+    return _render_docx_from_template("invoice", placeholders, f"invoice_{t.id}.docx", branch_id=t.branch_id)
 
 # ✅ تنزيل فاتورة بنك (من جدول BankInvoice)
 @app.route("/finance/download/bank_invoice/<int:invoice_id>")
@@ -1618,6 +1678,14 @@ def download_bank_invoice_doc(invoice_id: int):
         return redirect(url_for("login"))
     inv = BankInvoice.query.get_or_404(invoice_id)
     bank = Bank.query.get(inv.bank_id)
+    # اختيار الفرع: إن وجدت معاملة مرتبطة نستخدم فرعها، وإلا فرع موظف المالية
+    preferred_branch_id = None
+    if inv.transaction_id:
+        t = Transaction.query.get(inv.transaction_id)
+        preferred_branch_id = t.branch_id if t else None
+    if preferred_branch_id is None:
+        user = User.query.get(session.get("user_id"))
+        preferred_branch_id = getattr(user, "branch_id", None)
     placeholders = {
         "{NAME}": (bank.name if bank else f"Bank #{inv.bank_id}"),
         "{CLIENT_NAME}": (bank.name if bank else f"Bank #{inv.bank_id}"),
@@ -1630,7 +1698,7 @@ def download_bank_invoice_doc(invoice_id: int):
         "{QUOTE_NO}": "",
         "{QUTE_NO}": "",
     }
-    return _render_docx_from_template("invoice", placeholders, f"bank_invoice_{inv.id}.docx")
+    return _render_docx_from_template("invoice", placeholders, f"bank_invoice_{inv.id}.docx", branch_id=preferred_branch_id)
 
 # ✅ تنزيل فاتورة عميل (من جدول CustomerInvoice)
 @app.route("/finance/download/customer_invoice/<int:invoice_id>")
@@ -1638,6 +1706,13 @@ def download_customer_invoice_doc(invoice_id: int):
     if session.get("role") != "finance":
         return redirect(url_for("login"))
     inv = CustomerInvoice.query.get_or_404(invoice_id)
+    preferred_branch_id = None
+    if inv.transaction_id:
+        t = Transaction.query.get(inv.transaction_id)
+        preferred_branch_id = t.branch_id if t else None
+    if preferred_branch_id is None:
+        user = User.query.get(session.get("user_id"))
+        preferred_branch_id = getattr(user, "branch_id", None)
     placeholders = {
         "{NAME}": inv.customer_name or "—",
         "{CLIENT_NAME}": inv.customer_name or "—",
@@ -1650,7 +1725,7 @@ def download_customer_invoice_doc(invoice_id: int):
         "{QUOTE_NO}": "",
         "{QUTE_NO}": "",
     }
-    return _render_docx_from_template("invoice", placeholders, f"customer_invoice_{inv.id}.docx")
+    return _render_docx_from_template("invoice", placeholders, f"customer_invoice_{inv.id}.docx", branch_id=preferred_branch_id)
 
 # ✅ تنزيل عرض سعر عميل (من جدول CustomerQuote)
 @app.route("/finance/download/customer_quote/<int:quote_id>")
@@ -1658,6 +1733,13 @@ def download_customer_quote_doc(quote_id: int):
     if session.get("role") != "finance":
         return redirect(url_for("login"))
     q = CustomerQuote.query.get_or_404(quote_id)
+    preferred_branch_id = None
+    if q.transaction_id:
+        t = Transaction.query.get(q.transaction_id)
+        preferred_branch_id = t.branch_id if t else None
+    if preferred_branch_id is None:
+        user = User.query.get(session.get("user_id"))
+        preferred_branch_id = getattr(user, "branch_id", None)
     placeholders = {
         "{NAME}": q.customer_name or "—",
         "{CLIENT_NAME}": q.customer_name or "—",
@@ -1670,7 +1752,7 @@ def download_customer_quote_doc(quote_id: int):
         "{QUTE_NO}": str(q.id),
         "{INVOICE_NO}": "",
     }
-    return _render_docx_from_template("quote", placeholders, f"customer_quote_{q.id}.docx")
+    return _render_docx_from_template("quote", placeholders, f"customer_quote_{q.id}.docx", branch_id=preferred_branch_id)
 
 # ✅ إضافة دفعة جديدة
 @app.route("/add_payment/<int:tid>", methods=["POST"])
