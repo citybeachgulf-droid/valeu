@@ -2672,6 +2672,7 @@ def update_bank_invoice_stage(bank_id):
         db.session.commit()
 
     now_ts = datetime.utcnow()
+    created_income = False
     if action == "issue":
         invoice.issued_at = now_ts
         if amount:
@@ -2680,11 +2681,46 @@ def update_bank_invoice_stage(bank_id):
         invoice.delivered_at = now_ts
     elif action == "receive":
         invoice.received_at = now_ts
+        # عند الاستلام، نسجل الدخل كدفعة إذا كانت الفاتورة مربوطة بمعاملة ونفس فرع المستخدم
+        try:
+            if invoice.transaction_id:
+                t = Transaction.query.get(invoice.transaction_id)
+                user = User.query.get(session.get("user_id"))
+                if t and user and t.branch_id == user.branch_id and (invoice.amount or 0) > 0:
+                    existing_payment = Payment.query.filter_by(
+                        transaction_id=t.id,
+                        amount=invoice.amount,
+                        method="بنك",
+                    ).first()
+                    if not existing_payment:
+                        p = Payment(
+                            transaction_id=t.id,
+                            amount=invoice.amount,
+                            method="بنك",
+                            date_received=datetime.utcnow(),
+                            received_by=session.get("username"),
+                        )
+                        db.session.add(p)
+                        db.session.commit()
+                        created_income = True
+
+                    total_paid = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0)) \
+                        .filter_by(transaction_id=t.id).scalar() or 0.0
+                    t.payment_status = "مدفوعة" if total_paid >= t.fee else "غير مدفوعة"
+                    db.session.commit()
+        except Exception:
+            db.session.rollback()
     if note:
         invoice.note = note
     db.session.commit()
 
-    flash("✅ تم تحديث مرحلة الفاتورة", "success")
+    if action == "receive":
+        if created_income:
+            flash("✅ تم تحديث المرحلة وإضافة الدخل للفرع", "success")
+        else:
+            flash("✅ تم تحديث المرحلة. ⚠️ لم يُسجل دخل تلقائيًا (لا توجد معاملة مرتبطة أو اختلاف فرع)", "warning")
+    else:
+        flash("✅ تم تحديث مرحلة الفاتورة", "success")
     return redirect(url_for("bank_detail", bank_id=bank_id, start=request.args.get('start'), end=request.args.get('end')))
 
 # ---------------- إدارة الموظفين ----------------
