@@ -22,6 +22,7 @@
   </div>
 </nav>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>🏢 إدارة الفروع</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
@@ -35,10 +36,10 @@
     <div class="card-body">
       <h5 class="mb-3">➕ إضافة فرع جديد</h5>
       <form method="POST" class="row g-3">
-        <div class="col-md-10">
+        <div class="col-12 col-md-10">
           <input type="text" name="name" placeholder="اسم الفرع" class="form-control" required>
         </div>
-        <div class="col-md-2">
+        <div class="col-12 col-md-2">
           <button type="submit" class="btn btn-primary w-100">إضافة</button>
         </div>
       </form>
@@ -49,6 +50,7 @@
   <div class="card shadow-sm">
     <div class="card-body">
       <h5 class="mb-3">📋 قائمة الفروع</h5>
+      <div class="table-responsive">
       <table class="table table-bordered table-striped">
         <thead class="table-dark">
           <tr>
@@ -74,6 +76,7 @@
           {% endfor %}
         </tbody>
       </table>
+      </div>
     </div>
   </div>
 </div>
