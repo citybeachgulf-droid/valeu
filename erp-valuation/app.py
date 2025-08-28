@@ -2432,8 +2432,7 @@ def finance_update_bank_invoice_status(invoice_id: int):
         created_income = False
         if invoice.transaction_id:
             t = Transaction.query.get(invoice.transaction_id)
-            user = User.query.get(session.get("user_id"))
-            if t and user and t.branch_id == user.branch_id:
+            if t:
                 # نتجنب التكرار: نتحقق من وجود دفعة بنفس المبلغ والطريقة "بنك"
                 existing_payment = Payment.query.filter_by(
                     transaction_id=t.id,
@@ -2461,7 +2460,7 @@ def finance_update_bank_invoice_status(invoice_id: int):
         if created_income:
             flash("✅ تم تحديث الحالة وإضافة الدخل للفرع", "success")
         else:
-            flash("✅ تم تحديث الحالة. ⚠️ لم يُسجل دخل تلقائيًا (لا توجد معاملة مرتبطة أو اختلاف فرع)", "warning")
+            flash("✅ تم تحديث الحالة. ⚠️ لم يُسجل دخل تلقائيًا (لا توجد معاملة مرتبطة)", "warning")
     else:
         flash("⚠️ إجراء غير معروف", "warning")
 
