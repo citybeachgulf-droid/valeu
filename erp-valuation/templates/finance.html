@@ -206,8 +206,8 @@
                   </select>
                 </div>
                 <div class="col-12 d-flex gap-2 flex-wrap">
-                  <a href="#" onclick="this.closest('form').action='{{ url_for('download_quote_doc', transaction_id=t.id) }}'; this.closest('form').submit(); return false;" class="btn btn-outline-primary btn-sm">عرض سعر</a>
-                  <a href="#" onclick="this.closest('form').action='{{ url_for('download_invoice_doc', transaction_id=t.id) }}'; this.closest('form').submit(); return false;" class="btn btn-outline-secondary btn-sm">فاتورة</a>
+                  <a href="{{ url_for('download_quote_doc', transaction_id=t.id) }}" onclick="this.closest('form').action=this.getAttribute('href'); this.closest('form').submit(); return false;" class="btn btn-outline-primary btn-sm">عرض سعر</a>
+                  <a href="{{ url_for('download_invoice_doc', transaction_id=t.id) }}" onclick="this.closest('form').action=this.getAttribute('href'); this.closest('form').submit(); return false;" class="btn btn-outline-secondary btn-sm">فاتورة</a>
                   <a href="{{ url_for('print_invoice_html', transaction_id=t.id) }}?auto=1" class="btn btn-sm btn-success">طباعة</a>
                 </div>
               </form>
