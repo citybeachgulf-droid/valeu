@@ -1963,6 +1963,73 @@ def print_invoice_html(transaction_id: int):
         notes=t.status or "",
     )
 
+# ✅ طباعة فاتورة بنك HTML بنفس تصميم الطباعة
+@app.route("/finance/print/bank_invoice/<int:invoice_id>")
+def print_bank_invoice_html(invoice_id: int):
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+
+    inv = BankInvoice.query.get_or_404(invoice_id)
+    bank = Bank.query.get(inv.bank_id) if inv.bank_id else None
+    transaction = Transaction.query.get(inv.transaction_id) if inv.transaction_id else None
+
+    bank_name = bank.name if bank else None
+    amount = float(inv.amount or 0)
+    tax, total_with_tax = _compute_tax_and_total(amount)
+
+    org_name = "شركة التثمين"
+    org_meta = "العنوان · الهاتف · البريد الإلكتروني"
+
+    return render_template(
+        "print_bank_invoice.html",
+        invoice=inv,
+        transaction=transaction,
+        bank_name=bank_name,
+        amount=amount,
+        tax=tax,
+        total_with_tax=total_with_tax,
+        vat_rate=_get_vat_rate(),
+        date_str=(inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
+        org_name=org_name,
+        org_meta=org_meta,
+        notes=inv.note or "",
+    )
+
+# ✅ طباعة فاتورة عميل HTML بنفس تصميم الطباعة
+@app.route("/finance/print/customer_invoice/<int:invoice_id>")
+def print_customer_invoice_html(invoice_id: int):
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+
+    inv = CustomerInvoice.query.get_or_404(invoice_id)
+    transaction = Transaction.query.get(inv.transaction_id) if inv.transaction_id else None
+
+    bank_name = None
+    if transaction and transaction.bank_id:
+        bank = Bank.query.get(transaction.bank_id)
+        bank_name = bank.name if bank else None
+
+    amount = float(inv.amount or 0)
+    tax, total_with_tax = _compute_tax_and_total(amount)
+
+    org_name = "شركة التثمين"
+    org_meta = "العنوان · الهاتف · البريد الإلكتروني"
+
+    return render_template(
+        "print_customer_invoice.html",
+        invoice=inv,
+        transaction=transaction,
+        bank_name=bank_name,
+        amount=amount,
+        tax=tax,
+        total_with_tax=total_with_tax,
+        vat_rate=_get_vat_rate(),
+        date_str=(inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
+        org_name=org_name,
+        org_meta=org_meta,
+        notes=inv.note or "",
+    )
+
 # ✅ تنزيل فاتورة بنك (من جدول BankInvoice)
 @app.route("/finance/download/bank_invoice/<int:invoice_id>")
 def download_bank_invoice_doc(invoice_id: int):
@@ -2224,7 +2291,7 @@ def finance_create_bank_invoice():
     db.session.add(inv)
     db.session.commit()
     flash("✅ تم إنشاء فاتورة البنك", "success")
-    return redirect(url_for("download_bank_invoice_doc", invoice_id=inv.id))
+    return redirect(url_for("print_bank_invoice_html", invoice_id=inv.id) + "?auto=1")
 
 # ✅ تحديث حالة فاتورة البنك (تسليم / استلام)
 @app.route("/finance/bank_invoices/<int:invoice_id>/status", methods=["POST"])
@@ -2343,7 +2410,7 @@ def finance_create_customer_invoice():
     db.session.add(inv)
     db.session.commit()
     flash("✅ تم إنشاء فاتورة العميل", "success")
-    return redirect(url_for("download_customer_invoice_doc", invoice_id=inv.id))
+    return redirect(url_for("print_customer_invoice_html", invoice_id=inv.id) + "?auto=1")
 
 # ---------------- صفحة البنوك: نظرة عامة ----------------
 @app.route("/banks")
