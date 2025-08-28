@@ -1,11 +1,8 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <title>💰 لوحة المالية</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
- <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+{% extends 'base.html' %}
+{% set title = '💰 لوحة المالية' %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 animate__animated animate__fadeInDown">
   <div class="container-fluid">
     <a class="navbar-brand" href="#">🛠️ نظام التثمين</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -13,41 +10,24 @@
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto">
-        <!-- زر الصفحة الرئيسية -->
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('finance_dashboard') }}">🏠 الصفحة الرئيسية</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('finance_paid') }}">✅ المدفوعة</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('finance_templates') }}">📄 القوالب</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('customers_page') }}">👥 العملاء</a>
-        </li>
-        <!-- زر تسجيل الخروج -->
-        <li class="nav-item">
-          <a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 تسجيل الخروج</a>
-        </li>
-          <li class="nav-item">
-            <a class="nav-link text-warning" href="/reports">📑 التقارير</a>
-          </li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('finance_dashboard') }}">🏠 الصفحة الرئيسية</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('finance_paid') }}">✅ المدفوعة</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('finance_templates') }}">📄 القوالب</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('customers_page') }}">👥 العملاء</a></li>
+        <li class="nav-item"><a class="nav-link text-warning" href="/reports">📑 التقارير</a></li>
+        <li class="nav-item"><a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 تسجيل الخروج</a></li>
       </ul>
     </div>
   </div>
 </nav>
-<body class="bg-light">
+{% endblock %}
 
+{% block content %}
 <div class="container py-4">
+  <h2 class="mb-4" data-aos="fade-up">💰 لوحة التحكم المالية</h2>
 
-  <h2 class="mb-4">💰 لوحة التحكم المالية</h2>
-
-  <!-- إنشاء عرض سعر وفاتورة بنك / عميل -->
-  <div class="row mb-4">
-    <!-- تم إزالة قسم "إنشاء عرض سعر للبنك" -->
-
-    <div class="col-md-6">
+  <div class="row mb-4" data-aos="fade-up">
+    <div class="col-md-6" data-aos="zoom-in">
       <div class="card shadow-sm">
         <div class="card-body">
           <h5 class="mb-3">📄 إنشاء فاتورة بنك</h5>
@@ -82,8 +62,8 @@
     </div>
   </div>
 
-  <div class="row mb-4">
-    <div class="col-md-6">
+  <div class="row mb-4" data-aos="fade-up">
+    <div class="col-md-6" data-aos="zoom-in">
       <div class="card shadow-sm">
         <div class="card-body">
           <h5 class="mb-3">🧾 إنشاء عرض سعر للعميل</h5>
@@ -116,7 +96,7 @@
       </div>
     </div>
 
-    <div class="col-md-6">
+    <div class="col-md-6" data-aos="zoom-in" data-aos-delay="80">
       <div class="card shadow-sm">
         <div class="card-body">
           <h5 class="mb-3">🧮 إنشاء فاتورة للعميل</h5>
@@ -146,9 +126,8 @@
     </div>
   </div>
 
-  <!-- البطاقات -->
-  <div class="row mb-4">
-    <div class="col-md-4">
+  <div class="row mb-4" data-aos="fade-up">
+    <div class="col-md-4" data-aos="zoom-in">
       <div class="card shadow-sm text-center">
         <div class="card-body">
           <h5>📥 إجمالي الدخل</h5>
@@ -156,7 +135,7 @@
         </div>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-4" data-aos="zoom-in" data-aos-delay="60">
       <div class="card shadow-sm text-center">
         <div class="card-body">
           <h5>📤 إجمالي المصاريف</h5>
@@ -164,7 +143,7 @@
         </div>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-4" data-aos="zoom-in" data-aos-delay="120">
       <div class="card shadow-sm text-center">
         <div class="card-body">
           <h5>💹 صافي الربح</h5>
@@ -174,78 +153,73 @@
     </div>
   </div>
 
-  <!-- جدول المعاملات الغير مدفوعة -->
-  <div class="card shadow-sm mb-4">
+  <div class="card shadow-sm mb-4" data-aos="fade-up">
     <div class="card-body">
       <h5 class="mb-3">❌ المعاملات غير المدفوعة</h5>
       <table class="table table-bordered">
-  <thead>
-    <tr>
-      <th>#</th>
-      <th>العميل</th>
-      <th>الموظف</th>
-      <th>الرسوم</th>
-      <th>المدفوع</th>
-      <th>الحالة</th>
-      <th>إضافة دفعة</th>
-      <th>تنزيل مستند</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for t in transactions %}
-    <tr>
-      <td>{{ t.id }}</td>
-      <td>{{ t.client }}</td>
-      <td>{{ t.employee }}</td>
-      <td>{{ t.fee }} ريال</td>
-      <td>{{ t.paid }} ريال</td>
-      <td>{{ t.payment_status }}</td>
-      <td>
-        <form action="{{ url_for('add_payment', tid=t.id) }}" method="post" enctype="multipart/form-data" class="d-flex gap-2">
-          <input type="number" step="0.01" name="amount" placeholder="المبلغ" class="form-control form-control-sm" required>
-          <select name="method" class="form-select form-select-sm" required>
-            <option value="كاش">كاش</option>
-            <option value="تحويل">تحويل</option>
-          </select>
-          <input type="file" name="receipt_file" class="form-control form-control-sm">
-          <button type="submit" class="btn btn-success btn-sm">💵</button>
-        </form>
-      </td>
-      <td>
-        <form method="get" class="row g-2 align-items-end">
-          <div class="col-12">
-            <input type="text" name="details" class="form-control form-control-sm" placeholder="وصف/تفاصيل (اختياري)">
-          </div>
-          <div class="col-6">
-            <label class="form-label mb-1 small">نسبة الضريبة %</label>
-            <input type="number" name="vat" class="form-control form-control-sm" value="{{ vat_default_percent }}" min="0" max="100" step="0.01">
-          </div>
-          <div class="col-6">
-            <label class="form-label mb-1 small">تطبيق الضريبة</label>
-            <select name="apply_vat" class="form-select form-select-sm">
-              <option value="1" selected>نعم</option>
-              <option value="0">لا</option>
-            </select>
-          </div>
-          <div class="col-12 d-flex gap-2 flex-wrap">
-            <a href="#" onclick="this.closest('form').action='{{ url_for('download_quote_doc', transaction_id=t.id) }}'; this.closest('form').submit(); return false;" class="btn btn-outline-primary btn-sm">عرض سعر</a>
-            <a href="#" onclick="this.closest('form').action='{{ url_for('download_invoice_doc', transaction_id=t.id) }}'; this.closest('form').submit(); return false;" class="btn btn-outline-secondary btn-sm">فاتورة</a>
-            <a href="{{ url_for('print_invoice_html', transaction_id=t.id) }}?auto=1" class="btn btn-sm btn-success">طباعة</a>
-          </div>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>العميل</th>
+            <th>الموظف</th>
+            <th>الرسوم</th>
+            <th>المدفوع</th>
+            <th>الحالة</th>
+            <th>إضافة دفعة</th>
+            <th>تنزيل مستند</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in transactions %}
+          <tr>
+            <td>{{ t.id }}</td>
+            <td>{{ t.client }}</td>
+            <td>{{ t.employee }}</td>
+            <td>{{ t.fee }} ريال</td>
+            <td>{{ t.paid }} ريال</td>
+            <td>{{ t.payment_status }}</td>
+            <td>
+              <form action="{{ url_for('add_payment', tid=t.id) }}" method="post" enctype="multipart/form-data" class="d-flex gap-2">
+                <input type="number" step="0.01" name="amount" placeholder="المبلغ" class="form-control form-control-sm" required>
+                <select name="method" class="form-select form-select-sm" required>
+                  <option value="كاش">كاش</option>
+                  <option value="تحويل">تحويل</option>
+                </select>
+                <input type="file" name="receipt_file" class="form-control form-control-sm">
+                <button type="submit" class="btn btn-success btn-sm">💵</button>
+              </form>
+            </td>
+            <td>
+              <form method="get" class="row g-2 align-items-end">
+                <div class="col-12">
+                  <input type="text" name="details" class="form-control form-control-sm" placeholder="وصف/تفاصيل (اختياري)">
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1 small">نسبة الضريبة %</label>
+                  <input type="number" name="vat" class="form-control form-control-sm" value="{{ vat_default_percent }}" min="0" max="100" step="0.01">
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1 small">تطبيق الضريبة</label>
+                  <select name="apply_vat" class="form-select form-select-sm">
+                    <option value="1" selected>نعم</option>
+                    <option value="0">لا</option>
+                  </select>
+                </div>
+                <div class="col-12 d-flex gap-2 flex-wrap">
+                  <a href="#" onclick="this.closest('form').action='{{ url_for('download_quote_doc', transaction_id=t.id) }}'; this.closest('form').submit(); return false;" class="btn btn-outline-primary btn-sm">عرض سعر</a>
+                  <a href="#" onclick="this.closest('form').action='{{ url_for('download_invoice_doc', transaction_id=t.id) }}'; this.closest('form').submit(); return false;" class="btn btn-outline-secondary btn-sm">فاتورة</a>
+                  <a href="{{ url_for('print_invoice_html', transaction_id=t.id) }}?auto=1" class="btn btn-sm btn-success">طباعة</a>
+                </div>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 
-  <!-- تم نقل جدول المعاملات المدفوعة إلى صفحة منفصلة -->
-
-  <!-- العروض الأخيرة والفواتير الأخيرة (بنوك) -->
-  <div class="row mb-4">
+  <div class="row mb-4" data-aos="fade-up">
     <div class="col-md-12">
       <div class="card shadow-sm">
         <div class="card-body">
@@ -274,15 +248,7 @@
                   <td>{{ inv.delivered_at.strftime('%Y-%m-%d') if inv.delivered_at else '-' }}</td>
                   <td>{{ inv.received_at.strftime('%Y-%m-%d') if inv.received_at else '-' }}</td>
                   <td>
-                    {% if inv.received_at %}
-                      تم استلام المبلغ
-                    {% elif inv.delivered_at %}
-                      تم التسليم
-                    {% elif inv.issued_at %}
-                      تم الإصدار
-                    {% else %}
-                      -
-                    {% endif %}
+                    {% if inv.received_at %}تم استلام المبلغ{% elif inv.delivered_at %}تم التسليم{% elif inv.issued_at %}تم الإصدار{% else %}-{% endif %}
                   </td>
                   <td class="text-nowrap">
                     <div class="d-flex gap-2 flex-wrap">
@@ -313,8 +279,7 @@
     </div>
   </div>
 
-  <!-- العروض الأخيرة والفواتير الأخيرة (عملاء) -->
-  <div class="row mb-4">
+  <div class="row mb-4" data-aos="fade-up">
     <div class="col-md-6">
       <div class="card shadow-sm">
         <div class="card-body">
@@ -389,8 +354,7 @@
     </div>
   </div>
 
-  <!-- إضافة مصروف جديد -->
-  <div class="card shadow-sm mb-4">
+  <div class="card shadow-sm" data-aos="fade-up">
     <div class="card-body">
       <h5 class="mb-3">➕ إضافة مصروف جديد</h5>
       <form method="POST" enctype="multipart/form-data">
@@ -415,101 +379,33 @@
     </div>
   </div>
 
-  <!-- جدول المصاريف -->
-  <div class="card shadow-sm">
-    <div class="card-body">
-      <h5 class="mb-3">📑 سجل المصاريف</h5>
-      <table class="table table-bordered table-striped">
-        <thead class="table-dark">
-          <tr>
-            <th>#</th>
-            <th>اسم المصروف</th>
-            <th>المبلغ</th>
-            <th>التاريخ</th>
-            <th>الإيصال</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for e in expenses %}
-          <tr>
-            <td>{{ e.id }}</td>
-            <td>{{ e.name }}</td>
-            <td>{{ e.amount }} ريال</td>
-            <td>{{ e.date }}</td>
-            <td>
-              {% if e.file %}
-                <a href="{{ url_for('uploaded_file', filename=e.file) }}" target="_blank">📎 عرض</a>
-              {% else %}
-                -
-              {% endif %}
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="5" class="text-center">❌ لا توجد مصاريف مسجلة</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
 </div>
+{% endblock %}
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
+{% block scripts %}
 <script>
 if ("serviceWorker" in navigator && "PushManager" in window) {
- navigator.serviceWorker.register("/static/service-worker.js")
-    .then(function(reg) {
-      console.log("✅ Service Worker مسجل:", reg);
-    })
-    .catch(function(err) {
-      console.error("❌ فشل التسجيل:", err);
-    });
+  navigator.serviceWorker.register("/static/service-worker.js")
+    .then(function(reg) { console.log("✅ Service Worker مسجل:", reg); })
+    .catch(function(err) { console.error("❌ فشل التسجيل:", err); });
 }
-</script>
 
-
-
-
-
-<script>
-// دالة لتحويل المفتاح العام إلى Uint8Array
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding)
-    .replace(/-/g, "+")
-    .replace(/_/g, "/");
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = atob(base64);
   const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
+  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
   return outputArray;
 }
 
 async function subscribeUser() {
   try {
-    // نتأكد أن الـ Service Worker جاهز
     const registration = await navigator.serviceWorker.ready;
-
-    // المفتاح العام من Flask
     const vapidPublicKey = "BFNeZpjEro8pwFxR1H20twlTd2pL5MZtWrDATu4ME2RcbzhN-PBHcpk_jYrRlDUrn4SUxHJ5TOEF796OXs-NN";
     const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
-
-    // نطلب الاشتراك
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey
-    });
-
-    // نرسل الاشتراك للسيرفر
-    await fetch("/save-subscription", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(subscription)
-    });
-
-    console.log("✅ تم الاشتراك بنجاح:", subscription);
+    const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
+    await fetch("/save-subscription", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(subscription) });
     alert("✅ تم تفعيل الإشعارات");
   } catch (err) {
     console.error("❌ خطأ في الاشتراك:", err);
@@ -517,12 +413,6 @@ async function subscribeUser() {
   }
 }
 </script>
+<div class="container py-2"><button onclick="subscribeUser()" class="btn btn-warning">🔔 تفعيل الإشعارات</button></div>
+{% endblock %}
 
-<!-- زر تفعيل الإشعارات -->
-<button onclick="subscribeUser()" class="btn btn-warning">
-  🔔 تفعيل الإشعارات
-</button>
-
-
-</body>
-</html>
