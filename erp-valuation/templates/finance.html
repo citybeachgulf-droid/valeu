@@ -213,7 +213,8 @@
       </td>
       <td class="text-nowrap">
         <a href="{{ url_for('download_quote_doc', transaction_id=t.id) }}" class="btn btn-outline-primary btn-sm">عرض سعر</a>
-        <a href="{{ url_for('download_invoice_doc', transaction_id=t.id) }}" class="btn btn-outline-secondary btn-sm">فاتورة</a>
+        <a href="{{ url_for('download_invoice_doc', transaction_id=t.id) }}" class="btn btn-outline-secondary btn-sm">تنزيل</a>
+        <a href="{{ url_for('print_invoice_html', transaction_id=t.id) }}?auto=1" class="btn btn-sm btn-success">طباعة</a>
       </td>
     </tr>
     {% endfor %}
