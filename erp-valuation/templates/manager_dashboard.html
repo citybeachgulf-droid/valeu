@@ -1,12 +1,8 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>👨‍💼 لوحة المدير</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+{% extends 'base.html' %}
+{% set title = '👨‍💼 لوحة المدير' %}
+
+{% block head_extra %}
   <style>
-    body { background-color: #f8f9fa; }
     .card { border-radius: 1rem; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
     .navbar-brand { font-weight: bold; }
     .transaction-card { border-radius: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 1rem; }
@@ -23,11 +19,10 @@
       .btn-mobile-full { width: 100%; }
     }
   </style>
-</head>
-<body>
+{% endblock %}
 
-<!-- ✅ شريط علوي -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark animate__animated animate__fadeInDown">
   <div class="container-fluid">
     <a class="navbar-brand" href="#">لوحة المدير</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -42,20 +37,18 @@
         <li class="nav-item"><a class="nav-link" href="{{ url_for('branch_documents') }}">📁 مستندات الفروع</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('commissions_page') }}">💸 عمولة الموظفين</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('customers_page') }}">👥 العملاء</a></li>
-        
-        <li class="nav-item">
-            <a class="nav-link text-warning" href="/reports">📑 التقارير</a>
-          </li>
+        <li class="nav-item"><a class="nav-link text-warning" href="/reports">📑 التقارير</a></li>
       </ul>
     </div>
   </div>
-</nav>
+  </nav>
+{% endblock %}
 
-<!-- ✅ محتوى الصفحة -->
+{% block content %}
 <div class="container my-4">
 
   {% if expiring_docs and expiring_docs|length > 0 %}
-  <div class="alert alert-warning d-flex justify-content-between align-items-center">
+  <div class="alert alert-warning d-flex justify-content-between align-items-center animate__animated animate__fadeIn" data-aos="fade-up">
     <div>
       ⚠️ هناك مستندات/عقود قريبة الانتهاء خلال 30 يوماً.
       <a href="{{ url_for('branch_documents') }}" class="alert-link">عرض التفاصيل</a>
@@ -64,13 +57,10 @@
   </div>
   {% endif %}
 
-  <!-- ⛔ تم تعطيل رفع القوالب -->
-
-  <!-- 🔹 قائمة المعاملات -->
-  <h4 class="mb-3 text-center">📋 جميع المعاملات</h4>
+  <h4 class="mb-3 text-center" data-aos="fade-up">📋 جميع المعاملات</h4>
   <div class="row">
     {% for t in transactions %}
-      <div class="col-12">
+      <div class="col-12" data-aos="fade-up" data-aos-delay="{{ loop.index0 * 40 }}">
         <div class="card transaction-card">
           <div class="card-body">
             <div class="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-2 mb-2">
@@ -92,7 +82,6 @@
 
             <hr>
 
-            <!-- 🔹 ملخص الرسوم (بدون إجراءات) -->
             <div class="d-flex justify-content-between">
               <span><strong>💵 الرسوم:</strong> {{ "{:,.0f}".format(t.fee) }} ريال</span>
               <span class="text-muted">الإجراءات تتم بواسطة المهندس والمالية</span>
@@ -107,19 +96,15 @@
     {% endfor %}
   </div>
 
-
-  <!-- 🔹 أرباح الفروع -->
-  <h4 class="mb-4 text-center mt-5">📊 أرباح الفروع</h4>
+  <h4 class="mb-4 text-center mt-5" data-aos="fade-up">📊 أرباح الفروع</h4>
   <div class="row g-3">
   {% for branch in branches %}
-  <div class="col-12 col-md-6 col-lg-4">
+  <div class="col-12 col-md-6 col-lg-4" data-aos="zoom-in" data-aos-delay="{{ loop.index0 * 60 }}">
     <div class="card text-center p-3">
       <h5 class="card-title">🏢 {{ branch.name }}</h5>
       <p class="mb-1">💰 الدخل: {{ branch.income }} ريال</p>
       <p class="mb-1">📉 المصاريف: {{ branch.expenses }} ريال</p>
       <p class="fw-bold text-success">📊 الربح: {{ branch.profit }} ريال</p>
-
-      <!-- ✅ معاملات البنوك حسب البنك -->
       <div class="mt-3">
         <h6 class="text-primary">🏦 معاملات البنوك (هذا الشهر):</h6>
         <ul class="list-group">
@@ -136,9 +121,18 @@
     </div>
   </div>
   {% endfor %}
-</div>
+  </div>
+
+  <div class="mt-3" data-aos="fade-up">
+    <button onclick="subscribeUser()" class="btn btn-warning btn-mobile-full">
+      🔔 تفعيل الإشعارات
+    </button>
+  </div>
 
 </div>
+{% endblock %}
+
+{% block scripts %}
 <script>
 if ("serviceWorker" in navigator && "PushManager" in window) {
  navigator.serviceWorker.register("/static/service-worker.js")
@@ -149,14 +143,7 @@ if ("serviceWorker" in navigator && "PushManager" in window) {
       console.error("❌ فشل التسجيل:", err);
     });
 }
-</script>
 
-
-
-
-
-<script>
-// دالة لتحويل المفتاح العام إلى Uint8Array
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding)
@@ -172,26 +159,18 @@ function urlBase64ToUint8Array(base64String) {
 
 async function subscribeUser() {
   try {
-    // نتأكد أن الـ Service Worker جاهز
     const registration = await navigator.serviceWorker.ready;
-
-    // المفتاح العام من Flask
     const vapidPublicKey = "BFNeZpjEro8pwFxR1H20twlTd2pL5MZtWrDATu4ME2RcbzhN-PBHcpk_jYrRlDUrn4SUxHJ5TOEF796OXs-NN";
     const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
-
-    // نطلب الاشتراك
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey
     });
-
-    // نرسل الاشتراك للسيرفر
     await fetch("/save-subscription", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(subscription)
     });
-
     console.log("✅ تم الاشتراك بنجاح:", subscription);
     alert("✅ تم تفعيل الإشعارات");
   } catch (err) {
@@ -200,18 +179,4 @@ async function subscribeUser() {
   }
 }
 </script>
-
-<!-- زر تفعيل الإشعارات -->
-<button onclick="subscribeUser()" class="btn btn-warning btn-mobile-full">
-  🔔 تفعيل الإشعارات
-</button>
-
-
-
-
-
-
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+{% endblock %}

@@ -1,13 +1,11 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <title>تسجيل دخول الموظف</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light d-flex justify-content-center align-items-center vh-100">
-  <div class="card shadow p-4" style="min-width:350px">
-    <h4 class="mb-3 text-center">👨‍💼 دخول الموظف</h4>
+{% extends 'base.html' %}
+{% set title = 'تسجيل دخول الموظف' %}
+
+{% block body_class %}login-gradient d-flex justify-content-center align-items-center vh-100{% endblock %}
+
+{% block content %}
+  <div class="card shadow p-4 animate__animated animate__fadeInUp" data-aos="zoom-in" style="min-width:350px">
+    <h4 class="mb-3 text-center fw-bold">👨‍💼 دخول الموظف</h4>
     <form method="post" action="/login">
       <div class="mb-3">
         <label class="form-label">اسم المستخدم</label>
@@ -17,8 +15,9 @@
         <label class="form-label">كلمة المرور</label>
         <input type="password" name="password" class="form-control" required>
       </div>
-      <button type="submit" class="btn btn-primary w-100">تسجيل الدخول</button>
+      <button type="submit" class="btn btn-primary w-100">
+        دخول
+      </button>
     </form>
   </div>
-</body>
-</html>
+{% endblock %}
