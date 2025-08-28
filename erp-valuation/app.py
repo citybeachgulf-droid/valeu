@@ -1703,6 +1703,20 @@ def _render_docx_from_template(doc_type: str, placeholders: dict, out_name: str,
     _fill_docx_from_template_xml(path, output_path, placeholders)
     return send_file(output_path, as_attachment=True, download_name=out_name)
 
+
+def _get_vat_rate() -> float:
+    try:
+        return float(os.getenv("VAT_RATE", "0.15"))
+    except Exception:
+        return 0.15
+
+
+def _compute_tax_and_total(base_amount: float) -> tuple[float, float]:
+    vat = _get_vat_rate()
+    tax = round((base_amount or 0.0) * vat, 2)
+    total = round((base_amount or 0.0) + tax, 2)
+    return tax, total
+
 @app.route("/finance/templates/quote/<int:transaction_id>")
 def download_quote_doc(transaction_id: int):
     if session.get("role") != "finance":
@@ -1712,12 +1726,17 @@ def download_quote_doc(transaction_id: int):
     if t.bank_id:
         bank = Bank.query.get(t.bank_id)
         bank_name = bank.name if bank else None
+    amount = float(t.fee or 0)
+    tax, total_with_tax = _compute_tax_and_total(amount)
     placeholders = {
         "NAME": t.client or "",
         "CLIENT_NAME": t.client or "",
-        "AMOUNT": f"{float(t.fee or 0):.2f}",
-        "PRICE": f"{float(t.fee or 0):.2f}",
-        "TOTAL": f"{float(t.fee or 0):.2f}",
+        "AMOUNT": f"{amount:.2f}",
+        "PRICE": f"{amount:.2f}",
+        "TAX": f"{tax:.2f}",
+        "TOTAL_PRICE": f"{total_with_tax:.2f}",
+        # للحفاظ على التوافق مع القوالب القديمة
+        "TOTAL": f"{amount:.2f}",
         "DATE": datetime.utcnow().strftime("%Y-%m-%d"),
         "DETAILS": t.status or "",
         "QUOTE_NO": f"QUOTE-{t.id}",
@@ -1752,12 +1771,17 @@ def download_invoice_doc(transaction_id: int):
     if t.bank_id:
         bank = Bank.query.get(t.bank_id)
         bank_name = bank.name if bank else None
+    amount = float(t.fee or 0)
+    tax, total_with_tax = _compute_tax_and_total(amount)
     placeholders = {
         "NAME": t.client or "",
         "CLIENT_NAME": t.client or "",
-        "AMOUNT": f"{float(t.fee or 0):.2f}",
-        "PRICE": f"{float(t.fee or 0):.2f}",
-        "TOTAL": f"{float(t.fee or 0):.2f}",
+        "AMOUNT": f"{amount:.2f}",
+        "PRICE": f"{amount:.2f}",
+        "TAX": f"{tax:.2f}",
+        "TOTAL_PRICE": f"{total_with_tax:.2f}",
+        # للتوافق مع القوالب القديمة
+        "TOTAL": f"{amount:.2f}",
         "DATE": datetime.utcnow().strftime("%Y-%m-%d"),
         "DETAILS": t.status or "",
         "INVOICE_NO": f"INV-{t.id}",
@@ -1799,12 +1823,17 @@ def download_bank_invoice_doc(invoice_id: int):
         user = User.query.get(session.get("user_id"))
         preferred_branch_id = getattr(user, "branch_id", None)
 
+    amount = float(inv.amount or 0)
+    tax, total_with_tax = _compute_tax_and_total(amount)
     placeholders = {
         "NAME": (bank.name if bank else f"Bank #{inv.bank_id}"),
         "CLIENT_NAME": (bank.name if bank else f"Bank #{inv.bank_id}"),
-        "AMOUNT": f"{float(inv.amount or 0):.2f}",
-        "PRICE": f"{float(inv.amount or 0):.2f}",
-        "TOTAL": f"{float(inv.amount or 0):.2f}",
+        "AMOUNT": f"{amount:.2f}",
+        "PRICE": f"{amount:.2f}",
+        "TAX": f"{tax:.2f}",
+        "TOTAL_PRICE": f"{total_with_tax:.2f}",
+        # توافق قديم
+        "TOTAL": f"{amount:.2f}",
         "DATE": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
         "DETAILS": inv.note or "",
         "INVOICE_NO": f"INV-BANK-{inv.id}",
@@ -1850,12 +1879,17 @@ def download_customer_invoice_doc(invoice_id: int):
         user = User.query.get(session.get("user_id"))
         preferred_branch_id = getattr(user, "branch_id", None)
 
+    amount = float(inv.amount or 0)
+    tax, total_with_tax = _compute_tax_and_total(amount)
     placeholders = {
         "NAME": inv.customer_name or "",
         "CLIENT_NAME": inv.customer_name or "",
-        "AMOUNT": f"{float(inv.amount or 0):.2f}",
-        "PRICE": f"{float(inv.amount or 0):.2f}",
-        "TOTAL": f"{float(inv.amount or 0):.2f}",
+        "AMOUNT": f"{amount:.2f}",
+        "PRICE": f"{amount:.2f}",
+        "TAX": f"{tax:.2f}",
+        "TOTAL_PRICE": f"{total_with_tax:.2f}",
+        # توافق قديم
+        "TOTAL": f"{amount:.2f}",
         "DATE": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
         "DETAILS": inv.note or "",
         "INVOICE_NO": f"INV-CUST-{inv.id}",
