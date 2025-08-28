@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>نموذج موحد | عرض سعر / فاتورة</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/assets/app.js" defer></script>
+  </head>
+  <body>
+    <div class="container">
+      <header class="doc-header">
+        <div class="brand">
+          <div class="logo" aria-hidden="true"></div>
+          <div>
+            <div class="title">نموذج موحّد للمستندات</div>
+            <div style="color: var(--muted); font-size: 13px;">عرض سعر / فاتورة</div>
+          </div>
+        </div>
+        <div style="display:grid; gap:8px; min-width: 220px;">
+          <label for="docType">نوع المستند</label>
+          <select id="docType" style="padding:10px 12px; background:#0c1722; color:var(--text); border:1px solid var(--border); border-radius:10px;">
+            <option>عرض سعر</option>
+            <option>فاتورة</option>
+          </select>
+        </div>
+      </header>
+
+      <section class="panel" style="margin-top:16px;">
+        <div class="grid-3">
+          <div>
+            <label for="docNumber">رقم المستند</label>
+            <input id="docNumber" type="text" placeholder="مثال: Q-2025-001" />
+          </div>
+          <div>
+            <label for="docDate">التاريخ</label>
+            <input id="docDate" type="date" />
+          </div>
+          <div>
+            <label for="currency">العملة</label>
+            <input id="currency" type="text" placeholder="SAR / AED / USD" />
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top:12px;">
+          <div>
+            <label for="seller">البائع / الشركة</label>
+            <textarea id="seller" placeholder="اسم الشركة\nالسجل التجاري\nالعنوان\nالهاتف"></textarea>
+          </div>
+          <div>
+            <label for="buyer">العميل</label>
+            <textarea id="buyer" placeholder="اسم العميل\nالرقم الضريبي (إن وجد)\nالعنوان\nالهاتف"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section style="margin-top:16px;">
+        <table class="items">
+          <thead>
+            <tr>
+              <th>الوصف</th>
+              <th style="width:110px;">الكمية</th>
+              <th style="width:140px;">سعر الوحدة</th>
+              <th style="width:140px;">الإجمالي</th>
+              <th class="no-print" style="width:60px;">حذف</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="5" class="no-print">
+                <div class="actions">
+                  <button id="addRow" class="btn">+ إضافة بند</button>
+                  <button id="printDoc" class="btn primary">طباعة</button>
+                </div>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+
+      <section class="totals" style="margin-top:16px;">
+        <div class="panel">
+          <div class="grid-3">
+            <div>
+              <label>الإجمالي الفرعي</label>
+              <div class="summary-row"><span>المجموع</span><span id="subtotal">0.00</span></div>
+            </div>
+            <div>
+              <label for="vatPercent">الضريبة %</label>
+              <div class="summary-row">
+                <input id="vatPercent" type="number" step="0.01" min="0" placeholder="0" style="width:90px;" />
+                <span id="vatAmount">0.00</span>
+              </div>
+            </div>
+            <div>
+              <label>الإجمالي النهائي</label>
+              <div class="summary-row" style="font-weight:700;"><span>المبلغ المستحق</span><span id="grandTotal">0.00</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <label for="notes">ملاحظات</label>
+          <textarea id="notes" placeholder="شروط الدفع، مدة العرض، أو أي ملاحظات إضافية"></textarea>
+        </div>
+      </section>
+    </div>
+  </body>
+  <script>
+    // تعبئة التاريخ تلقائياً
+    (function(){
+      var d = document.getElementById('docDate');
+      if (d && !d.value) {
+        var today = new Date();
+        var yyyy = today.getFullYear();
+        var mm = String(today.getMonth()+1).padStart(2,'0');
+        var dd = String(today.getDate()).padStart(2,'0');
+        d.value = yyyy+'-'+mm+'-'+dd;
+      }
+    })();
+  </script>
+</html>
+
