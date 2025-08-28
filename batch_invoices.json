@@ -1,0 +1,19 @@
+[
+  {
+    "INVOICE_NO": "INV-2025-001",
+    "NAME": "Acme Corp",
+    "DETAILS": "Consulting services - January",
+    "PRICE": "170",
+    "TOTAL": "170",
+    "DATE": "2025-01-31"
+  },
+  {
+    "INVOICE_NO": "INV-2025-002",
+    "NAME": "Globex LLC",
+    "DETAILS": "Hardware supply",
+    "PRICE": "250",
+    "TOTAL": "250",
+    "DATE": "2025-02-05"
+  }
+]
+
