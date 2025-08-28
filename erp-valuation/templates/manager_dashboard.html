@@ -14,6 +14,14 @@
     .status-معلقة { background: #ffc107; color: #000; }
     .status-مكتملة { background: #28a745; color: #fff; }
     .status-مرفوضة { background: #dc3545; color: #fff; }
+    .min-w-0 { min-width: 0; }
+    @media (max-width: 576px) {
+      .transaction-card .card-body { padding: 0.75rem; }
+      .card-title { font-size: 1rem; }
+      .status-badge { font-size: 0.75rem; padding: 0.25em 0.5em; }
+      .navbar .nav-link { padding: 0.5rem 0.75rem; }
+      .btn-mobile-full { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -63,8 +71,8 @@
       <div class="col-12">
         <div class="card transaction-card">
           <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <h5 class="card-title mb-0">🏦 {{ t.bank.name|default("غير محدد") }}</h5>
+            <div class="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-2 mb-2">
+              <h5 class="card-title mb-0 text-truncate min-w-0">🏦 {{ t.bank.name|default("غير محدد") }}</h5>
               <span class="status-badge status-{{ t.status }}">{{ t.status }}</span>
             </div>
 
@@ -192,7 +200,7 @@ async function subscribeUser() {
 </script>
 
 <!-- زر تفعيل الإشعارات -->
-<button onclick="subscribeUser()" class="btn btn-warning">
+<button onclick="subscribeUser()" class="btn btn-warning btn-mobile-full">
   🔔 تفعيل الإشعارات
 </button>
 

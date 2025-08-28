@@ -188,6 +188,7 @@
       <th>المدفوع</th>
       <th>الحالة</th>
       <th>إضافة دفعة</th>
+      <th>تنزيل مستند</th>
     </tr>
   </thead>
   <tbody>
@@ -209,6 +210,10 @@
           <input type="file" name="receipt_file" class="form-control form-control-sm">
           <button type="submit" class="btn btn-success btn-sm">💵</button>
         </form>
+      </td>
+      <td class="text-nowrap">
+        <a href="{{ url_for('download_quote_doc', transaction_id=t.id) }}" class="btn btn-outline-primary btn-sm">عرض سعر</a>
+        <a href="{{ url_for('download_invoice_doc', transaction_id=t.id) }}" class="btn btn-outline-secondary btn-sm">فاتورة</a>
       </td>
     </tr>
     {% endfor %}
