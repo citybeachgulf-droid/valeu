@@ -211,10 +211,28 @@
           <button type="submit" class="btn btn-success btn-sm">💵</button>
         </form>
       </td>
-      <td class="text-nowrap">
-        <a href="{{ url_for('download_quote_doc', transaction_id=t.id) }}" class="btn btn-outline-primary btn-sm">عرض سعر</a>
-        <a href="{{ url_for('download_invoice_doc', transaction_id=t.id) }}" class="btn btn-outline-secondary btn-sm">تنزيل</a>
-        <a href="{{ url_for('print_invoice_html', transaction_id=t.id) }}?auto=1" class="btn btn-sm btn-success">طباعة</a>
+      <td>
+        <form method="get" class="row g-2 align-items-end">
+          <div class="col-12">
+            <input type="text" name="details" class="form-control form-control-sm" placeholder="وصف/تفاصيل (اختياري)">
+          </div>
+          <div class="col-6">
+            <label class="form-label mb-1 small">نسبة الضريبة %</label>
+            <input type="number" name="vat" class="form-control form-control-sm" value="{{ vat_default_percent }}" min="0" max="100" step="0.01">
+          </div>
+          <div class="col-6">
+            <label class="form-label mb-1 small">تطبيق الضريبة</label>
+            <select name="apply_vat" class="form-select form-select-sm">
+              <option value="1" selected>نعم</option>
+              <option value="0">لا</option>
+            </select>
+          </div>
+          <div class="col-12 d-flex gap-2 flex-wrap">
+            <a href="#" onclick="this.closest('form').action='{{ url_for('download_quote_doc', transaction_id=t.id) }}'; this.closest('form').submit(); return false;" class="btn btn-outline-primary btn-sm">عرض سعر</a>
+            <a href="#" onclick="this.closest('form').action='{{ url_for('download_invoice_doc', transaction_id=t.id) }}'; this.closest('form').submit(); return false;" class="btn btn-outline-secondary btn-sm">فاتورة</a>
+            <a href="{{ url_for('print_invoice_html', transaction_id=t.id) }}?auto=1" class="btn btn-sm btn-success">طباعة</a>
+          </div>
+        </form>
       </td>
     </tr>
     {% endfor %}

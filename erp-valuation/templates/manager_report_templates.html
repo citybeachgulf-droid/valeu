@@ -33,16 +33,7 @@
           <textarea name="real_estate_content" class="form-control" rows="10">{{ real_estate_content }}</textarea>
           <small class="text-muted">أمثلة للمتغيرات: {client_name}, {sketch_number}, {property_state}, {property_region}, {bank_name}, {bank_branch}, {area}, {building_area}, {building_age}, {land_value}, {building_value}, {total_estimate}, {today}, {transaction_id}</small>
           <hr>
-          <label class="form-label">📤 رفع قوالب وورد (حتى 6)</label>
-          <input type="file" name="re_files" class="form-control" accept=".doc,.docx" multiple>
-          {% if real_estate_files %}
-          <div class="mt-2 small">القوالب المرفوعة:</div>
-          <ul class="small">
-            {% for f in real_estate_files %}
-              <li><a href="{{ url_for('uploaded_file', filename=f.file) }}" target="_blank">{{ f.title or f.file }}</a></li>
-            {% endfor %}
-          </ul>
-          {% endif %}
+          <div class="alert alert-secondary mb-0">تم تعطيل رفع القوالب، يمكنك تعديل النص أعلاه فقط.</div>
         </div>
       </div>
     </div>
@@ -54,16 +45,7 @@
           <textarea name="vehicle_content" class="form-control" rows="10">{{ vehicle_content }}</textarea>
           <small class="text-muted">أمثلة للمتغيرات: {client_name}, {sketch_number}, {bank_name}, {bank_branch}, {vehicle_type}, {vehicle_model}, {vehicle_year}, {vehicle_value}, {today}, {transaction_id}</small>
           <hr>
-          <label class="form-label">📤 رفع قالب وورد للمركبات</label>
-          <input type="file" name="ve_file" class="form-control" accept=".doc,.docx">
-          {% if vehicle_files %}
-          <div class="mt-2 small">القوالب المرفوعة:</div>
-          <ul class="small">
-            {% for f in vehicle_files %}
-              <li><a href="{{ url_for('uploaded_file', filename=f.file) }}" target="_blank">{{ f.title or f.file }}</a></li>
-            {% endfor %}
-          </ul>
-          {% endif %}
+          <div class="alert alert-secondary mb-0">تم تعطيل رفع القوالب، يمكنك تعديل النص أعلاه فقط.</div>
         </div>
       </div>
     </div>
