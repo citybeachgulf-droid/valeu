@@ -23,7 +23,7 @@
           <div class="meta-grid mt-2">
             <div><span class="section-title">رقم الفاتورة</span><div class="fw-bold">INV-{{ transaction.id }}</div></div>
             <div><span class="section-title">التاريخ</span><div class="fw-bold">{{ date_str }}</div></div>
-            <div><span class="section-title">المرجع</span><div class="fw-bold">INV-{{ transaction.id }}</div></div>
+            <div><span class="section-title">المرجع</span><div class="fw-bold">INV-CUST</div></div>
             <div><span class="section-title">الموظف</span><div class="fw-bold">{{ transaction.employee or '-' }}</div></div>
           </div>
         </div>
@@ -48,18 +48,18 @@
         <table class="items">
           <thead>
             <tr>
-              <th>الوصف</th>
-              <th style="width:120px">الكمية</th>
-              <th style="width:160px">سعر الوحدة</th>
               <th style="width:160px">الإجمالي</th>
+              <th style="width:160px">سعر الوحدة</th>
+              <th style="width:120px">الكمية</th>
+              <th>الوصف</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>رسوم التثمين{% if transaction.status %} - {{ transaction.status }}{% endif %}</td>
+              <td>{{ amount | round(2) }}</td>
+              <td>{{ amount | round(2) }}</td>
               <td>1</td>
-              <td>{{ amount | round(2) }}</td>
-              <td>{{ amount | round(2) }}</td>
+              <td>رسوم التثمين{% if transaction.status %} - {{ transaction.status }}{% endif %}</td>
             </tr>
           </tbody>
           <tfoot>
