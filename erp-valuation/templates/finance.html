@@ -241,6 +241,7 @@
                   <th>إصدار</th>
                   <th>تسليم</th>
                   <th>استلام</th>
+                  <th>الحالة</th>
                   <th>إجراءات</th>
                 </tr>
               </thead>
@@ -253,6 +254,17 @@
                   <td>{{ inv.issued_at.strftime('%Y-%m-%d') if inv.issued_at else '-' }}</td>
                   <td>{{ inv.delivered_at.strftime('%Y-%m-%d') if inv.delivered_at else '-' }}</td>
                   <td>{{ inv.received_at.strftime('%Y-%m-%d') if inv.received_at else '-' }}</td>
+                  <td>
+                    {% if inv.received_at %}
+                      تم استلام المبلغ
+                    {% elif inv.delivered_at %}
+                      تم التسليم
+                    {% elif inv.issued_at %}
+                      تم الإصدار
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
                   <td class="text-nowrap">
                     <div class="d-flex gap-2">
                       {% if not inv.delivered_at %}

@@ -1707,7 +1707,35 @@ def finance_update_bank_invoice_status(invoice_id: int):
     elif action == "receive":
         invoice.received_at = datetime.utcnow()
         db.session.commit()
-        flash("✅ تم تحديث حالة الفاتورة: تم الاستلام", "success")
+
+        # عند تأكيد الاستلام، نسجل الدخل كـ Payment لفرع المعاملة (إن وُجدت)
+        created_income = False
+        if invoice.transaction_id:
+            t = Transaction.query.get(invoice.transaction_id)
+            user = User.query.get(session.get("user_id"))
+            if t and user and t.branch_id == user.branch_id:
+                # نتجنب التكرار: نتحقق من وجود دفعة بنفس المبلغ والطريقة "بنك"
+                existing_payment = Payment.query.filter_by(
+                    transaction_id=t.id,
+                    amount=invoice.amount,
+                    method="بنك",
+                ).first()
+                if not existing_payment:
+                    p = Payment(
+                        transaction_id=t.id,
+                        amount=invoice.amount,
+                        method="بنك",
+                        date_received=datetime.utcnow(),
+                        received_by=session.get("username"),
+                    )
+                    db.session.add(p)
+                    db.session.commit()
+                    created_income = True
+
+        if created_income:
+            flash("✅ تم تحديث الحالة وإضافة الدخل للفرع", "success")
+        else:
+            flash("✅ تم تحديث الحالة. ⚠️ لم يُسجل دخل تلقائيًا (لا توجد معاملة مرتبطة أو اختلاف فرع)", "warning")
     else:
         flash("⚠️ إجراء غير معروف", "warning")
 
