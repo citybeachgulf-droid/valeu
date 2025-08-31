@@ -77,12 +77,15 @@
 
   <div class="card shadow-sm">
     <div class="card-header bg-dark text-white d-flex">
+      {% set has_invoices = invoices and (invoices|length) > 0 %}
+      {% set has_docs = documents and (documents|length) > 0 %}
+      {% set active_tab = request.args.get('tab') or ('docs' if (has_docs and not has_invoices) else 'invoices') %}
       <ul class="nav nav-tabs card-header-tabs" id="bankTabs" role="tablist">
         <li class="nav-item" role="presentation">
-          <button class="nav-link active" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices" type="button" role="tab">📄 الفواتير المرسلة للبنك</button>
+          <button class="nav-link {{ 'active' if active_tab == 'invoices' else '' }}" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices" type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'invoices' else 'false' }}">📄 الفواتير المرسلة للبنك</button>
         </li>
         <li class="nav-item" role="presentation">
-          <button class="nav-link" id="docs-tab" data-bs-toggle="tab" data-bs-target="#docs" type="button" role="tab">📎 المستندات المرسلة</button>
+          <button class="nav-link {{ 'active' if active_tab == 'docs' else '' }}" id="docs-tab" data-bs-toggle="tab" data-bs-target="#docs" type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'docs' else 'false' }}">📎 المستندات المرسلة</button>
         </li>
         <li class="nav-item" role="presentation">
           <button class="nav-link" id="stages-tab" data-bs-toggle="tab" data-bs-target="#stages" type="button" role="tab">✅ مراحل فواتير البنك</button>
@@ -91,7 +94,7 @@
     </div>
     <div class="card-body">
       <div class="tab-content">
-        <div class="tab-pane fade show active" id="invoices" role="tabpanel">
+        <div class="tab-pane fade {{ 'show active' if active_tab == 'invoices' else '' }}" id="invoices" role="tabpanel">
           <div class="table-responsive">
             <table class="table table-bordered table-striped">
               <thead class="table-dark">
@@ -122,7 +125,7 @@
           </div>
         </div>
 
-        <div class="tab-pane fade" id="docs" role="tabpanel">
+        <div class="tab-pane fade {{ 'show active' if active_tab == 'docs' else '' }}" id="docs" role="tabpanel">
           <div class="table-responsive">
             <table class="table table-bordered table-striped">
               <thead class="table-dark">
