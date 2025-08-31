@@ -11,6 +11,7 @@
   <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
       <span class="navbar-brand">📑 صفحة التقارير</span>
+      <a href="{{ url_for('index') }}" class="btn btn-outline-light">🏠 الرئيسية</a>
       <a href="/logout" class="btn btn-outline-light">تسجيل الخروج</a>
     </div>
   </nav>
@@ -19,7 +20,7 @@
     <h3 class="text-center mb-4">📋 جميع التقارير</h3>
 
     <!-- 🔍 نموذج البحث (GET لنفس الصفحة) -->
-    <form method="get" action="{{ url_for('reports') }}" class="row g-2 mb-3">
+    <form method="get" action="{{ url_for('reports_page') }}" class="row g-2 mb-3">
       <div class="col-12 col-md-6">
         <input type="text" name="q" class="form-control" placeholder="🔍 ابحث برقم التقرير (مثال: ref52254)" value="{{ q or '' }}">
       </div>
@@ -27,7 +28,7 @@
         <button class="btn btn-primary w-100">بحث</button>
       </div>
       <div class="col-12 col-md-2">
-        <a href="{{ url_for('reports') }}" class="btn btn-secondary w-100">مسح البحث</a>
+        <a href="{{ url_for('reports_page') }}" class="btn btn-secondary w-100">مسح البحث</a>
       </div>
     </form>
 
