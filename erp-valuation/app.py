@@ -255,6 +255,19 @@ class BranchDocument(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     branch = db.relationship("Branch", backref="documents")
 
+# ✅ مستندات عامة مرسلة إلى البنوك (غير مرتبطة بمعاملة)
+class BankDocument(db.Model):
+    __tablename__ = "bank_document"
+    id = db.Column(db.Integer, primary_key=True)
+    bank_id = db.Column(db.Integer, db.ForeignKey("bank.id"), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text, nullable=True)
+    doc_type = db.Column(db.String(100), nullable=True)  # رسالة، سيرة ذاتية، ...
+    file = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=True)
+
 # ✅ جدول بسيط لحفظ العملاء (اسم ورقم)
 class Customer(db.Model):
     __tablename__ = "customer"
@@ -2644,6 +2657,12 @@ def bank_detail(bank_id):
                 if fname:
                     documents.append({"transaction_id": t.id, "filename": fname})
 
+    # 📨 مستندات عامة مرسلة للبنك (غير مرتبطة بمعاملة)
+    try:
+        general_docs = BankDocument.query.filter_by(bank_id=bank_id).order_by(BankDocument.id.desc()).all()
+    except Exception:
+        general_docs = []
+
     # فواتير البنك بمراحلها (إن وُجدت)
     inv_query = BankInvoice.query.filter_by(bank_id=bank_id)
     if start_date:
@@ -2688,6 +2707,7 @@ def bank_detail(bank_id):
         total_tx=total_tx,
         payments=payments,
         documents=documents,
+        general_docs=general_docs,
         invoices=invoices,
         invoice_summary=invoice_summary,
         start=start_date_str,
@@ -2933,6 +2953,58 @@ def employee_upload_bank_docs_lookup():
         flash("✅ تم رفع ملفات البنك وحفظها", "success")
     else:
         flash("⚠️ لم يتم اختيار أي ملف", "warning")
+
+    return redirect(url_for("employee_dashboard"))
+
+# ✅ رفع مستند/رسالة عامة لبنك (غير مرتبطة بمعاملة)
+@app.route("/employee/bank_documents", methods=["POST"])
+def employee_add_bank_document():
+    if session.get("role") != "employee":
+        return redirect(url_for("login"))
+
+    user = User.query.get(session.get("user_id"))
+    if not user:
+        return redirect(url_for("login"))
+
+    bank_id = request.form.get("bank_id")
+    title = (request.form.get("title") or "").strip()
+    message = (request.form.get("message") or "").strip()
+    doc_type = (request.form.get("doc_type") or "").strip()
+    file = request.files.get("file")
+
+    try:
+        bank_id_val = int(bank_id) if bank_id else None
+    except Exception:
+        bank_id_val = None
+
+    if not bank_id_val:
+        flash("⚠️ يرجى اختيار البنك", "warning")
+        return redirect(url_for("employee_dashboard"))
+    if not title:
+        flash("⚠️ العنوان مطلوب", "warning")
+        return redirect(url_for("employee_dashboard"))
+
+    filename = None
+    if file and file.filename:
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+
+    try:
+        doc = BankDocument(
+            bank_id=bank_id_val,
+            title=title,
+            message=message,
+            doc_type=doc_type or None,
+            file=filename,
+            created_by=user.id,
+            branch_id=user.branch_id,
+        )
+        db.session.add(doc)
+        db.session.commit()
+        flash("✅ تم إرسال المستند/الرسالة إلى صفحة البنك", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash("❌ فشل الحفظ", "danger")
 
     return redirect(url_for("employee_dashboard"))
 
@@ -3262,6 +3334,31 @@ with app.app_context():
             ))
             db.session.commit()
             print("✅ تم إنشاء جدول report_template")
+        except Exception:
+            db.session.rollback()
+
+    # محاولة إنشاء جدول bank_document إذا غير موجود
+    try:
+        db.session.execute(text("SELECT 1 FROM bank_document LIMIT 1"))
+    except Exception:
+        try:
+            db.session.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS bank_document (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    bank_id INTEGER NOT NULL,
+                    title VARCHAR(200) NOT NULL,
+                    message TEXT,
+                    doc_type VARCHAR(100),
+                    file VARCHAR(255),
+                    created_at TIMESTAMP,
+                    created_by INTEGER,
+                    branch_id INTEGER
+                )
+                """
+            ))
+            db.session.commit()
+            print("✅ تم إنشاء جدول bank_document")
         except Exception:
             db.session.rollback()
 
