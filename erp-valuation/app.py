@@ -2620,13 +2620,14 @@ def bank_detail(bank_id):
         pay_query = pay_query.filter(Payment.date_received <= end_date)
     payments = pay_query.order_by(Payment.date_received.desc()).all()
 
-    # المستندات المرتبطة بمعاملات هذا البنك (ملفات المعاملة + ملف التقرير)
-    txs_query = Transaction.query.filter(Transaction.bank_id == bank_id)
-    if start_date:
-        txs_query = txs_query.filter(Transaction.date >= start_date)
-    if end_date:
-        txs_query = txs_query.filter(Transaction.date <= end_date)
-    txs = txs_query.order_by(Transaction.id.desc()).all()
+    # المستندات المرتبطة بمعاملات هذا البنك
+    # ملاحظة: نعرضها دائمًا بدون أي فلترة حسب التاريخ بناءً على طلب المستخدم
+    txs = (
+        Transaction.query
+        .filter(Transaction.bank_id == bank_id)
+        .order_by(Transaction.id.desc())
+        .all()
+    )
     documents = []
     for t in txs:
         # ملفات متعددة محفوظة كسلسلة مفصولة بفواصل
