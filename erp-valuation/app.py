@@ -2007,6 +2007,7 @@ def print_invoice_html(transaction_id: int):
 
     amount = float(t.fee or 0)
     tax, total_with_tax = _compute_tax_and_total(amount)
+    details_override = (request.args.get("details") or "").strip()
 
     # معلومات المؤسسة الافتراضية (يمكن لاحقًا ربطها من الإعدادات/الفرع)
     org_name = "شركة التثمين"
@@ -2023,7 +2024,7 @@ def print_invoice_html(transaction_id: int):
         date_str=(datetime.utcnow().strftime("%Y-%m-%d")),
         org_name=org_name,
         org_meta=org_meta,
-        notes=t.status or "",
+        notes=details_override or "",
     )
 
 # ✅ طباعة فاتورة بنك HTML بنفس تصميم الطباعة
@@ -2039,6 +2040,7 @@ def print_bank_invoice_html(invoice_id: int):
     bank_name = bank.name if bank else None
     amount = float(inv.amount or 0)
     tax, total_with_tax = _compute_tax_and_total(amount)
+    details_override = (request.args.get("details") or "").strip()
 
     org_name = "شركة التثمين"
     org_meta = "العنوان · الهاتف · البريد الإلكتروني"
@@ -2055,7 +2057,7 @@ def print_bank_invoice_html(invoice_id: int):
         date_str=(inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
         org_name=org_name,
         org_meta=org_meta,
-        notes=inv.note or "",
+        notes=details_override or (inv.note or ""),
         # metadata for header
         badge_label="فاتورة",
         invoice_code=f"INV-BANK-{inv.id}",
@@ -2080,6 +2082,7 @@ def print_customer_invoice_html(invoice_id: int):
 
     amount = float(inv.amount or 0)
     tax, total_with_tax = _compute_tax_and_total(amount)
+    details_override = (request.args.get("details") or "").strip()
 
     org_name = "شركة التثمين"
     org_meta = "العنوان · الهاتف · البريد الإلكتروني"
@@ -2096,7 +2099,7 @@ def print_customer_invoice_html(invoice_id: int):
         date_str=(inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
         org_name=org_name,
         org_meta=org_meta,
-        notes=inv.note or "",
+        notes=details_override or (inv.note or ""),
         # metadata for header
         badge_label="فاتورة",
         invoice_code=f"INV-CUST-{inv.id}",
