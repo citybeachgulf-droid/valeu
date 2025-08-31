@@ -2898,13 +2898,15 @@ def employee_upload_bank_docs_lookup():
         flash("⚠️ يرجى إدخال رقم المعاملة أو اسم العميل", "warning")
         return redirect(url_for("employee_dashboard"))
 
-    # محاولة تفسيره كرقم معاملة أولًا
+    # محاولة تفسيره كرقم معاملة أولًا (باستخراج الأرقام فقط من النص)
     t = None
-    try:
-        tid = int(lookup)
-        t = Transaction.query.get(tid)
-    except Exception:
-        t = None
+    digits_only = "".join(ch for ch in lookup if ch.isdigit())
+    if digits_only:
+        try:
+            tid = int(digits_only)
+            t = Transaction.query.get(tid)
+        except Exception:
+            t = None
 
     # إن لم يكن رقم، نبحث بالاسم (يطابق جزئيًا أحدث معاملة)
     if not t:
@@ -2916,7 +2918,8 @@ def employee_upload_bank_docs_lookup():
         )
 
     if not t:
-        flash("❌ لم يتم العثور على معاملة بهذا الرقم أو الاسم", "danger")
+        # تلميح للمستخدم حول الصيغة الصحيحة للبحث
+        flash("❌ لم يتم العثور على معاملة بهذا الرقم أو الاسم. جرّب إدخال رقم المعاملة فقط أو اسم العميل الكامل.", "danger")
         return redirect(url_for("employee_dashboard"))
 
     user = User.query.get(session.get("user_id"))
