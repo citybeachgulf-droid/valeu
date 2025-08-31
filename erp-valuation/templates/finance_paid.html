@@ -55,7 +55,7 @@
               <td>{{ p.date_received.strftime('%Y-%m-%d') if p.date_received else '-' }}</td>
               <td>
                 {% if p.receipt_file %}
-                  <a href="{{ url_for('static', filename='uploads/' ~ p.receipt_file) }}" target="_blank">📎 عرض</a>
+                  <a href="{{ url_for('uploaded_file', filename=p.receipt_file) }}" target="_blank">📎 عرض</a>
                 {% else %}
                   -
                 {% endif %}
