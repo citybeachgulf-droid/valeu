@@ -1593,8 +1593,23 @@ def engineer_upload_report(tid):
 
         # حاول ختم PDF عبر PyMuPDF (fitz)
         try:
+            # تأكد أن الملف ليس فارغاً
+            try:
+                if os.path.getsize(filepath) == 0:
+                    raise RuntimeError("Uploaded PDF is empty")
+            except OSError:
+                # في حال تعذر الحصول على حجم الملف، أكمل المحاولة
+                pass
+
             doc = fitz.open(filepath)
             try:
+                # تحقق من التشفير/الحماية
+                if getattr(doc, "needs_pass", False) or getattr(doc, "is_encrypted", False):
+                    raise RuntimeError("Cannot stamp encrypted / password-protected PDF")
+
+                if doc.page_count == 0:
+                    raise RuntimeError("Cannot stamp PDF with zero pages")
+
                 page = doc[0]
                 page_rect = page.rect
                 # حجم ديناميكي للـ QR (بالبكسل PDF)
@@ -1611,14 +1626,30 @@ def engineer_upload_report(tid):
                 if rect.y1 > page_rect.height or rect.x1 > page_rect.width or rect.x0 < 0 or rect.y0 < 0:
                     rect = fitz.Rect(margin, margin, margin + qr_size, margin + qr_size)
 
-                # إدراج الصورة من الذاكرة لتفادي مشاكل المسارات/الترميزات
+                # إدراج الصورة: جرب stream أولاً ثم اسم الملف كحل بديل حسب نسخة PyMuPDF
+                inserted = False
                 with open(qr_path, "rb") as qr_file:
                     qr_bytes = qr_file.read()
-                page.insert_image(rect, stream=qr_bytes)
+                try:
+                    page.insert_image(rect, stream=qr_bytes)
+                    inserted = True
+                except Exception as e_stream:
+                    app.logger.warning("insert_image(stream) failed for transaction %s: %s", t.id, e_stream)
+                    try:
+                        page.insert_image(rect, filename=qr_path)
+                        inserted = True
+                    except Exception as e_file:
+                        app.logger.warning("insert_image(filename) failed for transaction %s: %s", t.id, e_file)
+
+                if not inserted:
+                    raise RuntimeError("Failed to insert QR image into PDF")
 
                 # نص الرابط أعلى الـ QR بحجم صغير
                 text_y = max(8, rect.y0 - 8)
-                page.insert_text((rect.x0, text_y), verify_url, fontsize=7, color=(0, 0, 1))
+                try:
+                    page.insert_text((rect.x0, text_y), verify_url, fontsize=7, color=(0, 0, 1))
+                except Exception as e_text:
+                    app.logger.warning("insert_text failed for transaction %s: %s", t.id, e_text)
 
                 # إضافة رابط قابل للنقر فوق مساحة الـ QR
                 try:
