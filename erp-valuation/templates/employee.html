@@ -162,39 +162,7 @@
 
       <!-- تبويب مستندات البنك -->
       <div class="tab-pane fade" id="tab-bankdocs" role="tabpanel">
-        <div class="row justify-content-center">
-          <div class="col-md-8" data-aos="fade-up">
-            <div class="card shadow-sm">
-              <div class="card-body">
-                <h5 class="mb-3">📤 رفع مستندات مُرسلة للبنك</h5>
-                <form class="row g-2 align-items-end" method="POST" action="/employee/upload_bank_docs_lookup" enctype="multipart/form-data">
-                  <div class="col-md-3">
-                    <label class="form-label">المعاملة (رقم أو اسم العميل)</label>
-                    <input type="text" class="form-control" name="lookup" placeholder="مثال: 123 أو أحمد علي" required>
-                    <div class="form-text">يمكنك إدخال رقم المعاملة فقط أو اسم العميل. إن لم تكن المعاملة موجودة أو ترفع رسالة عامة للبنك، استخدم النموذج بالأسفل "إرسال رسالة/سيرة ذاتية للبنك".</div>
-                  </div>
-                  <div class="col-md-3">
-                    <label class="form-label">🏦 اختر البنك</label>
-                    <select name="bank_id" class="form-select" required>
-                      <option value="">— اختر البنك —</option>
-                      {% for bank in banks %}
-                        <option value="{{ bank.id }}">{{ bank.name }}</option>
-                      {% endfor %}
-                    </select>
-                  </div>
-                  <div class="col-md-4">
-                    <label class="form-label">الملفات</label>
-                    <input type="file" class="form-control" name="bank_docs" multiple>
-                  </div>
-                  <div class="col-md-2">
-                    <button class="btn btn-success w-100">رفع</button>
-                  </div>
-                </form>
-                <div class="form-text">الملفات تظهر ضمن تبويب "المستندات المرسلة" في صفحة تفاصيل البنك لدى المدير.</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- تم إخفاء نموذج رفع مستندات المعاملات بناءً على طلب المستخدم، والاكتفاء بنموذج الرسائل العامة أدناه. -->
 
         <div class="row justify-content-center mt-3">
           <div class="col-md-8" data-aos="fade-up">
