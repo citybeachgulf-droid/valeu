@@ -2574,19 +2574,23 @@ def bank_detail(bank_id):
     start_date = datetime.fromisoformat(start_date_str) if start_date_str else None
     end_date = datetime.fromisoformat(end_date_str) if end_date_str else None
 
-    # إحصائية عدد المعاملات لكل فرع لهذا البنك
-    br_query = db.session.query(Branch.id, Branch.name, func.count(Transaction.id))\
-        .join(Transaction, Transaction.branch_id == Branch.id)\
-        .filter(Transaction.bank_id == bank_id)
+    # إحصائية عدد المعاملات لكل فرع بنك لهذا البنك
+    br_query = db.session.query(
+        Transaction.bank_branch.label("bank_branch"),
+        func.count(Transaction.id)
+    ).filter(
+        Transaction.bank_id == bank_id,
+        Transaction.bank_branch.isnot(None),
+        func.length(func.trim(Transaction.bank_branch)) > 0
+    )
     if start_date:
         br_query = br_query.filter(Transaction.date >= start_date)
     if end_date:
         br_query = br_query.filter(Transaction.date <= end_date)
-    branch_rows = br_query.group_by(Branch.id, Branch.name)\
-        .order_by(Branch.name.asc()).all()
+    branch_rows = br_query.group_by(text("bank_branch")).order_by(text("bank_branch ASC")).all()
     branch_stats = [
-        {"id": bid, "name": bname, "count": bcount}
-        for (bid, bname, bcount) in branch_rows
+        {"name": (bname or "غير محدد"), "count": bcount}
+        for (bname, bcount) in branch_rows
     ]
 
     total_tx = sum(b["count"] for b in branch_stats)
