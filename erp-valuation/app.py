@@ -1877,10 +1877,8 @@ def _render_docx_from_template(doc_type: str, placeholders: dict, out_name: str,
 
 
 def _get_vat_rate() -> float:
-    try:
-        return float(os.getenv("VAT_RATE", "0.15"))
-    except Exception:
-        return 0.15
+    # ثابت: ضريبة قيمة مضافة 5%
+    return 0.05
 
 
 def _compute_tax_and_total(base_amount: float) -> tuple[float, float]:
