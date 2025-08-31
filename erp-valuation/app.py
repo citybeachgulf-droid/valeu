@@ -2878,6 +2878,13 @@ def employee_upload_bank_docs_lookup():
         flash("⛔ لا يمكنك رفع مستندات لمعالجة من فرع آخر", "danger")
         return redirect(url_for("employee_dashboard"))
 
+    # اختيار البنك (اختياري) لتثبيته على المعاملة إن كان فارغًا
+    bank_id_form = request.form.get("bank_id")
+    try:
+        bank_id_val = int(bank_id_form) if bank_id_form else None
+    except Exception:
+        bank_id_val = None
+
     uploaded = request.files.getlist("bank_docs")
     saved = []
     for f in uploaded:
@@ -2887,6 +2894,9 @@ def employee_upload_bank_docs_lookup():
             saved.append(fname)
 
     if saved:
+        # في حال تم تحديد بنك في النموذج ولم تكن المعاملة مرتبطة ببنك، نثبّت البنك
+        if bank_id_val and not t.bank_id:
+            t.bank_id = bank_id_val
         existing = (t.bank_sent_files or "").split(",") if t.bank_sent_files else []
         existing = [x.strip() for x in existing if x.strip()]
         t.bank_sent_files = ",".join(existing + saved)
