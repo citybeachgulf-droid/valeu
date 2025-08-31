@@ -38,6 +38,7 @@ import sys
 import tempfile
 import zipfile
 from typing import Dict, Any, Iterable
+import xml.etree.ElementTree as ET
 
 
 XML_TARGETS = (
@@ -48,19 +49,67 @@ XML_TARGETS = (
 
 
 def replace_placeholders_in_xml_bytes(xml_bytes: bytes, mapping: Dict[str, Any]) -> bytes:
+    """
+    Replace placeholders in DOCX XML robustly, supporting placeholders split across runs.
+
+    Strategy:
+    - Parse the XML and iterate through all paragraph elements (w:p)
+    - Concatenate descendant text (w:t) within each paragraph
+    - Apply placeholder replacements on the concatenated string
+    - If changed, write the replaced string back into the first w:t and clear the rest
+      (ensuring xml:space="preserve"), which effectively merges split placeholders
+    - If XML parsing fails, fall back to a simple text replace to be resilient
+    """
+    # Namespaces commonly used in WordprocessingML
+    NS_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    NS_XML = "http://www.w3.org/XML/1998/namespace"
+    ns = {"w": NS_W}
+
+    # Try XML-based processing first
     try:
-        text = xml_bytes.decode("utf-8")
-    except UnicodeDecodeError:
-        # Fallback to latin-1 just in case
-        text = xml_bytes.decode("latin-1")
+        root = ET.fromstring(xml_bytes)
 
-    for key, value in mapping.items():
-        placeholder = "{" + str(key) + "}"
-        replacement = str(value)
-        if placeholder in text:
-            text = text.replace(placeholder, replacement)
+        # Iterate over all paragraphs throughout the part (covers shapes, headers, etc.)
+        for p in root.findall(".//w:p", ns):
+            t_elems = p.findall('.//w:t', ns)
+            if not t_elems:
+                continue
 
-    return text.encode("utf-8")
+            original_text = ''.join((t.text or '') for t in t_elems)
+            if not original_text:
+                continue
+
+            replaced_text = original_text
+            for key, value in mapping.items():
+                placeholder = "{" + str(key) + "}"
+                replaced_text = replaced_text.replace(placeholder, str(value))
+
+            # If any replacement occurred, write back
+            if replaced_text != original_text:
+                first_t = t_elems[0]
+                # Ensure spaces preserved
+                first_t.set(f"{{{NS_XML}}}space", "preserve")
+                first_t.text = replaced_text
+
+                # Clear remaining text nodes
+                for extra_t in t_elems[1:]:
+                    extra_t.text = ''
+
+        return ET.tostring(root, encoding='utf-8')
+    except Exception:
+        # Fallback to naive text replacement if XML parse fails for any reason
+        try:
+            text = xml_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            text = xml_bytes.decode("latin-1")
+
+        for key, value in mapping.items():
+            placeholder = "{" + str(key) + "}"
+            replacement = str(value)
+            if placeholder in text:
+                text = text.replace(placeholder, replacement)
+
+        return text.encode("utf-8")
 
 
 def fill_one(template_path: str, out_path: str, mapping: Dict[str, Any]) -> None:
