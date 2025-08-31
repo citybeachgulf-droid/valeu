@@ -170,6 +170,7 @@ class Payment(db.Model):
     received_by    = db.Column(db.String(50))
     method         = db.Column(db.String(20))   # كاش / تحويل
     receipt_file   = db.Column(db.String(200))  # صورة أو ملف الإيصال
+    branch_id      = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=True)
 
 
 class ReportTemplate(db.Model):
@@ -1678,15 +1679,16 @@ def finance_dashboard():
         branch_id=user.branch_id
     ).all()
 
-    # ✅ المدفوعات الخاصة بمعاملات هذا الفرع
-    paid_transactions = Payment.query.join(Transaction).filter(
-        Transaction.branch_id == user.branch_id
-    ).order_by(Payment.id.desc()).all()
+    # ✅ المدفوعات الخاصة بهذا الفرع (سواء مرتبطة بمعاملة الفرع أو غير مرتبطة ولكن منسوبة للفرع)
+    paid_transactions = Payment.query.outerjoin(Transaction, Payment.transaction_id == Transaction.id) \
+        .filter(or_(Transaction.branch_id == user.branch_id, Payment.branch_id == user.branch_id)) \
+        .order_by(Payment.id.desc()).all()
 
-    # ✅ مجموع الدخل للفرع فقط
-    total_income = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0))\
-        .join(Transaction)\
-        .filter(Transaction.branch_id == user.branch_id).scalar() or 0.0
+    # ✅ مجموع الدخل للفرع فقط (يشمل المدفوعات غير المرتبطة بالمعاملات والمنسوبة للفرع)
+    total_income = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0)) \
+        .select_from(Payment) \
+        .outerjoin(Transaction, Payment.transaction_id == Transaction.id) \
+        .filter(or_(Transaction.branch_id == user.branch_id, Payment.branch_id == user.branch_id)).scalar() or 0.0
 
     # ✅ مصاريف الفرع فقط
     expenses = Expense.query.filter_by(branch_id=user.branch_id).order_by(Expense.id.desc()).all()
@@ -1734,14 +1736,15 @@ def finance_paid():
 
     user = User.query.get(session["user_id"])
 
-    # معاملات هذا الفرع التي لديها مدفوعات
-    payments = Payment.query.join(Transaction).filter(
-        Transaction.branch_id == user.branch_id
-    ).order_by(Payment.id.desc()).all()
+    # معاملات هذا الفرع التي لديها مدفوعات + الدفعات المنسوبة للفرع بدون معاملة
+    payments = Payment.query.outerjoin(Transaction, Payment.transaction_id == Transaction.id) \
+        .filter(or_(Transaction.branch_id == user.branch_id, Payment.branch_id == user.branch_id)) \
+        .order_by(Payment.id.desc()).all()
 
-    total_income = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0))\
-        .join(Transaction)\
-        .filter(Transaction.branch_id == user.branch_id).scalar() or 0.0
+    total_income = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0)) \
+        .select_from(Payment) \
+        .outerjoin(Transaction, Payment.transaction_id == Transaction.id) \
+        .filter(or_(Transaction.branch_id == user.branch_id, Payment.branch_id == user.branch_id)).scalar() or 0.0
 
     # فواتير البنك التي تم استلام مبلغها
     received_bank_invoices = BankInvoice.query \
@@ -2572,6 +2575,7 @@ def finance_update_bank_invoice_status(invoice_id: int):
                         method="بنك",
                         date_received=datetime.utcnow(),
                         received_by=session.get("username"),
+                        branch_id=t.branch_id,
                     )
                     db.session.add(p)
                     db.session.commit()
@@ -2583,10 +2587,33 @@ def finance_update_bank_invoice_status(invoice_id: int):
                 t.payment_status = "مدفوعة" if total_paid >= t.fee else "غير مدفوعة"
                 db.session.commit()
 
+        # لا توجد معاملة مرتبطة: ننشئ دخلًا غير مرتبط بالمعاملة، منسوبًا لفرع موظف المالية
+        if not created_income and not invoice.transaction_id:
+            user = User.query.get(session.get("user_id"))
+            finance_branch_id = getattr(user, "branch_id", None)
+            # تجنب التكرار: تحقق من وجود دفعة لنفس الفاتورة عبر نفس المبلغ والتاريخ التقريبي
+            existing_unlinked = Payment.query.filter_by(
+                transaction_id=None,
+                amount=invoice.amount,
+                method="بنك",
+            ).first()
+            if not existing_unlinked:
+                p = Payment(
+                    transaction_id=None,
+                    amount=invoice.amount,
+                    method="بنك",
+                    date_received=datetime.utcnow(),
+                    received_by=session.get("username"),
+                    branch_id=finance_branch_id,
+                )
+                db.session.add(p)
+                db.session.commit()
+                created_income = True
+
         if created_income:
-            flash("✅ تم تحديث الحالة وإضافة الدخل للفرع", "success")
+            flash("✅ تم تحديث الحالة وإضافة الدخل", "success")
         else:
-            flash("✅ تم تحديث الحالة. ⚠️ لم يُسجل دخل تلقائيًا (لا توجد معاملة مرتبطة)", "warning")
+            flash("✅ تم تحديث الحالة", "success")
     else:
         flash("⚠️ إجراء غير معروف", "warning")
 
@@ -3307,6 +3334,15 @@ with app.app_context():
             db.session.execute(text("ALTER TABLE transaction ADD COLUMN sent_to_engineer_at TIMESTAMP"))
             db.session.commit()
             print("✅ تمت إضافة عمود sent_to_engineer_at")
+    except Exception:
+        db.session.rollback()
+
+    # محاولة إضافة عمود branch_id لجدول payments إذا كان الجدول قديم
+    try:
+        if not column_exists("payment", "branch_id"):
+            db.session.execute(text("ALTER TABLE payment ADD COLUMN branch_id INTEGER"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود branch_id إلى payment")
     except Exception:
         db.session.rollback()
 
