@@ -36,7 +36,7 @@
           <thead class="table-dark">
             <tr>
               <th># المعاملة</th>
-              <th>العميل</th>
+              <th>العميل/الفرع</th>
               <th>الموظف</th>
               <th>المبلغ</th>
               <th>طريقة الدفع</th>
@@ -47,9 +47,15 @@
           <tbody>
             {% for p in payments %}
             <tr>
-              <td>{{ p.transaction_id }}</td>
-              <td>{{ p.transaction.client }}</td>
-              <td>{{ p.transaction.employee }}</td>
+              <td>{{ p.transaction_id or '-' }}</td>
+              <td>
+                {% if p.transaction %}
+                  {{ p.transaction.client }}
+                {% else %}
+                  فرع: {{ p.branch_id or '-' }}
+                {% endif %}
+              </td>
+              <td>{{ p.transaction.employee if p.transaction else '-' }}</td>
               <td>{{ p.amount }} ريال</td>
               <td>{{ p.method }}</td>
               <td>{{ p.date_received.strftime('%Y-%m-%d') if p.date_received else '-' }}</td>
