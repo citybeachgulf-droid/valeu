@@ -1611,9 +1611,16 @@ def engineer_upload_report(tid):
 
             doc = fitz.open(filepath)
             try:
-                # تحقق من التشفير/الحماية
-                if getattr(doc, "needs_pass", False) or getattr(doc, "is_encrypted", False):
-                    raise RuntimeError("Cannot stamp encrypted / password-protected PDF")
+                # تحقق من التشفير/الحماية: اسمح بالملفات المشفرة إن لم تكن تتطلب كلمة مرور
+                try:
+                    if getattr(doc, "needs_pass", False):
+                        # جرب كلمة مرور فارغة (بعض الملفات تُفتح بدون كلمة مرور)
+                        if not doc.authenticate(""):
+                            raise RuntimeError("Cannot stamp password-protected PDF")
+                except Exception:
+                    # في حال عدم توفر authenticate في بعض الإصدارات، امنع فقط إن كانت تحتاج كلمة مرور
+                    if getattr(doc, "needs_pass", False):
+                        raise RuntimeError("Cannot stamp password-protected PDF")
 
                 if doc.page_count == 0:
                     raise RuntimeError("Cannot stamp PDF with zero pages")
@@ -1648,6 +1655,13 @@ def engineer_upload_report(tid):
                         inserted = True
                     except Exception as e_file:
                         app.logger.warning("insert_image(filename) failed for transaction %s: %s", t.id, e_file)
+                        # آخر محاولة: Pixmap (بعض الإصدارات تتسامح أكثر مع Pixmap)
+                        try:
+                            pix = fitz.Pixmap(qr_path)
+                            page.insert_image(rect, pixmap=pix)
+                            inserted = True
+                        except Exception as e_pix:
+                            app.logger.warning("insert_image(pixmap) failed for transaction %s: %s", t.id, e_pix)
 
                 if not inserted:
                     raise RuntimeError("Failed to insert QR image into PDF")
