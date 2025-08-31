@@ -1594,23 +1594,36 @@ def engineer_upload_report(tid):
         # حاول ختم PDF عبر PyMuPDF (fitz)
         try:
             doc = fitz.open(filepath)
-            page = doc[0]
-            rect = fitz.Rect(
-                page.rect.width - 150,
-                page.rect.height - 150,
-                page.rect.width - 10,
-                page.rect.height - 10,
-            )
-            page.insert_image(rect, filename=qr_path)
-            # وضع النص أعلى رمز QR لتجنب الخروج عن الهامش السفلي
-            safe_text_y = max(10, rect.y0 - 6)
-            page.insert_text((rect.x0, safe_text_y), verify_url, fontsize=6, color=(0, 0, 1))
-            stamped_path = os.path.join(app.config["UPLOAD_FOLDER"], f"stamped_{filename}")
-            doc.save(stamped_path)
-            doc.close()
-            os.replace(stamped_path, filepath)
+            try:
+                page = doc[0]
+                rect = fitz.Rect(
+                    page.rect.width - 150,
+                    page.rect.height - 150,
+                    page.rect.width - 10,
+                    page.rect.height - 10,
+                )
+                # إدراج الصورة من الذاكرة لتفادي مشاكل المسارات/الترميزات
+                with open(qr_path, "rb") as qr_file:
+                    qr_bytes = qr_file.read()
+                page.insert_image(rect, stream=qr_bytes)
+                # وضع النص أعلى رمز QR لتجنب الخروج عن الهامش السفلي
+                safe_text_y = max(10, rect.y0 - 6)
+                page.insert_text((rect.x0, safe_text_y), verify_url, fontsize=6, color=(0, 0, 1))
+                stamped_path = os.path.join(app.config["UPLOAD_FOLDER"], f"stamped_{filename}")
+                # احفظ إلى ملف وسيط ثم استبدل الملف الأصلي لضمان الكتابة الكاملة
+                doc.save(stamped_path, garbage=3, deflate=True)
+                os.replace(stamped_path, filepath)
+            finally:
+                doc.close()
         except Exception as e:
             app.logger.exception("PDF stamping failed for transaction %s: %s", t.id, e)
+        finally:
+            # تنظيف ملف ال QR المؤقت
+            try:
+                if os.path.exists(qr_path):
+                    os.remove(qr_path)
+            except Exception:
+                pass
     except Exception as e:
         # لا تُفشل عملية الرفع ولكن سجّل سبب الفشل للمراجعة
         app.logger.exception("QR generation failed for transaction %s: %s", t.id, e)
