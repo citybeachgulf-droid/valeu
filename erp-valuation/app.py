@@ -1,5 +1,6 @@
 from operator import and_
 import os, json, re
+import hashlib
 from datetime import datetime, timedelta, date
 import fitz  # PyMuPDF (kept to preserve functionality if used in templates/utilities)
 import pytesseract  # OCR (kept to preserve functionality if used elsewhere)
@@ -41,6 +42,15 @@ db = SQLAlchemy(app)
 def generate_verification_token() -> str:
     import secrets
     return secrets.token_hex(16)
+
+# -------- تجزئة الملفات للتحقق من سلامتها --------
+def compute_file_sha256(file_path: str) -> str:
+    """إرجاع بصمة SHA-256 لملف كبير بطريقة فعّالة بالذاكرة."""
+    sha256 = hashlib.sha256()
+    with open(file_path, 'rb') as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b''):
+            sha256.update(chunk)
+    return sha256.hexdigest()
 
 # -------- أدوات مساعدة للأرقام (تقبل أرقام عربية وفواصل) --------
 def parse_float_input(value) -> float:
@@ -141,6 +151,8 @@ class Transaction(db.Model):
 
     # رمز تحقق عام للباركود/QR
     verification_token = db.Column(db.String(64), nullable=True, unique=True)
+    # بصمة التقرير (SHA-256) للتحقق من عدم العبث
+    report_sha256 = db.Column(db.String(64), nullable=True)
 
     payments = db.relationship("Payment", backref="transaction", lazy=True)
 
@@ -1559,9 +1571,13 @@ def engineer_upload_report(tid):
     filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(filepath)
 
+    # تأكد من وجود رمز تحقق قبل توليد ال QR
+    if not t.verification_token:
+        t.verification_token = generate_verification_token()
+
     # محاولة ختم التقرير برمز QR يشير إلى رابط التحقق العام
     try:
-        verify_url = url_for('verify_report', token=t.verification_token or generate_verification_token(), _external=True)
+        verify_url = url_for('verify_report', token=t.verification_token, _external=True)
         # إنشئ QR كصورة مؤقتة
         import qrcode
         from PIL import Image as PILImage
@@ -1601,9 +1617,11 @@ def engineer_upload_report(tid):
         else:
             t.report_number = "ref1001"
 
-    # توليد رمز تحقق إن لم يوجد
-    if not t.verification_token:
-        t.verification_token = generate_verification_token()
+    # حساب بصمة SHA-256 للملف النهائي (بعد الختم إن وُجد)
+    try:
+        t.report_sha256 = compute_file_sha256(filepath)
+    except Exception:
+        t.report_sha256 = None
     db.session.commit()
 
     # بعد db.session.commit() في upload_report
@@ -3321,8 +3339,35 @@ def search_report():
 def verify_report(token):
     tx = Transaction.query.filter_by(verification_token=token).first()
     if not tx:
-        return render_template("verify.html", ok=False, tx=None)
-    return render_template("verify.html", ok=True, tx=tx)
+        return render_template("verify.html", ok=False, tx=None, compared=None, match=None)
+
+    # إذا كان هناك رفع ملف للتحقق (POST إلى نفس العنوان باستخدام method override عبر form؟ سنوفر مسار POST منفصل أدناه)
+    return render_template("verify.html", ok=True, tx=tx, compared=None, match=None)
+
+@app.route("/verify/<token>", methods=["POST"])
+def verify_report_file(token):
+    tx = Transaction.query.filter_by(verification_token=token).first()
+    if not tx:
+        return render_template("verify.html", ok=False, tx=None, compared=None, match=None)
+
+    uploaded = request.files.get("file")
+    if not uploaded or uploaded.filename == "":
+        flash("يرجى اختيار ملف للتحقق", "warning")
+        return render_template("verify.html", ok=True, tx=tx, compared=None, match=None)
+
+    # احسب بصمة الملف المرفوع دون حفظ دائم
+    try:
+        sha256 = hashlib.sha256()
+        for chunk in iter(lambda: uploaded.stream.read(1024 * 1024), b""):
+            sha256.update(chunk)
+        # أعد المؤشر إن لزم (ليس ضرورياً هنا بعد الحساب)
+        uploaded.stream.close()
+        uploaded_hash = sha256.hexdigest()
+    except Exception:
+        uploaded_hash = None
+
+    match = (uploaded_hash and tx.report_sha256 and uploaded_hash == tx.report_sha256)
+    return render_template("verify.html", ok=True, tx=tx, compared=uploaded_hash, match=bool(match))
 
 # --------- إنشاء الجداول + ترقيعات متوافقة مع قواعد قديمة ---------
 with app.app_context():
@@ -3564,6 +3609,15 @@ with app.app_context():
             db.session.execute(text("ALTER TABLE transaction ADD COLUMN verification_token VARCHAR(64)"))
             db.session.commit()
             print("✅ تمت إضافة عمود verification_token")
+    except Exception:
+        db.session.rollback()
+
+    # محاولة إضافة عمود report_sha256 إذا كان الجدول قديم
+    try:
+        if not column_exists("transaction", "report_sha256"):
+            db.session.execute(text("ALTER TABLE transaction ADD COLUMN report_sha256 VARCHAR(64)"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود report_sha256")
     except Exception:
         db.session.rollback()
 
