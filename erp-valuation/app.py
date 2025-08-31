@@ -1917,7 +1917,7 @@ def _compute_tax_and_total(base_amount: float) -> tuple[float, float]:
     return tax, total
 
 
-def _sanitize_description(raw_text: str, transaction: "Transaction" | None = None) -> str:
+def _sanitize_description(raw_text: str, transaction: Transaction | None = None) -> str:
     """إزالة أي ذكر لحالة المعاملة من الوصف/الملاحظات قبل الطباعة.
 
     - يحذف صراحة قيمة حالة المعاملة إن توفرت
