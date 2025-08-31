@@ -225,6 +225,41 @@ class CustomerQuote(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
 
+# ---------------- تنظيف عروض الأسعار منتهية الصلاحية ----------------
+# ملاحظة: نستخدم خانة global لتقليل تكرار التنفيذ على كل طلب
+last_quotes_purge_at = None
+PURGE_INTERVAL_SECONDS = 600  # 10 دقائق
+
+def purge_expired_quotes() -> None:
+    """يحذف كافة عروض الأسعار التي انتهى تاريخ صلاحيتها.
+
+    يُعتبر العرض منتهيًا إذا كانت له قيمة valid_until وأصبحت أقل من الآن (UTC).
+    تنطبق العملية على جدولي Quote و CustomerQuote.
+    """
+    now_utc = datetime.utcnow()
+    try:
+        deleted_quotes = Quote.query \
+            .filter(Quote.valid_until != None, Quote.valid_until < now_utc) \
+            .delete(synchronize_session=False)
+
+        deleted_customer_quotes = CustomerQuote.query \
+            .filter(CustomerQuote.valid_until != None, CustomerQuote.valid_until < now_utc) \
+            .delete(synchronize_session=False)
+
+        if (deleted_quotes or 0) > 0 or (deleted_customer_quotes or 0) > 0:
+            db.session.commit()
+    except Exception:
+        # في حال حدوث أي خطأ، نرجع المعاملة لحالتها السابقة
+        db.session.rollback()
+
+@app.before_request
+def auto_purge_expired_quotes():
+    global last_quotes_purge_at
+    now_utc = datetime.utcnow()
+    if last_quotes_purge_at is None or (now_utc - last_quotes_purge_at).total_seconds() >= PURGE_INTERVAL_SECONDS:
+        purge_expired_quotes()
+        last_quotes_purge_at = now_utc
+
 class ValuationMemory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     state = db.Column(db.String(100), nullable=False)   # الولاية
@@ -1663,9 +1698,15 @@ def finance_dashboard():
 
     # ✅ بيانات العروض والفواتير للبنوك لعرضها بسرعة في لوحة المالية
     banks = Bank.query.order_by(Bank.name.asc()).all()
-    recent_quotes = Quote.query.order_by(Quote.id.desc()).limit(20).all()
+    # استبعاد العروض المنتهية من العرض السريع
+    now_utc = datetime.utcnow()
+    recent_quotes = Quote.query \
+        .filter(or_(Quote.valid_until == None, Quote.valid_until >= now_utc)) \
+        .order_by(Quote.id.desc()).limit(20).all()
     recent_bank_invoices = BankInvoice.query.order_by(BankInvoice.id.desc()).limit(20).all()
-    recent_customer_quotes = CustomerQuote.query.order_by(CustomerQuote.id.desc()).limit(20).all()
+    recent_customer_quotes = CustomerQuote.query \
+        .filter(or_(CustomerQuote.valid_until == None, CustomerQuote.valid_until >= now_utc)) \
+        .order_by(CustomerQuote.id.desc()).limit(20).all()
     recent_customer_invoices = CustomerInvoice.query.order_by(CustomerInvoice.id.desc()).limit(20).all()
 
     return render_template(
