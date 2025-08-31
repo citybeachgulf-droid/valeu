@@ -1971,7 +1971,7 @@ def download_invoice_doc(transaction_id: int):
         # للتوافق مع القوالب القديمة
         "TOTAL": f"{amount:.2f}",
         "DATE": datetime.utcnow().strftime("%Y-%m-%d"),
-        "DETAILS": details_override or (t.status or ""),
+        "DETAILS": details_override or "رسوم تثمين",
         "INVOICE_NO": f"INV-{t.id}",
         "TRANSACTION_ID": str(t.id),
         "EMPLOYEE": t.employee or "",
