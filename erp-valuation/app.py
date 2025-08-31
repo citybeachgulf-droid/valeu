@@ -3038,6 +3038,24 @@ def assign_branch(uid):
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
+# ---------------- توليد باركود تجريبي ----------------
+@app.route("/qr/demo")
+def qr_demo():
+    try:
+        import qrcode
+        from io import BytesIO
+        # نص تجريبي قابل للتغيير عبر ?text=
+        text = (request.args.get("text") or "VALeu Demo QR").strip()
+        img = qrcode.make(text)
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+        return send_file(buf, mimetype="image/png", download_name="qr_demo.png")
+    except Exception as e:
+        app.logger.exception("QR demo generation failed: %s", e)
+        flash("تعذر توليد باركود تجريبي.", "danger")
+        return redirect(url_for("index"))
+
 # ---------------- صفحة التقارير المشتركة ----------------
 @app.route("/employee/upload_bank_docs/<int:tid>", methods=["POST"])
 def employee_upload_bank_docs(tid):
