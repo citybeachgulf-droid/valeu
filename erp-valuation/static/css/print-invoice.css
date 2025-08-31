@@ -127,10 +127,10 @@ table.items tfoot td { padding: 10px 12px; background: rgba(14,165,233,0.06); }
 }
 
 @media print {
-  body { background: #ffffff; }
+  html, body { height: auto !important; overflow: visible !important; background: #ffffff; }
   .no-print { display: none !important; }
-  .invoice-container { margin: var(--letterhead-offset) auto 0; padding: 0; max-width: 100%; }
-  .card { box-shadow: none; border-color: #e5e7eb; }
+  .invoice-container { margin: var(--letterhead-offset) auto 0; padding: 0; max-width: 100%; break-inside: avoid-page; page-break-inside: avoid; }
+  .card { box-shadow: none; border-color: #e5e7eb; break-inside: avoid-page; page-break-inside: avoid; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
