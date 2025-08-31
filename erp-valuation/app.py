@@ -1917,7 +1917,7 @@ def download_quote_doc(transaction_id: int):
         # للحفاظ على التوافق مع القوالب القديمة
         "TOTAL": f"{amount:.2f}",
         "DATE": datetime.utcnow().strftime("%Y-%m-%d"),
-        "DETAILS": details_override or (t.status or ""),
+        "DETAILS": details_override or "",
         "QUOTE_NO": f"QUOTE-{t.id}",
         "QUTE_NO": f"QUOTE-{t.id}",
         "TRANSACTION_ID": str(t.id),
@@ -1971,7 +1971,7 @@ def download_invoice_doc(transaction_id: int):
         # للتوافق مع القوالب القديمة
         "TOTAL": f"{amount:.2f}",
         "DATE": datetime.utcnow().strftime("%Y-%m-%d"),
-        "DETAILS": details_override or (t.status or ""),
+        "DETAILS": details_override or "",
         "INVOICE_NO": f"INV-{t.id}",
         "TRANSACTION_ID": str(t.id),
         "EMPLOYEE": t.employee or "",
