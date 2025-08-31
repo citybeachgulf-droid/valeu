@@ -1877,10 +1877,8 @@ def _render_docx_from_template(doc_type: str, placeholders: dict, out_name: str,
 
 
 def _get_vat_rate() -> float:
-    try:
-        return float(os.getenv("VAT_RATE", "0.15"))
-    except Exception:
-        return 0.15
+    # ثابت: ضريبة قيمة مضافة 5%
+    return 0.05
 
 
 def _compute_tax_and_total(base_amount: float) -> tuple[float, float]:
@@ -2009,6 +2007,7 @@ def print_invoice_html(transaction_id: int):
 
     amount = float(t.fee or 0)
     tax, total_with_tax = _compute_tax_and_total(amount)
+    details_override = (request.args.get("details") or "").strip()
 
     # معلومات المؤسسة الافتراضية (يمكن لاحقًا ربطها من الإعدادات/الفرع)
     org_name = "شركة التثمين"
@@ -2025,7 +2024,7 @@ def print_invoice_html(transaction_id: int):
         date_str=(datetime.utcnow().strftime("%Y-%m-%d")),
         org_name=org_name,
         org_meta=org_meta,
-        notes=t.status or "",
+        notes=details_override or "",
     )
 
 # ✅ طباعة فاتورة بنك HTML بنفس تصميم الطباعة
@@ -2041,6 +2040,7 @@ def print_bank_invoice_html(invoice_id: int):
     bank_name = bank.name if bank else None
     amount = float(inv.amount or 0)
     tax, total_with_tax = _compute_tax_and_total(amount)
+    details_override = (request.args.get("details") or "").strip()
 
     org_name = "شركة التثمين"
     org_meta = "العنوان · الهاتف · البريد الإلكتروني"
@@ -2057,7 +2057,7 @@ def print_bank_invoice_html(invoice_id: int):
         date_str=(inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
         org_name=org_name,
         org_meta=org_meta,
-        notes=inv.note or "",
+        notes=details_override or (inv.note or ""),
         # metadata for header
         badge_label="فاتورة",
         invoice_code=f"INV-BANK-{inv.id}",
@@ -2082,6 +2082,7 @@ def print_customer_invoice_html(invoice_id: int):
 
     amount = float(inv.amount or 0)
     tax, total_with_tax = _compute_tax_and_total(amount)
+    details_override = (request.args.get("details") or "").strip()
 
     org_name = "شركة التثمين"
     org_meta = "العنوان · الهاتف · البريد الإلكتروني"
@@ -2098,7 +2099,7 @@ def print_customer_invoice_html(invoice_id: int):
         date_str=(inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
         org_name=org_name,
         org_meta=org_meta,
-        notes=inv.note or "",
+        notes=details_override or (inv.note or ""),
         # metadata for header
         badge_label="فاتورة",
         invoice_code=f"INV-CUST-{inv.id}",
@@ -2573,19 +2574,23 @@ def bank_detail(bank_id):
     start_date = datetime.fromisoformat(start_date_str) if start_date_str else None
     end_date = datetime.fromisoformat(end_date_str) if end_date_str else None
 
-    # إحصائية عدد المعاملات لكل فرع لهذا البنك
-    br_query = db.session.query(Branch.id, Branch.name, func.count(Transaction.id))\
-        .join(Transaction, Transaction.branch_id == Branch.id)\
-        .filter(Transaction.bank_id == bank_id)
+    # إحصائية عدد المعاملات لكل فرع بنك لهذا البنك
+    br_query = db.session.query(
+        Transaction.bank_branch.label("bank_branch"),
+        func.count(Transaction.id)
+    ).filter(
+        Transaction.bank_id == bank_id,
+        Transaction.bank_branch.isnot(None),
+        func.length(func.trim(Transaction.bank_branch)) > 0
+    )
     if start_date:
         br_query = br_query.filter(Transaction.date >= start_date)
     if end_date:
         br_query = br_query.filter(Transaction.date <= end_date)
-    branch_rows = br_query.group_by(Branch.id, Branch.name)\
-        .order_by(Branch.name.asc()).all()
+    branch_rows = br_query.group_by(text("bank_branch")).order_by(text("bank_branch ASC")).all()
     branch_stats = [
-        {"id": bid, "name": bname, "count": bcount}
-        for (bid, bname, bcount) in branch_rows
+        {"name": (bname or "غير محدد"), "count": bcount}
+        for (bname, bcount) in branch_rows
     ]
 
     total_tx = sum(b["count"] for b in branch_stats)
@@ -2873,6 +2878,13 @@ def employee_upload_bank_docs_lookup():
         flash("⛔ لا يمكنك رفع مستندات لمعالجة من فرع آخر", "danger")
         return redirect(url_for("employee_dashboard"))
 
+    # اختيار البنك (اختياري) لتثبيته على المعاملة إن كان فارغًا
+    bank_id_form = request.form.get("bank_id")
+    try:
+        bank_id_val = int(bank_id_form) if bank_id_form else None
+    except Exception:
+        bank_id_val = None
+
     uploaded = request.files.getlist("bank_docs")
     saved = []
     for f in uploaded:
@@ -2882,6 +2894,9 @@ def employee_upload_bank_docs_lookup():
             saved.append(fname)
 
     if saved:
+        # في حال تم تحديد بنك في النموذج ولم تكن المعاملة مرتبطة ببنك، نثبّت البنك
+        if bank_id_val and not t.bank_id:
+            t.bank_id = bank_id_val
         existing = (t.bank_sent_files or "").split(",") if t.bank_sent_files else []
         existing = [x.strip() for x in existing if x.strip()]
         t.bank_sent_files = ",".join(existing + saved)

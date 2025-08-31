@@ -168,11 +168,20 @@
               <div class="card-body">
                 <h5 class="mb-3">📤 رفع مستندات مُرسلة للبنك</h5>
                 <form class="row g-2 align-items-end" method="POST" action="/employee/upload_bank_docs_lookup" enctype="multipart/form-data">
-                  <div class="col-md-4">
+                  <div class="col-md-3">
                     <label class="form-label">المعاملة (رقم أو اسم العميل)</label>
                     <input type="text" class="form-control" name="lookup" placeholder="مثال: 123 أو أحمد علي" required>
                   </div>
-                  <div class="col-md-7">
+                  <div class="col-md-3">
+                    <label class="form-label">🏦 اختر البنك</label>
+                    <select name="bank_id" class="form-select">
+                      <option value="">— اختر البنك —</option>
+                      {% for bank in banks %}
+                        <option value="{{ bank.id }}">{{ bank.name }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-4">
                     <label class="form-label">الملفات</label>
                     <input type="file" class="form-control" name="bank_docs" multiple>
                   </div>

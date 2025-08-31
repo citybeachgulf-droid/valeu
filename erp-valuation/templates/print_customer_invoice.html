@@ -63,7 +63,7 @@
               <td>{{ amount | round(2) }}</td>
               <td>{{ amount | round(2) }}</td>
               <td>1</td>
-              <td>رسوم التثمين{% if transaction and transaction.status %} - {{ transaction.status }}{% elif notes %} - {{ notes }}{% endif %}</td>
+              <td>{{ notes or 'رسوم تثمين' }}</td>
             </tr>
           </tbody>
           <tfoot>
