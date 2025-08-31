@@ -2818,6 +2818,11 @@ def employee_upload_bank_docs(tid):
         flash("⛔ لا يمكنك رفع مستندات لمعالجة من فرع آخر", "danger")
         return redirect(url_for("employee_dashboard"))
 
+    # تأكد من وجود بنك مرتبط بالمعاملة قبل قبول ملفات البنك
+    if not t.bank_id:
+        flash("⚠️ يجب ربط المعاملة ببنك قبل رفع مستندات البنك.", "warning")
+        return redirect(url_for("employee_dashboard"))
+
     uploaded = request.files.getlist("bank_docs")
     saved = []
     for f in uploaded:
@@ -2884,6 +2889,11 @@ def employee_upload_bank_docs_lookup():
         bank_id_val = int(bank_id_form) if bank_id_form else None
     except Exception:
         bank_id_val = None
+
+    # إذا لم تكن المعاملة مرتبطة ببنك ولم يُحدد بنك في النموذج: لا نحفظ وثائق لن تظهر بأي بنك
+    if not t.bank_id and not bank_id_val:
+        flash("⚠️ المعاملة غير مرتبطة بأي بنك. يرجى اختيار البنك قبل رفع المستندات.", "warning")
+        return redirect(url_for("employee_dashboard"))
 
     uploaded = request.files.getlist("bank_docs")
     saved = []
