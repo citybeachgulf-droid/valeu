@@ -10,13 +10,24 @@ self.addEventListener("activate", function(event) {
 
 // تجربة: عند وصول إشعار Push
 self.addEventListener("push", function(event) {
-  console.log("📩 وصل إشعار:", event.data.text());
-  const data = event.data.json();
+  try {
+    const data = event.data ? event.data.json() : { title: "إشعار", body: "لديك إشعار جديد" };
+    event.waitUntil(
+      self.registration.showNotification(data.title || "إشعار", {
+        body: data.body || "لديك إشعار جديد",
+        icon: "/static/icon.png",
+        data: data.click_url || "/"
+      })
+    );
+  } catch (e) {
+    event.waitUntil(
+      self.registration.showNotification("إشعار", { body: "لديك إشعار جديد", icon: "/static/icon.png" })
+    );
+  }
+});
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: "/static/icon.png" // تقدر تحط أي صورة كأيقونة
-    })
-  );
+self.addEventListener("notificationclick", function(event) {
+  event.notification.close();
+  const target = event.notification.data || "/";
+  event.waitUntil(clients.openWindow(target));
 });

@@ -174,7 +174,7 @@ function urlBase64ToUint8Array(base64String) {
 async function subscribeUser() {
   try {
     const registration = await navigator.serviceWorker.ready;
-    const vapidPublicKey = "BFNeZpjEro8pwFxR1H20twlTd2pL5MZtWrDATu4ME2RcbzhN-PBHcpk_jYrRlDUrn4SUxHJ5TOEF796OXs-NN";
+    const vapidPublicKey = "{{ vapid_public_key }}";
     const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,

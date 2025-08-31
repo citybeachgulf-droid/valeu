@@ -23,6 +23,17 @@ UPLOAD_FOLDER = os.path.join(app.root_path, "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
+# ---------------- إعداد مفاتيح Web Push (VAPID) ----------------
+# يمكن ضبطها عبر متغيرات البيئة VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT
+app.config["VAPID_PUBLIC_KEY"] = os.environ.get(
+    "VAPID_PUBLIC_KEY",
+    app.config.get("VAPID_PUBLIC_KEY") or "BFNeZpjEro8pwFxR1H20twlTd2pL5MZtWrDATu4ME2RcbzhN"
+)
+app.config["VAPID_PRIVATE_KEY"] = os.environ.get("VAPID_PRIVATE_KEY", app.config.get("VAPID_PRIVATE_KEY"))
+app.config["VAPID_CLAIMS"] = {
+    "sub": os.environ.get("VAPID_SUBJECT", "mailto:your-email@example.com")
+}
+
 # ---------------- إعداد قاعدة البيانات ----------------
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///erp.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -378,13 +389,18 @@ def save_price(state, region, bank, price):
 
 def send_notification(user_id, title, body):
     subs = NotificationSubscription.query.filter_by(user_id=user_id).all()
+    vapid_private = app.config.get("VAPID_PRIVATE_KEY") or os.environ.get("VAPID_PRIVATE_KEY")
+    vapid_claims = app.config.get("VAPID_CLAIMS", {"sub": "mailto:your-email@example.com"})
+    if not vapid_private:
+        # لا يوجد مفتاح خاص للإرسال، نتجاوز حتى لا نفشل التطبيق
+        return
     for sub in subs:
         try:
             webpush(
                 subscription_info=json.loads(sub.subscription_json),
                 data=json.dumps({"title": title, "body": body}),
-                vapid_private_key="YOUR_VAPID_PRIVATE_KEY",
-                vapid_claims={"sub": "mailto:admin@example.com"}
+                vapid_private_key=vapid_private,
+                vapid_claims=vapid_claims
             )
         except WebPushException as e:
             print("❌ إشعار فشل:", e)
