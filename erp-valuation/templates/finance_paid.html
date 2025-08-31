@@ -69,6 +69,42 @@
       </div>
     </div>
   </div>
+
+  <div class="card mt-4">
+    <div class="card-body">
+      <h5 class="mb-3">🏦 فواتير البنوك المستلمة</h5>
+      <div class="table-responsive">
+        <table class="table table-bordered table-striped align-middle">
+          <thead class="table-dark">
+            <tr>
+              <th>#</th>
+              <th>البنك</th>
+              <th>المبلغ</th>
+              <th>إصدار</th>
+              <th>تسليم</th>
+              <th>استلام</th>
+              <th>ملاحظة</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inv in received_bank_invoices %}
+            <tr>
+              <td>{{ inv.id }}</td>
+              <td>{{ inv.bank_id }}</td>
+              <td>{{ inv.amount }}</td>
+              <td>{{ inv.issued_at.strftime('%Y-%m-%d') if inv.issued_at else '-' }}</td>
+              <td>{{ inv.delivered_at.strftime('%Y-%m-%d') if inv.delivered_at else '-' }}</td>
+              <td>{{ inv.received_at.strftime('%Y-%m-%d') if inv.received_at else '-' }}</td>
+              <td>{{ inv.note or '-' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center">لا توجد فواتير مستلمة</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

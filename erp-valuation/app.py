@@ -1703,7 +1703,9 @@ def finance_dashboard():
     recent_quotes = Quote.query \
         .filter(or_(Quote.valid_until == None, Quote.valid_until >= now_utc)) \
         .order_by(Quote.id.desc()).limit(20).all()
-    recent_bank_invoices = BankInvoice.query.order_by(BankInvoice.id.desc()).limit(20).all()
+    recent_bank_invoices = BankInvoice.query \
+        .filter(BankInvoice.received_at == None) \
+        .order_by(BankInvoice.id.desc()).limit(20).all()
     recent_customer_quotes = CustomerQuote.query \
         .filter(or_(CustomerQuote.valid_until == None, CustomerQuote.valid_until >= now_utc)) \
         .order_by(CustomerQuote.id.desc()).limit(20).all()
@@ -1741,7 +1743,12 @@ def finance_paid():
         .join(Transaction)\
         .filter(Transaction.branch_id == user.branch_id).scalar() or 0.0
 
-    return render_template("finance_paid.html", payments=payments, total_income=total_income)
+    # فواتير البنك التي تم استلام مبلغها
+    received_bank_invoices = BankInvoice.query \
+        .filter(BankInvoice.received_at != None) \
+        .order_by(BankInvoice.received_at.desc()).all()
+
+    return render_template("finance_paid.html", payments=payments, total_income=total_income, received_bank_invoices=received_bank_invoices)
 
 # ---------------- إدارة قوالب وورد (مالية) ----------------
 @app.route("/finance/templates")
