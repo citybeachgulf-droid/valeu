@@ -1588,8 +1588,16 @@ def engineer_upload_report(tid):
         import qrcode
         from PIL import Image as PILImage
         qr_img = qrcode.make(verify_url)
+        # بعض إصدارات PyMuPDF قد تفشل في إدراج صور PNG ذات وضع 1-بت / لوحة ألوان
+        # نحول الصورة إلى RGB لضمان التوافق
+        try:
+            if getattr(qr_img, "mode", "") != "RGB":
+                qr_img = qr_img.convert("RGB")
+        except Exception:
+            # في حال عدم توفر PIL Image أو خاصية mode، نتجاهل التحويل
+            pass
         qr_path = os.path.join(app.config["UPLOAD_FOLDER"], f"qr_{t.id}.png")
-        qr_img.save(qr_path)
+        qr_img.save(qr_path, format="PNG")
 
         # حاول ختم PDF عبر PyMuPDF (fitz)
         try:
