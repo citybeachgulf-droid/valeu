@@ -1596,19 +1596,41 @@ def engineer_upload_report(tid):
             doc = fitz.open(filepath)
             try:
                 page = doc[0]
+                page_rect = page.rect
+                # حجم ديناميكي للـ QR (بالبكسل PDF)
+                qr_size = max(120, min(page_rect.width, page_rect.height) * 0.18)
+                margin = 16
+                # الموضع الافتراضي أسفل اليمين مع هامش
                 rect = fitz.Rect(
-                    page.rect.width - 150,
-                    page.rect.height - 150,
-                    page.rect.width - 10,
-                    page.rect.height - 10,
+                    page_rect.width - qr_size - margin,
+                    page_rect.height - qr_size - margin,
+                    page_rect.width - margin,
+                    page_rect.height - margin,
                 )
+                # إذا تعارض مع الهوامش، انقل لأعلى اليسار كهروب آمن
+                if rect.y1 > page_rect.height or rect.x1 > page_rect.width or rect.x0 < 0 or rect.y0 < 0:
+                    rect = fitz.Rect(margin, margin, margin + qr_size, margin + qr_size)
+
                 # إدراج الصورة من الذاكرة لتفادي مشاكل المسارات/الترميزات
                 with open(qr_path, "rb") as qr_file:
                     qr_bytes = qr_file.read()
                 page.insert_image(rect, stream=qr_bytes)
-                # وضع النص أعلى رمز QR لتجنب الخروج عن الهامش السفلي
-                safe_text_y = max(10, rect.y0 - 6)
-                page.insert_text((rect.x0, safe_text_y), verify_url, fontsize=6, color=(0, 0, 1))
+
+                # نص الرابط أعلى الـ QR بحجم صغير
+                text_y = max(8, rect.y0 - 8)
+                page.insert_text((rect.x0, text_y), verify_url, fontsize=7, color=(0, 0, 1))
+
+                # إضافة رابط قابل للنقر فوق مساحة الـ QR
+                try:
+                    page.insert_link({
+                        "kind": fitz.LINK_URI,
+                        "from": rect,
+                        "uri": verify_url,
+                    })
+                except Exception:
+                    # تجاهل في حال عدم دعم الروابط في بعض الإصدارات
+                    pass
+
                 stamped_path = os.path.join(app.config["UPLOAD_FOLDER"], f"stamped_{filename}")
                 # احفظ إلى ملف وسيط ثم استبدل الملف الأصلي لضمان الكتابة الكاملة
                 doc.save(stamped_path, garbage=3, deflate=True)
@@ -1617,6 +1639,10 @@ def engineer_upload_report(tid):
                 doc.close()
         except Exception as e:
             app.logger.exception("PDF stamping failed for transaction %s: %s", t.id, e)
+            try:
+                flash("تم رفع الملف لكن لم يتم ختمه برمز QR بسبب خطأ داخلي.", "warning")
+            except Exception:
+                pass
         finally:
             # تنظيف ملف ال QR المؤقت
             try:
@@ -1627,6 +1653,10 @@ def engineer_upload_report(tid):
     except Exception as e:
         # لا تُفشل عملية الرفع ولكن سجّل سبب الفشل للمراجعة
         app.logger.exception("QR generation failed for transaction %s: %s", t.id, e)
+        try:
+            flash("تم رفع الملف لكن تعذر إنشاء رمز QR للتوثيق.", "warning")
+        except Exception:
+            pass
 
     t.report_file = filename
     t.status = "📑 تقرير مرفوع"
