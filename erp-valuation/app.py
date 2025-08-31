@@ -1916,6 +1916,54 @@ def _compute_tax_and_total(base_amount: float) -> tuple[float, float]:
     total = round((base_amount or 0.0) + tax, 2)
     return tax, total
 
+
+def _sanitize_description(raw_text: str, transaction: "Transaction" | None = None) -> str:
+    """إزالة أي ذكر لحالة المعاملة من الوصف/الملاحظات قبل الطباعة.
+
+    - يحذف صراحة قيمة حالة المعاملة إن توفرت
+    - يحذف المقاطع التي تبدأ بـ "الحالة:" أو "حالة المعاملة:" حتى نهاية السطر
+    - يحذف أشهر العبارات المستخدمة كحالة
+    - ينظف الفواصل الزائدة في النهاية
+    """
+    if not raw_text:
+        return ""
+    try:
+        text = str(raw_text)
+        # إزالة قيمة حالة المعاملة إن وُجدت
+        if transaction is not None and getattr(transaction, "status", None):
+            status_value = str(transaction.status or "").strip()
+            if status_value:
+                text = text.replace(status_value, "")
+
+        # إزالة الأنماط النصية الشائعة للحالة
+        patterns = [
+            r"\bالحالة\s*(?:الحالية)?\s*[:：]\s*.*$",
+            r"\bحالة\s*(?:المعاملة|الفاتورة|الطلب)?\s*[:：]\s*.*$",
+        ]
+        for pat in patterns:
+            text = re.sub(pat, "", text).strip()
+
+        # إزالة أشهر قيم الحالة المعروفة في النظام
+        known_statuses = (
+            "بانتظار المهندس",
+            "قيد المعاينة",
+            "قيد التنفيذ",
+            "مرفوضة",
+            "بانتظار الدفع",
+            "مكتملة",
+            "منجزة",
+            "📑 تقرير مرفوع",
+            "📑 تقرير مبدئي",
+        )
+        for s in known_statuses:
+            text = text.replace(s, "")
+
+        # تنظيف فواصل/رموز زائدة في نهاية النص
+        text = re.sub(r"[\-\|\(\)\[\]·•،،:,\s]+$", "", text).strip()
+        return text
+    except Exception:
+        return str(raw_text)
+
 @app.route("/finance/templates/quote/<int:transaction_id>")
 def download_quote_doc(transaction_id: int):
     if session.get("role") != "finance":
@@ -2000,7 +2048,7 @@ def download_invoice_doc(transaction_id: int):
         # للتوافق مع القوالب القديمة
         "TOTAL": f"{amount:.2f}",
         "DATE": datetime.utcnow().strftime("%Y-%m-%d"),
-        "DETAILS": details_override or "رسوم التثمين",
+        "DETAILS": _sanitize_description(details_override or "رسوم التثمين", t),
         "INVOICE_NO": f"INV-{t.id}",
         "TRANSACTION_ID": str(t.id),
         "EMPLOYEE": t.employee or "",
@@ -2053,7 +2101,7 @@ def print_invoice_html(transaction_id: int):
         date_str=(datetime.utcnow().strftime("%Y-%m-%d")),
         org_name=org_name,
         org_meta=org_meta,
-        notes=details_override or "",
+        notes=_sanitize_description(details_override, t),
     )
 
 # ✅ طباعة فاتورة بنك HTML بنفس تصميم الطباعة
@@ -2086,7 +2134,7 @@ def print_bank_invoice_html(invoice_id: int):
         date_str=(inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
         org_name=org_name,
         org_meta=org_meta,
-        notes=details_override or (inv.note or ""),
+        notes=_sanitize_description(details_override or (inv.note or ""), transaction),
         # metadata for header
         badge_label="فاتورة",
         invoice_code=f"INV-BANK-{inv.id}",
@@ -2128,7 +2176,7 @@ def print_customer_invoice_html(invoice_id: int):
         date_str=(inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
         org_name=org_name,
         org_meta=org_meta,
-        notes=details_override or (inv.note or ""),
+        notes=_sanitize_description(details_override or (inv.note or ""), transaction),
         # metadata for header
         badge_label="فاتورة",
         invoice_code=f"INV-CUST-{inv.id}",
@@ -2207,7 +2255,7 @@ def download_bank_invoice_doc(invoice_id: int):
         # توافق قديم
         "TOTAL": f"{amount:.2f}",
         "DATE": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
-        "DETAILS": inv.note or "",
+        "DETAILS": _sanitize_description(inv.note or "", transaction),
         "INVOICE_NO": f"INV-BANK-{inv.id}",
         "TRANSACTION_ID": str(inv.transaction_id or ""),
         "BANK_NAME": (bank.name if bank else ""),
@@ -2263,7 +2311,7 @@ def download_customer_invoice_doc(invoice_id: int):
         # توافق قديم
         "TOTAL": f"{amount:.2f}",
         "DATE": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
-        "DETAILS": inv.note or "",
+        "DETAILS": _sanitize_description(inv.note or "", transaction),
         "INVOICE_NO": f"INV-CUST-{inv.id}",
         "TRANSACTION_ID": str(inv.transaction_id or ""),
     }
