@@ -79,16 +79,13 @@
     <div class="card-header bg-dark text-white d-flex">
       {% set has_invoices = invoices and (invoices|length) > 0 %}
       {% set has_docs = documents and (documents|length) > 0 %}
-      {% set active_tab = request.args.get('tab') or 'docs' %}
+      {% set active_tab = request.args.get('tab') or 'general-docs' %}
       <ul class="nav nav-tabs card-header-tabs" id="bankTabs" role="tablist">
         <li class="nav-item" role="presentation">
           <button class="nav-link {{ 'active' if active_tab == 'invoices' else '' }}" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices" type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'invoices' else 'false' }}">📄 الفواتير المرسلة للبنك</button>
         </li>
         <li class="nav-item" role="presentation">
-          <button class="nav-link {{ 'active' if active_tab == 'docs' else '' }}" id="docs-tab" data-bs-toggle="tab" data-bs-target="#docs" type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'docs' else 'false' }}">📎 المستندات المرسلة</button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="general-docs-tab" data-bs-toggle="tab" data-bs-target="#general-docs" type="button" role="tab">✉️ رسائل/مستندات عامة</button>
+          <button class="nav-link {{ 'active' if active_tab == 'general-docs' else '' }}" id="general-docs-tab" data-bs-toggle="tab" data-bs-target="#general-docs" type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'general-docs' else 'false' }}">✉️ رسائل/مستندات عامة</button>
         </li>
         <li class="nav-item" role="presentation">
           <button class="nav-link" id="stages-tab" data-bs-toggle="tab" data-bs-target="#stages" type="button" role="tab">✅ مراحل فواتير البنك</button>
@@ -128,32 +125,9 @@
           </div>
         </div>
 
-        <div class="tab-pane fade {{ 'show active' if active_tab == 'docs' else '' }}" id="docs" role="tabpanel">
-          <div class="table-responsive">
-            <table class="table table-bordered table-striped">
-              <thead class="table-dark">
-                <tr>
-                  <th>المعاملة</th>
-                  <th>الملف</th>
-                  <th>عرض</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for d in documents %}
-                <tr>
-                  <td>{{ d.transaction_id }}</td>
-                  <td>{{ d.filename }}</td>
-                  <td><a href="{{ url_for('uploaded_file', filename=d.filename) }}" target="_blank" class="btn btn-sm btn-outline-primary">فتح</a></td>
-                </tr>
-                {% else %}
-                <tr><td colspan="3" class="text-center">لا توجد مستندات</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        
 
-        <div class="tab-pane fade" id="general-docs" role="tabpanel">
+        <div class="tab-pane fade {{ 'show active' if active_tab == 'general-docs' else '' }}" id="general-docs" role="tabpanel">
           <div class="table-responsive">
             <table class="table table-bordered table-striped">
               <thead class="table-dark">
