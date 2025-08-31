@@ -76,7 +76,7 @@
                     <a href="{{ url_for('engineer_take', tid=t.id) }}" class="btn btn-sm btn-primary">استلام</a>
                   {% elif t.assigned_to == engineer.id and t.status == "قيد المعاينة" %}
                     <form method="POST" action="{{ url_for('engineer_upload_report', tid=t.id) }}" enctype="multipart/form-data" class="d-flex align-items-center gap-2">
-                      <input type="file" name="report_file" class="form-control form-control-sm" accept=".pdf,.doc,.docx" required>
+                      <input type="file" name="report_file" class="form-control form-control-sm" accept=".pdf" required>
                       <button type="submit" class="btn btn-sm btn-success">📤 رفع</button>
                     </form>
                   {% endif %}

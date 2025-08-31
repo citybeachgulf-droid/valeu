@@ -1567,7 +1567,13 @@ def engineer_upload_report(tid):
         return redirect(url_for("engineer_dashboard"))
 
     file = request.files["report_file"]
-    filename = secure_filename(f"{t.id}_{file.filename}")
+    original_name = file.filename
+    # السماح فقط برفع ملفات PDF لضمان إمكانية الختم
+    if not original_name.lower().endswith(".pdf"):
+        flash("⚠️ يجب رفع ملف بصيغة PDF ليتم ختمه برمز QR.", "danger")
+        return redirect(url_for("engineer_transaction_details", tid=tid))
+
+    filename = secure_filename(f"{t.id}_{original_name}")
     filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(filepath)
 
@@ -1589,19 +1595,25 @@ def engineer_upload_report(tid):
         try:
             doc = fitz.open(filepath)
             page = doc[0]
-            rect = fitz.Rect(page.rect.width - 150, page.rect.height - 150, page.rect.width - 10, page.rect.height - 10)
+            rect = fitz.Rect(
+                page.rect.width - 150,
+                page.rect.height - 150,
+                page.rect.width - 10,
+                page.rect.height - 10,
+            )
             page.insert_image(rect, filename=qr_path)
-            # إضافة نص رابط التحقق الصغير أسفل ال QR
-            page.insert_text((rect.x0, rect.y1 + 5), verify_url, fontsize=6, color=(0, 0, 1))
+            # وضع النص أعلى رمز QR لتجنب الخروج عن الهامش السفلي
+            safe_text_y = max(10, rect.y0 - 6)
+            page.insert_text((rect.x0, safe_text_y), verify_url, fontsize=6, color=(0, 0, 1))
             stamped_path = os.path.join(app.config["UPLOAD_FOLDER"], f"stamped_{filename}")
             doc.save(stamped_path)
             doc.close()
             os.replace(stamped_path, filepath)
-        except Exception:
-            pass
-    except Exception:
-        # تخطَ أي فشل في الختم ولا تُفشل الرفع
-        pass
+        except Exception as e:
+            app.logger.exception("PDF stamping failed for transaction %s: %s", t.id, e)
+    except Exception as e:
+        # لا تُفشل عملية الرفع ولكن سجّل سبب الفشل للمراجعة
+        app.logger.exception("QR generation failed for transaction %s: %s", t.id, e)
 
     t.report_file = filename
     t.status = "📑 تقرير مرفوع"
