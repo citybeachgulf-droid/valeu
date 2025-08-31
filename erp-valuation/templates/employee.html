@@ -194,6 +194,47 @@
             </div>
           </div>
         </div>
+
+        <div class="row justify-content-center mt-3">
+          <div class="col-md-8" data-aos="fade-up">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <h5 class="mb-3">✉️ إرسال رسالة/سيرة ذاتية للبنك (بدون معاملة)</h5>
+                <form class="row g-2" method="POST" action="{{ url_for('employee_add_bank_document') }}" enctype="multipart/form-data">
+                  <div class="col-md-4">
+                    <label class="form-label">🏦 اختر البنك</label>
+                    <select name="bank_id" class="form-select" required>
+                      <option value="">— اختر البنك —</option>
+                      {% for bank in banks %}
+                        <option value="{{ bank.id }}">{{ bank.name }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-8">
+                    <label class="form-label">العنوان</label>
+                    <input type="text" name="title" class="form-control" placeholder="مثال: رسالة تعارف، سيرة ذاتية" required>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">النوع (اختياري)</label>
+                    <input type="text" name="doc_type" class="form-control" placeholder="رسالة، سيرة ذاتية، ...">
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">نص الرسالة (اختياري)</label>
+                    <textarea name="message" class="form-control" rows="4" placeholder="اكتب رسالتك هنا..."></textarea>
+                  </div>
+                  <div class="col-md-8">
+                    <label class="form-label">ملف مرفق (اختياري)</label>
+                    <input type="file" name="file" class="form-control">
+                  </div>
+                  <div class="col-md-4 d-flex align-items-end">
+                    <button class="btn btn-primary w-100">إرسال</button>
+                  </div>
+                </form>
+                <div class="form-text">تظهر هذه الرسائل في تبويب "رسائل/مستندات عامة" في صفحة البنك.</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- تبويب مستندات الشركة/الفرع -->

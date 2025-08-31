@@ -88,6 +88,9 @@
           <button class="nav-link {{ 'active' if active_tab == 'docs' else '' }}" id="docs-tab" data-bs-toggle="tab" data-bs-target="#docs" type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'docs' else 'false' }}">📎 المستندات المرسلة</button>
         </li>
         <li class="nav-item" role="presentation">
+          <button class="nav-link" id="general-docs-tab" data-bs-toggle="tab" data-bs-target="#general-docs" type="button" role="tab">✉️ رسائل/مستندات عامة</button>
+        </li>
+        <li class="nav-item" role="presentation">
           <button class="nav-link" id="stages-tab" data-bs-toggle="tab" data-bs-target="#stages" type="button" role="tab">✅ مراحل فواتير البنك</button>
         </li>
       </ul>
@@ -144,6 +147,41 @@
                 </tr>
                 {% else %}
                 <tr><td colspan="3" class="text-center">لا توجد مستندات</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="general-docs" role="tabpanel">
+          <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+              <thead class="table-dark">
+                <tr>
+                  <th>#</th>
+                  <th>العنوان</th>
+                  <th>النوع</th>
+                  <th>الرسالة</th>
+                  <th>الملف</th>
+                  <th>التاريخ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for d in general_docs %}
+                <tr>
+                  <td>{{ d.id }}</td>
+                  <td>{{ d.title }}</td>
+                  <td>{{ d.doc_type or '-' }}</td>
+                  <td style="max-width:400px; white-space:pre-wrap">{{ d.message or '-' }}</td>
+                  <td>
+                    {% if d.file %}
+                      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('uploaded_file', filename=d.file) }}" target="_blank">فتح</a>
+                    {% else %} - {% endif %}
+                  </td>
+                  <td>{{ d.created_at.strftime('%Y-%m-%d %H:%M') if d.created_at else '-' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center">لا توجد رسائل/مستندات عامة</td></tr>
                 {% endfor %}
               </tbody>
             </table>
