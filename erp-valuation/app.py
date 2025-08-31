@@ -2885,7 +2885,15 @@ def employee_upload_bank_docs_lookup():
     if session.get("role") != "employee":
         return redirect(url_for("login"))
 
-    lookup = (request.form.get("lookup") or "").strip()
+    lookup_raw = (request.form.get("lookup") or "").strip()
+
+    # تحويل الأرقام العربية/الفارسية إلى أرقام لاتينية لضمان المطابقة الصحيحة
+    def normalize_digits(value: str) -> str:
+        translation_table = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
+        return value.translate(translation_table)
+
+    lookup = normalize_digits(lookup_raw)
+
     if not lookup:
         flash("⚠️ يرجى إدخال رقم المعاملة أو اسم العميل", "warning")
         return redirect(url_for("employee_dashboard"))
