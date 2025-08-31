@@ -2920,8 +2920,10 @@ def employee_upload_bank_docs_lookup():
             saved.append(fname)
 
     if saved:
-        # في حال تم تحديد بنك في النموذج ولم تكن المعاملة مرتبطة ببنك، نثبّت البنك
-        if bank_id_val and not t.bank_id:
+        # في حال تم تحديد بنك في النموذج:
+        # - إن لم تكن المعاملة مرتبطة ببنك نثبّت البنك المختار
+        # - وإن كانت مرتبطة ببنك مختلف، نحدث الربط للبنك المختار لضمان ظهور المستندات في صفحة البنك الصحيحة
+        if bank_id_val and (not t.bank_id or t.bank_id != bank_id_val):
             t.bank_id = bank_id_val
         existing = (t.bank_sent_files or "").split(",") if t.bank_sent_files else []
         existing = [x.strip() for x in existing if x.strip()]
