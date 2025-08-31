@@ -121,6 +121,11 @@ table.items tfoot td { padding: 10px 12px; background: rgba(14,165,233,0.06); }
 .btn:hover { filter: brightness(1.05) saturate(1.05); }
 .btn.secondary { background: linear-gradient(90deg, #475569, #334155); }
 
+@page {
+  size: auto;
+  margin: 0;
+}
+
 @media print {
   body { background: #ffffff; }
   .no-print { display: none !important; }
