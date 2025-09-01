@@ -39,9 +39,6 @@ app.config["VAPID_CLAIMS"] = {
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///erp.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
-def generate_verification_token() -> str:
-    import secrets
-    return secrets.token_hex(16)
 
 # -------- تجزئة الملفات للتحقق من سلامتها --------
 def compute_file_sha256(file_path: str) -> str:
@@ -151,8 +148,6 @@ class Transaction(db.Model):
 
     payment_status  = db.Column(db.String(20), default="غير مدفوعة")
 
-    # رمز تحقق عام للباركود/QR
-    verification_token = db.Column(db.String(64), nullable=True, unique=True)
     # بصمة التقرير (SHA-256) للتحقق من عدم العبث
     report_sha256 = db.Column(db.String(64), nullable=True)
 
@@ -1578,134 +1573,16 @@ def engineer_upload_report(tid):
 
     file = request.files["report_file"]
     original_name = file.filename
-    # السماح فقط برفع ملفات PDF لضمان إمكانية الختم
+    # السماح فقط برفع ملفات PDF
     if not original_name.lower().endswith(".pdf"):
-        flash("⚠️ يجب رفع ملف بصيغة PDF ليتم ختمه برمز QR.", "danger")
+        flash("⚠️ يجب رفع ملف بصيغة PDF.", "danger")
         return redirect(url_for("engineer_transaction_details", tid=tid))
 
     filename = secure_filename(f"{t.id}_{original_name}")
     filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(filepath)
 
-    # تأكد من وجود رمز تحقق قبل توليد ال QR
-    if not t.verification_token:
-        t.verification_token = generate_verification_token()
-
-    # محاولة ختم التقرير برمز QR يشير إلى رابط التحقق العام
-    try:
-        verify_url = url_for('verify_report', token=t.verification_token, _external=True)
-        # إنشئ QR كصورة مؤقتة
-        import qrcode
-        from PIL import Image as PILImage
-        qr_img = qrcode.make(verify_url)
-        # بعض إصدارات PyMuPDF قد تفشل في إدراج صور PNG ذات وضع 1-بت / لوحة ألوان
-        # نحول الصورة إلى RGB لضمان التوافق
-        try:
-            if getattr(qr_img, "mode", "") != "RGB":
-                qr_img = qr_img.convert("RGB")
-        except Exception:
-            # في حال عدم توفر PIL Image أو خاصية mode، نتجاهل التحويل
-            pass
-        qr_path = os.path.join(app.config["UPLOAD_FOLDER"], f"qr_{t.id}.png")
-        qr_img.save(qr_path, format="PNG")
-
-        # حاول ختم PDF عبر PyMuPDF (fitz)
-        try:
-            # تأكد أن الملف ليس فارغاً
-            try:
-                if os.path.getsize(filepath) == 0:
-                    raise RuntimeError("Uploaded PDF is empty")
-            except OSError:
-                # في حال تعذر الحصول على حجم الملف، أكمل المحاولة
-                pass
-
-            doc = fitz.open(filepath)
-            try:
-                # تحقق من التشفير/الحماية
-                if getattr(doc, "needs_pass", False) or getattr(doc, "is_encrypted", False):
-                    raise RuntimeError("Cannot stamp encrypted / password-protected PDF")
-
-                if doc.page_count == 0:
-                    raise RuntimeError("Cannot stamp PDF with zero pages")
-
-                page = doc[0]
-                page_rect = page.rect
-                # حجم ديناميكي للـ QR (بالبكسل PDF)
-                qr_size = max(120, min(page_rect.width, page_rect.height) * 0.18)
-                margin = 16
-                # الموضع الافتراضي أسفل اليمين مع هامش
-                rect = fitz.Rect(
-                    page_rect.width - qr_size - margin,
-                    page_rect.height - qr_size - margin,
-                    page_rect.width - margin,
-                    page_rect.height - margin,
-                )
-                # إذا تعارض مع الهوامش، انقل لأعلى اليسار كهروب آمن
-                if rect.y1 > page_rect.height or rect.x1 > page_rect.width or rect.x0 < 0 or rect.y0 < 0:
-                    rect = fitz.Rect(margin, margin, margin + qr_size, margin + qr_size)
-
-                # إدراج الصورة: جرب stream أولاً ثم اسم الملف كحل بديل حسب نسخة PyMuPDF
-                inserted = False
-                with open(qr_path, "rb") as qr_file:
-                    qr_bytes = qr_file.read()
-                try:
-                    page.insert_image(rect, stream=qr_bytes)
-                    inserted = True
-                except Exception as e_stream:
-                    app.logger.warning("insert_image(stream) failed for transaction %s: %s", t.id, e_stream)
-                    try:
-                        page.insert_image(rect, filename=qr_path)
-                        inserted = True
-                    except Exception as e_file:
-                        app.logger.warning("insert_image(filename) failed for transaction %s: %s", t.id, e_file)
-
-                if not inserted:
-                    raise RuntimeError("Failed to insert QR image into PDF")
-
-                # نص الرابط أعلى الـ QR بحجم صغير
-                text_y = max(8, rect.y0 - 8)
-                try:
-                    page.insert_text((rect.x0, text_y), verify_url, fontsize=7, color=(0, 0, 1))
-                except Exception as e_text:
-                    app.logger.warning("insert_text failed for transaction %s: %s", t.id, e_text)
-
-                # إضافة رابط قابل للنقر فوق مساحة الـ QR
-                try:
-                    page.insert_link({
-                        "kind": fitz.LINK_URI,
-                        "from": rect,
-                        "uri": verify_url,
-                    })
-                except Exception:
-                    # تجاهل في حال عدم دعم الروابط في بعض الإصدارات
-                    pass
-
-                stamped_path = os.path.join(app.config["UPLOAD_FOLDER"], f"stamped_{filename}")
-                # احفظ إلى ملف وسيط ثم استبدل الملف الأصلي لضمان الكتابة الكاملة
-                doc.save(stamped_path, garbage=3, deflate=True)
-                os.replace(stamped_path, filepath)
-            finally:
-                doc.close()
-        except Exception as e:
-            app.logger.exception("PDF stamping failed for transaction %s: %s", t.id, e)
-            try:
-                flash("تم رفع الملف لكن لم يتم ختمه برمز QR بسبب خطأ داخلي.", "warning")
-            except Exception:
-                pass
-        finally:
-            # تنظيف ملف ال QR المؤقت
-            try:
-                if os.path.exists(qr_path):
-                    os.remove(qr_path)
-            except Exception:
-                pass
-    except Exception as e:
-        # لا تُفشل عملية الرفع ولكن سجّل سبب الفشل للمراجعة
-        app.logger.exception("QR generation failed for transaction %s: %s", t.id, e)
-        try:
-            flash("تم رفع الملف لكن تعذر إنشاء رمز QR للتوثيق.", "warning")
-        except Exception:
-            pass
+    # تم إزالة ختم التقرير برمز QR ورابط التحقق
 
     t.report_file = filename
     t.status = "📑 تقرير مرفوع"
@@ -3103,32 +2980,7 @@ def assign_branch(uid):
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
-# ---------------- رابط عام لمشاركة التقرير عبر رمز التحقق ----------------
-@app.route("/r/<token>", endpoint="public_report")
-def public_report(token):
-    tx = Transaction.query.filter_by(verification_token=token).first()
-    if not tx or not tx.report_file:
-        flash("⚠️ التقرير غير متاح", "warning")
-        return redirect(url_for("index"))
-    return send_from_directory(app.config["UPLOAD_FOLDER"], tx.report_file, as_attachment=False)
-
-# ---------------- توليد باركود تجريبي ----------------
-@app.route("/qr/demo")
-def qr_demo():
-    try:
-        import qrcode
-        from io import BytesIO
-        # نص تجريبي قابل للتغيير عبر ?text=
-        text = (request.args.get("text") or "VALeu Demo QR").strip()
-        img = qrcode.make(text)
-        buf = BytesIO()
-        img.save(buf, format="PNG")
-        buf.seek(0)
-        return send_file(buf, mimetype="image/png", download_name="qr_demo.png")
-    except Exception as e:
-        app.logger.exception("QR demo generation failed: %s", e)
-        flash("تعذر توليد باركود تجريبي.", "danger")
-        return redirect(url_for("index"))
+# (تمت إزالة مسارات QR والروابط العامة المرتبطة بها)
 
 # ---------------- صفحة التقارير المشتركة ----------------
 @app.route("/employee/upload_bank_docs/<int:tid>", methods=["POST"])
@@ -3481,40 +3333,7 @@ def search_report():
             results = Transaction.query.filter_by(report_number=search_number).all()
     return render_template("reports.html", reports=results, search_number=search_number)
 
-# --------- تحقق عام من التقرير عبر رمز QR ---------
-@app.route("/verify/<token>")
-def verify_report(token):
-    tx = Transaction.query.filter_by(verification_token=token).first()
-    if not tx:
-        return render_template("verify.html", ok=False, tx=None, compared=None, match=None)
-
-    # إذا كان هناك رفع ملف للتحقق (POST إلى نفس العنوان باستخدام method override عبر form؟ سنوفر مسار POST منفصل أدناه)
-    return render_template("verify.html", ok=True, tx=tx, compared=None, match=None)
-
-@app.route("/verify/<token>", methods=["POST"])
-def verify_report_file(token):
-    tx = Transaction.query.filter_by(verification_token=token).first()
-    if not tx:
-        return render_template("verify.html", ok=False, tx=None, compared=None, match=None)
-
-    uploaded = request.files.get("file")
-    if not uploaded or uploaded.filename == "":
-        flash("يرجى اختيار ملف للتحقق", "warning")
-        return render_template("verify.html", ok=True, tx=tx, compared=None, match=None)
-
-    # احسب بصمة الملف المرفوع دون حفظ دائم
-    try:
-        sha256 = hashlib.sha256()
-        for chunk in iter(lambda: uploaded.stream.read(1024 * 1024), b""):
-            sha256.update(chunk)
-        # أعد المؤشر إن لزم (ليس ضرورياً هنا بعد الحساب)
-        uploaded.stream.close()
-        uploaded_hash = sha256.hexdigest()
-    except Exception:
-        uploaded_hash = None
-
-    match = (uploaded_hash and tx.report_sha256 and uploaded_hash == tx.report_sha256)
-    return render_template("verify.html", ok=True, tx=tx, compared=uploaded_hash, match=bool(match))
+# (تمت إزالة مسارات التحقق المرتبطة برموز QR)
 
 # --------- إنشاء الجداول + ترقيعات متوافقة مع قواعد قديمة ---------
 with app.app_context():
@@ -3759,14 +3578,7 @@ with app.app_context():
         db.session.commit()
         print("✅ تم إنشاء حساب المالية الافتراضي (username=finance, password=1234)")
 
-    # محاولة إضافة عمود verification_token إذا كان الجدول قديم
-    try:
-        if not column_exists("transaction", "verification_token"):
-            db.session.execute(text("ALTER TABLE transaction ADD COLUMN verification_token VARCHAR(64)"))
-            db.session.commit()
-            print("✅ تمت إضافة عمود verification_token")
-    except Exception:
-        db.session.rollback()
+    # (تمت إزالة إضافة عمود verification_token)
 
     # محاولة إضافة عمود report_sha256 إذا كان الجدول قديم
     try:
