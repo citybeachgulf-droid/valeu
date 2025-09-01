@@ -3077,6 +3077,15 @@ def assign_branch(uid):
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
+# ---------------- رابط عام لمشاركة التقرير عبر رمز التحقق ----------------
+@app.route("/r/<token>")
+def public_report(token):
+    tx = Transaction.query.filter_by(verification_token=token).first()
+    if not tx or not tx.report_file:
+        flash("⚠️ التقرير غير متاح", "warning")
+        return redirect(url_for("index"))
+    return send_from_directory(app.config["UPLOAD_FOLDER"], tx.report_file, as_attachment=False)
+
 # ---------------- توليد باركود تجريبي ----------------
 @app.route("/qr/demo")
 def qr_demo():
