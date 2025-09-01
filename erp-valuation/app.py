@@ -140,6 +140,8 @@ class Transaction(db.Model):
     bank_id = db.Column(db.Integer, db.ForeignKey("bank.id"), nullable=True)
     # 👇 اسم فرع البنك المرتبط بالمعاملة
     bank_branch = db.Column(db.String(120), nullable=True)
+    # 👇 اسم موظف البنك الذي جلب/قدّم المعاملة
+    bank_employee_name = db.Column(db.String(120), nullable=True)
 
     price = db.Column(db.Float, nullable=True)   # سعر التثمين (اختياري)
 
@@ -662,6 +664,7 @@ def add_transaction():
         region = request.form.get("region")
         bank_id = request.form.get("bank_id")
         bank_branch = (request.form.get("bank_branch") or "").strip()
+        bank_employee_name = (request.form.get("bank_employee_name") or "").strip()
         try:
             bank_id = int(bank_id) if bank_id else None
         except Exception:
@@ -716,6 +719,7 @@ def add_transaction():
             region=region,
             bank_id=bank_id,
             bank_branch=bank_branch,
+            bank_employee_name=bank_employee_name,
             created_by=user.id,
             payment_status="غير مدفوعة",
             transaction_type="real_estate",
@@ -732,6 +736,7 @@ def add_transaction():
         # تحقق أساسي: البنك وفرع البنك مطلوبان لمعاملات المركبات أيضًا
         bank_id = request.form.get("bank_id")
         bank_branch = (request.form.get("bank_branch") or "").strip()
+        bank_employee_name = (request.form.get("bank_employee_name") or "").strip()
         if not bank_id or not bank_branch:
             flash("⚠️ يرجى اختيار البنك وكتابة فرع البنك", "danger")
             return redirect(url_for("employee_dashboard"))
@@ -754,6 +759,7 @@ def add_transaction():
     region=None,
     bank_id=bank_id,
     bank_branch=bank_branch,
+    bank_employee_name=bank_employee_name,
     assigned_to=None   # ✅
 )
 
@@ -1438,6 +1444,7 @@ def add_transaction_engineer():
             region = request.form.get("region")
             bank_id = request.form.get("bank_id")
             bank_branch = (request.form.get("bank_branch") or "").strip()
+            bank_employee_name = (request.form.get("bank_employee_name") or "").strip()
 
             area = float(request.form.get("area") or 0)
             building_area = float(request.form.get("building_area") or 0)
@@ -1491,6 +1498,7 @@ def add_transaction_engineer():
                 region=region,
                 bank_id=bank_id,
                 bank_branch=bank_branch,
+                bank_employee_name=bank_employee_name,
                 created_by=user.id,
                 transaction_type="real_estate",
                 payment_status="غير مدفوعة",
@@ -1507,6 +1515,7 @@ def add_transaction_engineer():
             # تحقق أساسي: البنك وفرع البنك مطلوبان لمعاملات المركبات أيضًا
             bank_id = request.form.get("bank_id")
             bank_branch = (request.form.get("bank_branch") or "").strip()
+            bank_employee_name = (request.form.get("bank_employee_name") or "").strip()
             if not bank_id or not bank_branch:
                 flash("⚠️ يرجى اختيار البنك وكتابة فرع البنك", "danger")
                 return redirect(url_for("add_transaction_engineer"))
@@ -1528,6 +1537,7 @@ def add_transaction_engineer():
                 valuation_amount = vehicle_value,
                 bank_id=bank_id,
                 bank_branch=bank_branch,
+                bank_employee_name=bank_employee_name,
 
                 assigned_to=None   # ✅
             )
@@ -2859,6 +2869,21 @@ def bank_detail(bank_id):
 
     total_tx = sum(b["count"] for b in branch_stats)
 
+    # 👤 إحصائية عدد المعاملات لكل اسم موظف بنك
+    emp_query = db.session.query(
+        func.coalesce(func.trim(Transaction.bank_employee_name), "غير معروف").label("emp"),
+        func.count(Transaction.id)
+    ).filter(Transaction.bank_id == bank_id)
+    if start_date:
+        emp_query = emp_query.filter(Transaction.date >= start_date)
+    if end_date:
+        emp_query = emp_query.filter(Transaction.date <= end_date)
+    employee_rows = emp_query.group_by(text("emp")).order_by(text("emp ASC")).all()
+    employee_stats = [
+        {"name": ename or "غير معروف", "count": ecount}
+        for (ename, ecount) in employee_rows
+    ]
+
     # الفواتير المرتبطة بمعاملات هذا البنك (اعتماداً على جدول Payments)
     pay_query = Payment.query.join(Transaction, Payment.transaction_id == Transaction.id)\
         .filter(Transaction.bank_id == bank_id)
@@ -2939,6 +2964,7 @@ def bank_detail(bank_id):
         "bank_detail.html",
         bank=bank,
         branches=branch_stats,
+        employees=employee_stats,
         total_tx=total_tx,
         payments=payments,
         documents=documents,
@@ -3622,6 +3648,15 @@ with app.app_context():
             db.session.execute(text("ALTER TABLE transaction ADD COLUMN bank_branch VARCHAR(120)"))
             db.session.commit()
             print("✅ تمت إضافة عمود bank_branch")
+    except Exception:
+        db.session.rollback()
+
+    # محاولة إضافة عمود bank_employee_name للمعاملات إذا كان الجدول قديم
+    try:
+        if not column_exists("transaction", "bank_employee_name"):
+            db.session.execute(text("ALTER TABLE transaction ADD COLUMN bank_employee_name VARCHAR(120)"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود bank_employee_name")
     except Exception:
         db.session.rollback()
 

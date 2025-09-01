@@ -75,6 +75,32 @@
     </div>
   </div>
 
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-dark text-white">👤 عدد المعاملات حسب موظف البنك</div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-bordered table-striped align-middle">
+          <thead class="table-dark">
+            <tr>
+              <th>اسم موظف البنك</th>
+              <th>عدد المعاملات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in employees %}
+            <tr>
+              <td>{{ e.name }}</td>
+              <td><span class="badge bg-secondary">{{ e.count }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="2" class="text-center">لا توجد بيانات</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div class="card shadow-sm">
     <div class="card-header bg-dark text-white d-flex">
       {% set has_invoices = invoices and (invoices|length) > 0 %}
