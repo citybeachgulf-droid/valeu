@@ -3078,7 +3078,7 @@ def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 # ---------------- رابط عام لمشاركة التقرير عبر رمز التحقق ----------------
-@app.route("/r/<token>")
+@app.route("/r/<token>", endpoint="public_report")
 def public_report(token):
     tx = Transaction.query.filter_by(verification_token=token).first()
     if not tx or not tx.report_file:
