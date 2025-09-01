@@ -144,7 +144,7 @@
       🔗 رابط عام للتقرير:
       <a href="{{ url_for('public_report', token=t.verification_token, _external=True) }}" target="_blank">{{ url_for('public_report', token=t.verification_token, _external=True) }}</a>
     </div>
-    <button class="btn btn-sm btn-outline-primary" onclick="navigator.clipboard.writeText('{{ url_for('public_report', token=t.verification_token, _external=True) }}')">نسخ</button>
+    <button class="btn btn-sm btn-outline-primary" onclick="navigator.clipboard.writeText('{{ url_for("public_report", token=t.verification_token, _external=True) }}')">نسخ</button>
   </div>
   {% endif %}
 
