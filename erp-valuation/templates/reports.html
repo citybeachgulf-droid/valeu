@@ -53,7 +53,12 @@
             <td class="fw-bold">{{ t.report_number }}</td>
             <td>
               {% if t.report_file %}
-                <a href="{{ url_for('uploaded_file', filename=t.report_file) }}" class="btn btn-info btn-sm" target="_blank">📂 تحميل</a>
+                {% if t.verification_token %}
+                  <a href="{{ url_for('public_report', token=t.verification_token) }}" class="btn btn-info btn-sm" target="_blank">📂 فتح</a>
+                  <a href="{{ url_for('public_report', token=t.verification_token) }}" class="btn btn-outline-secondary btn-sm ms-1" target="_blank">🔗 مشاركة</a>
+                {% else %}
+                  <a href="{{ url_for('uploaded_file', filename=t.report_file) }}" class="btn btn-info btn-sm" target="_blank">📂 فتح</a>
+                {% endif %}
               {% else %}
                 🚫 لا يوجد
               {% endif %}
