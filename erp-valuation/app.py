@@ -2750,15 +2750,27 @@ def banks_overview():
     # فلترة بالتاريخ (اختياري)
     start_date_str = request.args.get("start")
     end_date_str = request.args.get("end")
-    start_date = datetime.fromisoformat(start_date_str) if start_date_str else None
-    end_date = datetime.fromisoformat(end_date_str) if end_date_str else None
+    # Parse dates safely; treat end as inclusive by moving to next day start
+    start_date = None
+    end_date = None
+    try:
+        if start_date_str:
+            start_date = datetime.fromisoformat(start_date_str)
+        if end_date_str:
+            parsed_end = datetime.fromisoformat(end_date_str)
+            end_date = parsed_end + timedelta(days=1)
+    except Exception:
+        # Ignore invalid date inputs gracefully
+        start_date = start_date or None
+        end_date = end_date or None
 
     tx_query = db.session.query(Bank.id, Bank.name, func.count(Transaction.id))\
         .outerjoin(Transaction, Transaction.bank_id == Bank.id)
     if start_date:
         tx_query = tx_query.filter(Transaction.date >= start_date)
     if end_date:
-        tx_query = tx_query.filter(Transaction.date <= end_date)
+        # end_date is exclusive (next day), so use < rather than <=
+        tx_query = tx_query.filter(Transaction.date < end_date)
 
     banks_stats = tx_query.group_by(Bank.id, Bank.name)\
         .order_by(Bank.name.asc()).all()
@@ -2768,6 +2780,7 @@ def banks_overview():
         for (b_id, b_name, tx_count) in banks_stats
     ]
 
+    # Keep original strings in template for inputs
     return render_template("banks.html", banks=banks_list, start=start_date_str, end=end_date_str)
 
 
@@ -2782,8 +2795,18 @@ def bank_detail(bank_id):
     # فلترة بالتاريخ (اختياري)
     start_date_str = request.args.get("start")
     end_date_str = request.args.get("end")
-    start_date = datetime.fromisoformat(start_date_str) if start_date_str else None
-    end_date = datetime.fromisoformat(end_date_str) if end_date_str else None
+    # Parse dates safely; treat end as inclusive by moving to next day start
+    start_date = None
+    end_date = None
+    try:
+        if start_date_str:
+            start_date = datetime.fromisoformat(start_date_str)
+        if end_date_str:
+            parsed_end = datetime.fromisoformat(end_date_str)
+            end_date = parsed_end + timedelta(days=1)
+    except Exception:
+        start_date = start_date or None
+        end_date = end_date or None
 
     # إحصائية عدد المعاملات لكل فرع بنك لهذا البنك
     br_query = db.session.query(
@@ -2797,7 +2820,7 @@ def bank_detail(bank_id):
     if start_date:
         br_query = br_query.filter(Transaction.date >= start_date)
     if end_date:
-        br_query = br_query.filter(Transaction.date <= end_date)
+        br_query = br_query.filter(Transaction.date < end_date)
     branch_rows = br_query.group_by(text("bank_branch")).order_by(text("bank_branch ASC")).all()
     branch_stats = [
         {"name": (bname or "غير محدد"), "count": bcount}
@@ -2814,7 +2837,7 @@ def bank_detail(bank_id):
     if start_date:
         emp_query = emp_query.filter(Transaction.date >= start_date)
     if end_date:
-        emp_query = emp_query.filter(Transaction.date <= end_date)
+        emp_query = emp_query.filter(Transaction.date < end_date)
     employee_rows = emp_query.group_by(text("emp")).order_by(text("emp ASC")).all()
     employee_stats = [
         {"name": ename or "غير معروف", "count": ecount}
@@ -2827,7 +2850,7 @@ def bank_detail(bank_id):
     if start_date:
         pay_query = pay_query.filter(Payment.date_received >= start_date)
     if end_date:
-        pay_query = pay_query.filter(Payment.date_received <= end_date)
+        pay_query = pay_query.filter(Payment.date_received < end_date)
     payments = pay_query.order_by(Payment.date_received.desc()).all()
 
     # المستندات المرتبطة بمعاملات هذا البنك
@@ -2873,9 +2896,9 @@ def bank_detail(bank_id):
     if end_date:
         inv_query = inv_query.filter(
             or_(
-                BankInvoice.issued_at <= end_date,
-                BankInvoice.delivered_at <= end_date,
-                BankInvoice.received_at <= end_date,
+                BankInvoice.issued_at < end_date,
+                BankInvoice.delivered_at < end_date,
+                BankInvoice.received_at < end_date,
             )
         )
     invoices = inv_query.order_by(BankInvoice.id.desc()).all()
