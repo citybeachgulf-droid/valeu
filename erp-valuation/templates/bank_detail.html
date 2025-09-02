@@ -50,48 +50,53 @@
   </div>
 
   <div class="card mb-4 shadow-sm">
-    <div class="card-header bg-dark text-white">📊 عدد المعاملات لكل فرع بنك</div>
+    <div class="card-header bg-dark text-white">🏦 الفروع وموظفو البنوك (مع عدد المعاملات)</div>
     <div class="card-body">
-      <div class="row g-3">
-        {% for b in branches %}
-        <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
-          <div class="card h-100 border-0 shadow-sm">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-start">
-                <h6 class="mb-1">{{ b.name }}</h6>
-                <span class="badge bg-primary">{{ b.count }}</span>
+      {% if branches_nested and (branches_nested|length) > 0 %}
+      <div class="accordion" id="branchesAccordion">
+        {% for b in branches_nested %}
+        {% set collapse_id = 'branch_' ~ loop.index %}
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="{{ collapse_id }}_header">
+            <button class="accordion-button d-flex justify-content-between" type="button" data-bs-toggle="collapse" data-bs-target="#{{ collapse_id }}" aria-expanded="{{ 'true' if loop.first else 'false' }}" aria-controls="{{ collapse_id }}">
+              <div class="w-100 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">{{ b.name }}</span>
+                <span class="badge bg-primary">{{ b.count }} معاملات</span>
               </div>
-              <small class="text-muted">معاملات</small>
+            </button>
+          </h2>
+          <div id="{{ collapse_id }}" class="accordion-collapse collapse {{ 'show' if loop.first else '' }}" aria-labelledby="{{ collapse_id }}_header" data-bs-parent="#branchesAccordion">
+            <div class="accordion-body">
+              {% if b.employees and (b.employees|length) > 0 %}
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr class="text-muted">
+                      <th class="text-start">الموظف</th>
+                      <th class="text-end" style="width: 120px;">المعاملات</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for e in b.employees %}
+                    <tr>
+                      <td class="text-start">{{ e.name }}</td>
+                      <td class="text-end"><span class="badge bg-secondary">{{ e.count }}</span></td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              {% else %}
+              <div class="text-muted">لا يوجد موظفون مسجلون لهذا الفرع</div>
+              {% endif %}
             </div>
           </div>
         </div>
-        {% else %}
-        <div class="col-12"><div class="alert alert-info mb-0">لا توجد معاملات</div></div>
         {% endfor %}
       </div>
-    </div>
-  </div>
-
-  <div class="card mb-4 shadow-sm">
-    <div class="card-header bg-dark text-white">👤 عدد المعاملات حسب موظف البنك</div>
-    <div class="card-body">
-      <div class="row g-3">
-        {% for e in employees %}
-        <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
-          <div class="card h-100 border-0 shadow-sm">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-start">
-                <h6 class="mb-1">{{ e.name }}</h6>
-                <span class="badge bg-secondary">{{ e.count }}</span>
-              </div>
-              <small class="text-muted">معاملات</small>
-            </div>
-          </div>
-        </div>
-        {% else %}
-        <div class="col-12"><div class="alert alert-info mb-0">لا توجد بيانات</div></div>
-        {% endfor %}
-      </div>
+      {% else %}
+        <div class="alert alert-info mb-0">لا توجد بيانات فروع/موظفين للفترة المحددة</div>
+      {% endif %}
     </div>
   </div>
 
