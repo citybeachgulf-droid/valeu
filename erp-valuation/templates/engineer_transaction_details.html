@@ -123,6 +123,12 @@
     </div>
   </div>
 
+  {% if session.get('role') == 'engineer' and (t.status == 'بانتظار المهندس' or t.status == 'بانتظار تقرير المهندس') %}
+  <div class="mb-3">
+    <a href="{{ url_for('engineer_take', tid=t.id) }}" class="btn btn-primary">استلام المعاملة</a>
+  </div>
+  {% endif %}
+
   <!-- ✅ رفع تقرير -->
   <div class="card mb-3">
     <div class="card-header bg-info text-white">📑 رفع تقرير</div>

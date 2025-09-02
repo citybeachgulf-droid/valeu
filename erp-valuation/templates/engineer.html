@@ -72,7 +72,7 @@
                   <a href="{{ url_for('engineer_transaction_details', tid=t.id) }}" class="btn btn-info btn-sm">👁️ عرض التفاصيل</a>
                 </td>
                 <td>
-                  {% if not t.assigned_to and (t.status == "بانتظار المهندس" or t.status == "بانتظار تقرير المهندس") %}
+                  {% if t.status == "بانتظار المهندس" or t.status == "بانتظار تقرير المهندس" %}
                     <a href="{{ url_for('engineer_take', tid=t.id) }}" class="btn btn-sm btn-primary">استلام</a>
                   {% elif t.assigned_to == engineer.id and t.status == "قيد المعاينة" %}
                     <form method="POST" action="{{ url_for('engineer_upload_report', tid=t.id) }}" enctype="multipart/form-data" class="d-flex align-items-center gap-2">
