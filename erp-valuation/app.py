@@ -2971,6 +2971,59 @@ def bank_detail(bank_id):
     )
 
 
+# ---------------- صفحة موظفي البنوك غير النشطين (> 15 يوم) ----------------
+@app.route("/banks/inactive_employees")
+def inactive_bank_employees():
+    if session.get("role") not in ["manager", "finance"]:
+        return redirect(url_for("login"))
+
+    try:
+        days_param = int(request.args.get("days") or 15)
+        if days_param < 1:
+            days_param = 15
+    except Exception:
+        days_param = 15
+
+    now_utc = datetime.utcnow()
+    threshold = now_utc - timedelta(days=days_param)
+
+    emp = func.coalesce(func.trim(Transaction.bank_employee_name), "غير معروف").label("emp")
+
+    query = (
+        db.session.query(
+            emp,
+            func.max(Transaction.date).label("last_date"),
+            func.count(Transaction.id).label("tx_count"),
+        )
+        .filter(
+            Transaction.bank_employee_name != None,
+            func.length(func.trim(Transaction.bank_employee_name)) > 0,
+        )
+        .group_by(text("emp"))
+        .having(func.max(Transaction.date) < threshold)
+        .order_by(func.max(Transaction.date).asc())
+    )
+
+    rows = query.all()
+
+    items = []
+    for emp_name, last_date, tx_count in rows:
+        days_since = (now_utc - (last_date or now_utc)).days
+        items.append({
+            "name": emp_name or "غير معروف",
+            "last_date": last_date,
+            "days_since": days_since,
+            "tx_count": tx_count or 0,
+        })
+
+    return render_template(
+        "inactive_bank_employees.html",
+        employees=items,
+        days=days_param,
+        now=now_utc,
+    )
+
+
 # ---------------- مستندات وفواتير الفروع (عرض فقط للمدير) ----------------
 @app.route("/branch_documents", methods=["GET"])
 def branch_documents():
