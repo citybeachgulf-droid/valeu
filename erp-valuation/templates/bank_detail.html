@@ -113,9 +113,7 @@
         <li class="nav-item" role="presentation">
           <button class="nav-link {{ 'active' if active_tab == 'general-docs' else '' }}" id="general-docs-tab" data-bs-toggle="tab" data-bs-target="#general-docs" type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'general-docs' else 'false' }}">✉️ رسائل/مستندات عامة</button>
         </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="stages-tab" data-bs-toggle="tab" data-bs-target="#stages" type="button" role="tab">✅ مراحل فواتير البنك</button>
-        </li>
+       
       </ul>
     </div>
     <div class="card-body">
@@ -158,10 +156,8 @@
             <table class="table table-bordered table-striped">
               <thead class="table-dark">
                 <tr>
-                  <th>#</th>
+                  <th>N</th>
                   <th>العنوان</th>
-                  <th>النوع</th>
-                  <th>الرسالة</th>
                   <th>الملف</th>
                   <th>التاريخ</th>
                 </tr>
@@ -171,8 +167,6 @@
                 <tr>
                   <td>{{ d.id }}</td>
                   <td>{{ d.title }}</td>
-                  <td>{{ d.doc_type or '-' }}</td>
-                  <td style="max-width:400px; white-space:pre-wrap">{{ d.message or '-' }}</td>
                   <td>
                     {% if d.file %}
                       <a class="btn btn-sm btn-outline-primary" href="{{ url_for('uploaded_file', filename=d.file) }}" target="_blank">فتح</a>
