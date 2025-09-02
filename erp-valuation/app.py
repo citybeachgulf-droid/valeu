@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, date
 import fitz  # PyMuPDF (kept to preserve functionality if used in templates/utilities)
 import pytesseract  # OCR (kept to preserve functionality if used elsewhere)
 from PIL import Image  # Image handling (kept)
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, send_file, flash, abort
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, send_file, flash, abort, jsonify
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
@@ -40,6 +40,21 @@ app.config["VAPID_CLAIMS"] = {
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///erp.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
+
+# ---------------- بث/إشارة تحديث المعاملات (نسخة بسيطة) ----------------
+TRANSACTIONS_VERSION = 0
+
+def bump_transactions_version() -> None:
+    global TRANSACTIONS_VERSION
+    try:
+        TRANSACTIONS_VERSION = (TRANSACTIONS_VERSION + 1) % 1_000_000_000
+    except Exception:
+        # fallback في حال حدث overflow غير متوقع
+        TRANSACTIONS_VERSION = int(datetime.utcnow().timestamp())
+
+@app.route("/api/transactions/version")
+def api_transactions_version():
+    return jsonify({"version": TRANSACTIONS_VERSION, "ts": int(datetime.utcnow().timestamp())})
 
 # -------- تجزئة الملفات للتحقق من سلامتها --------
 def compute_file_sha256(file_path: str) -> str:
@@ -776,6 +791,7 @@ def add_transaction():
 
     db.session.add(t)
     db.session.commit()
+    bump_transactions_version()
 
     # 🔔 إشعار جميع مهندسي نفس الفرع بوجود معاملة جديدة
     try:
@@ -994,6 +1010,7 @@ def update_status(tid, status):
 
     t.status = status
     db.session.commit()
+    bump_transactions_version()
       # بعد db.session.commit() في send_to_visit أو update_status
     engineer = User.query.filter_by(role="engineer").first()
     if engineer:
@@ -1027,6 +1044,7 @@ def approve_transaction(tid):
     transaction = Transaction.query.get_or_404(tid)
     transaction.status = "بانتظار المهندس"   # 👈 كل مهندس بالفرع بيشوفها
     db.session.commit()
+    bump_transactions_version()
 
     flash("✅ تم اعتماد المعاملة وإرسالها لجميع مهندسي الفرع", "success")
     return redirect(url_for("manager_dashboard"))
@@ -1141,6 +1159,7 @@ def engineer_valuate_transaction(tid):
             t.report_number = "ref1001"
 
     db.session.commit()
+    bump_transactions_version()
     flash("✅ تم حفظ التثمين بواسطة المهندس", "success")
     return redirect(url_for("engineer_transaction_details", tid=tid))
 
@@ -1326,6 +1345,7 @@ def manage_report_templates():
                 vehicle_tpl.content = ve_content
 
         db.session.commit()
+        bump_transactions_version()
         flash("✅ تم حفظ القوالب النصية (تم تعطيل الرفع)", "success")
         return redirect(url_for("manage_report_templates"))
 
@@ -1396,6 +1416,7 @@ def engineer_report_editor(tid):
         t.engineer_report = final_text
         t.status = "📑 تقرير مبدئي"  # حالة وسطية حتى الرفع النهائي PDF
         db.session.commit()
+        bump_transactions_version()
         flash("✅ تم حفظ نص التقرير من القالب", "success")
         return redirect(url_for("engineer_transaction_details", tid=tid))
 
@@ -1618,6 +1639,7 @@ def engineer_upload_report(tid):
     except Exception:
         t.report_sha256 = None
     db.session.commit()
+    bump_transactions_version()
 
     # بعد db.session.commit() في upload_report
     finance = User.query.filter_by(role="finance").first()

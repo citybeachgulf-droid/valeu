@@ -483,5 +483,29 @@
     }
   }
   </script>
+  <script>
+  // 🔄 تحديث لحظي بسيط: فحص نسخة المعاملات وإعادة تحميل الصفحة عند تغيّرها
+  (function autoReloadOnChanges(){
+    var currentVersion = null;
+    var lastPingFail = 0;
+    async function checkVersion(){
+      try {
+        const res = await fetch('/api/transactions/version', { cache: 'no-store' });
+        if (!res.ok) throw new Error('bad status');
+        const data = await res.json();
+        if (currentVersion === null) {
+          currentVersion = data.version;
+        } else if (data.version !== currentVersion) {
+          location.reload();
+        }
+      } catch (e) {
+        lastPingFail++;
+        if (lastPingFail > 5) lastPingFail = 0;
+      }
+    }
+    setInterval(checkVersion, 3000);
+    setTimeout(checkVersion, 1000);
+  })();
+  </script>
 {% endblock %}
 
