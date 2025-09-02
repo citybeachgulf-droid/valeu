@@ -78,6 +78,9 @@
                     <form method="POST" action="{{ url_for('engineer_upload_report', tid=t.id) }}" enctype="multipart/form-data" class="d-flex align-items-center gap-2">
                       <input type="file" name="report_file" class="form-control form-control-sm" accept=".pdf" required>
                       <button type="submit" class="btn btn-sm btn-success">📤 رفع</button>
+                      {% if t.report_sha256 %}
+                        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('barcode_page') }}?hash={{ t.report_sha256 }}" target="_blank">QR</a>
+                      {% endif %}
                     </form>
                   {% endif %}
                 </td>
