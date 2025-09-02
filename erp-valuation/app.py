@@ -11,7 +11,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, IntegrityError
 from pywebpush import webpush, WebPushException
 from docx import Document
 from pdf_templates import create_pdf
@@ -1101,10 +1101,24 @@ def add_bank():
     if request.method == "POST":
         name = request.form.get("name")
         if name:
-            db.session.add(Bank(name=name))
-            db.session.commit()
-            flash("✅ تم إضافة البنك بنجاح", "success")
-            return redirect(url_for("manager_dashboard"))
+            clean_name = name.strip()
+            if not clean_name:
+                flash("⚠️ يجب إدخال اسم البنك", "danger")
+            else:
+                # تحقق بدون حساسية لحالة الأحرف لمنع التكرار
+                existing = Bank.query.filter(func.lower(Bank.name) == func.lower(clean_name)).first()
+                if existing:
+                    flash("⚠️ هذا البنك موجود مسبقًا", "warning")
+                    return redirect(url_for("manager_dashboard"))
+                try:
+                    db.session.add(Bank(name=clean_name))
+                    db.session.commit()
+                    flash("✅ تم إضافة البنك بنجاح", "success")
+                    return redirect(url_for("manager_dashboard"))
+                except IntegrityError:
+                    db.session.rollback()
+                    flash("⚠️ هذا البنك موجود مسبقًا", "warning")
+                    return redirect(url_for("manager_dashboard"))
         else:
             flash("⚠️ يجب إدخال اسم البنك", "danger")
     
