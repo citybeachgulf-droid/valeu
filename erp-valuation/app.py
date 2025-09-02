@@ -150,6 +150,8 @@ class Transaction(db.Model):
 
     # بصمة التقرير (SHA-256) للتحقق من عدم العبث
     report_sha256 = db.Column(db.String(64), nullable=True)
+    # رابط مشاركة عام (Token)
+    public_share_token = db.Column(db.String(128), nullable=True)
 
     payments = db.relationship("Payment", backref="transaction", lazy=True)
 
@@ -1586,6 +1588,12 @@ def engineer_upload_report(tid):
 
     t.report_file = filename
     t.status = "📑 تقرير مرفوع"
+    # توليد رمز مشاركة عام إن لم يكن موجودًا
+    if not getattr(t, "public_share_token", None):
+        try:
+            t.public_share_token = secrets.token_urlsafe(24)
+        except Exception:
+            t.public_share_token = None
 
     if not t.report_number:
         last_txn = Transaction.query.filter(
@@ -2975,6 +2983,13 @@ def assign_branch(uid):
         flash("✅ تم تحديد فرع الموظف بنجاح", "success")
     return redirect(url_for("manager_dashboard"))
 
+@app.route("/r/<string:token>")
+def public_report(token):
+    t = Transaction.query.filter_by(public_share_token=token).first_or_404()
+    if not t.report_file:
+        abort(404)
+    return send_from_directory(app.config["UPLOAD_FOLDER"], t.report_file)
+
 # ---------------- عرض الملفات ----------------
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
@@ -3586,6 +3601,29 @@ with app.app_context():
             db.session.execute(text("ALTER TABLE transaction ADD COLUMN report_sha256 VARCHAR(64)"))
             db.session.commit()
             print("✅ تمت إضافة عمود report_sha256")
+    except Exception:
+        db.session.rollback()
+
+    # محاولة إضافة عمود public_share_token إذا كان الجدول قديم
+    try:
+        if not column_exists("transaction", "public_share_token"):
+            db.session.execute(text("ALTER TABLE transaction ADD COLUMN public_share_token VARCHAR(128)"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود public_share_token")
+    except Exception:
+        db.session.rollback()
+
+    # تعبئة رموز المشاركة العامة للتقارير الموجودة بدون رمز
+    try:
+        existing_with_files = Transaction.query.filter(
+            Transaction.report_file != None,
+            or_(Transaction.public_share_token == None, Transaction.public_share_token == "")
+        ).all()
+        for tx in existing_with_files:
+            tx.public_share_token = secrets.token_urlsafe(24)
+        if existing_with_files:
+            db.session.commit()
+            print(f"✅ تم توليد روابط عامة لـ {len(existing_with_files)} تقارير")
     except Exception:
         db.session.rollback()
 
