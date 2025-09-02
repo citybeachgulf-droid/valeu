@@ -2844,6 +2844,40 @@ def bank_detail(bank_id):
         for (ename, ecount) in employee_rows
     ]
 
+    # 👥 تجميع الموظفين داخل كل فرع (فرع ← [موظفون + عدد معاملاتهم])
+    branch_emp_query = db.session.query(
+        func.coalesce(func.trim(Transaction.bank_branch), "غير محدد").label("branch"),
+        func.coalesce(func.trim(Transaction.bank_employee_name), "غير معروف").label("emp"),
+        func.count(Transaction.id)
+    ).filter(Transaction.bank_id == bank_id)
+    if start_date:
+        branch_emp_query = branch_emp_query.filter(Transaction.date >= start_date)
+    if end_date:
+        branch_emp_query = branch_emp_query.filter(Transaction.date < end_date)
+    branch_emp_rows = (
+        branch_emp_query
+        .group_by(text("branch, emp"))
+        .order_by(text("branch ASC, emp ASC"))
+        .all()
+    )
+
+    # بناء هيكل متداخل: [{ name, count, employees: [{ name, count }] }]
+    from collections import defaultdict
+    branch_to_employees = defaultdict(list)
+    branch_totals = defaultdict(int)
+    for bname, ename, ecount in branch_emp_rows:
+        branch_to_employees[bname].append({"name": ename or "غير معروف", "count": ecount})
+        branch_totals[bname] += ecount
+
+    # ترتيب الموظفين داخل كل فرع حسب العدد تنازليًا، ثم بالاسم
+    for bname, items in branch_to_employees.items():
+        items.sort(key=lambda x: (-int(x.get("count") or 0), str(x.get("name") or "")))
+
+    branches_nested = [
+        {"name": bname or "غير محدد", "count": branch_totals.get(bname, 0), "employees": branch_to_employees.get(bname, [])}
+        for bname in sorted(branch_to_employees.keys(), key=lambda s: str(s or ""))
+    ]
+
     # الفواتير المرتبطة بمعاملات هذا البنك (اعتماداً على جدول Payments)
     pay_query = Payment.query.join(Transaction, Payment.transaction_id == Transaction.id)\
         .filter(Transaction.bank_id == bank_id)
@@ -2925,6 +2959,7 @@ def bank_detail(bank_id):
         bank=bank,
         branches=branch_stats,
         employees=employee_stats,
+        branches_nested=branches_nested,
         total_tx=total_tx,
         payments=payments,
         documents=documents,
