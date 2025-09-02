@@ -1315,7 +1315,7 @@ def engineer_valuate_transaction(tid):
             Transaction.report_number != None
         ).order_by(Transaction.id.desc()).first()
 
-        if last_txn and last_txn.report_number.startswith("ref"):
+        if last_txn and isinstance(last_txn.report_number, str) and last_txn.report_number.startswith("ref"):
             last_num = int(last_txn.report_number.replace("ref", ""))
             t.report_number = f"ref{last_num + 1}"
         else:
@@ -1811,7 +1811,7 @@ def engineer_upload_report(tid):
             Transaction.report_number != None
         ).order_by(Transaction.id.desc()).first()
 
-        if last_txn and last_txn.report_number.startswith("ref"):
+        if last_txn and isinstance(last_txn.report_number, str) and last_txn.report_number.startswith("ref"):
             last_num = int(last_txn.report_number.replace("ref", ""))
             t.report_number = f"ref{last_num + 1}"
         else:
