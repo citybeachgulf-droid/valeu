@@ -1279,7 +1279,7 @@ def engineer_take(tid):
     t.status = "قيد المعاينة"
 
     # 🆕 تخصيص رسالة حسب نوع المعاملة
-    if t.transaction_type == "سيارة":
+    if t.transaction_type == "vehicle":
         flash("🚗 تم استلام معاملة السيارة", "success")
     else:
         flash("🏠 تم استلام معاملة العقار", "success")
