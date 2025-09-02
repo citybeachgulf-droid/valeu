@@ -1,11 +1,12 @@
 from operator import and_
 import os, json, re
 import hashlib
+import secrets
 from datetime import datetime, timedelta, date
 import fitz  # PyMuPDF (kept to preserve functionality if used in templates/utilities)
 import pytesseract  # OCR (kept to preserve functionality if used elsewhere)
 from PIL import Image  # Image handling (kept)
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, send_file, flash
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, send_file, flash, abort
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
