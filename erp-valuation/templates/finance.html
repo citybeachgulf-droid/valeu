@@ -439,9 +439,6 @@
   setTimeout(checkVersion, 1000);
 })();
 </script>
-{% endblock %}
-
-{% block scripts %}
 <script>
 if ("serviceWorker" in navigator && "PushManager" in window) {
   navigator.serviceWorker.register("/service-worker.js")
@@ -504,5 +501,7 @@ async function subscribeUser() {
   }
 }
 </script>
+
 {% endblock %}
+
 
