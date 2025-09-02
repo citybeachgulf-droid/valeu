@@ -762,15 +762,7 @@ def add_transaction():
 )
 
 
-        # 👨‍🔧 تعيين مباشر للمهندس (مثال: أول مهندس مسجل)
-        engineer = User.query.filter_by(role="engineer").first()
-        if engineer:
-            t.assigned_to = engineer.id
-
-        # 👨‍🔧 تعيين مباشر للمهندس (أول مهندس في نفس الفرع إن وجد)
-        engineer = User.query.filter_by(role="engineer", branch_id=user.branch_id).first()
-        if engineer:
-            t.assigned_to = engineer.id
+        # إبقاء معاملة المركبة غير مسندة حتى يقوم مهندس بالاستلام من لوحة المهندس
 
     # رفع الملفات
     files = request.files.getlist("files")
