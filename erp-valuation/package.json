@@ -1,17 +1,11 @@
 {
-  "name": "qr",
+  "name": "erp-valuation",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "scripts": {
-    "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "scripts": {},
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "express": "^5.1.0",
-    "multer": "^2.0.2"
-  }
+  "dependencies": {}
 }

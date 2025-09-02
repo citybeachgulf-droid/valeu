@@ -16,9 +16,6 @@ from sqlalchemy.exc import OperationalError
 from pywebpush import webpush, WebPushException
 from docx import Document
 from pdf_templates import create_pdf
-from reportlab.graphics.barcode import qr as rl_qr
-from reportlab.graphics.shapes import Drawing
-from reportlab.graphics import renderPM
 import requests
 
 # ---------------- إعداد Flask ----------------
@@ -133,89 +130,7 @@ def stamp_pdf_with_seal(input_path: str, title: str, lines: List[str]) -> None:
         except Exception:
             pass
 
-# -------- توليد صورة QR كـ PNG (بايتس) --------
-def generate_qr_png_bytes(text: str, size: int = 100) -> bytes:
-    """ينشئ صورة QR في الذاكرة ويعيدها كـ PNG bytes.
-
-    يحاول أولاً باستخدام ReportLab. وإن فشل، يستخدم خدمة عامة كحل احتياطي.
-    """
-    try:
-        widget = rl_qr.QrCodeWidget(text)
-        bounds = widget.getBounds()
-        width = bounds[2] - bounds[0]
-        height = bounds[3] - bounds[1]
-        scale = max(size / float(width), size / float(height))
-        drawing = Drawing(width * scale, height * scale)
-        widget.scale(scale, scale)
-        drawing.add(widget)
-        png_bytes = renderPM.drawToString(drawing, fmt='PNG')
-        return png_bytes
-    except Exception:
-        # احتياطي: توليد من خدمة عامة
-        try:
-            url = f"https://api.qrserver.com/v1/create-qr-code/?size={size}x{size}&data=" + requests.utils.quote(text, safe="")
-            r = requests.get(url, timeout=10)
-            r.raise_for_status()
-            return r.content
-        except Exception:
-            # كحل أخير، أعِد بايتس فارغة
-            return b""
-
-# -------- ختم PDF وإدراج QR يشير إلى /file?hash=<hash> --------
-def stamp_pdf_with_qr(input_path: str, hash_value: str) -> None:
-    """يضيف علامة نصية وQR للصفحة الأولى ويكتب مقتطف البصمة.
-
-    - QR يشير إلى /file?hash=<hash_value>
-    - نص مختصر للبصمة يظهر في أسفل اليسار
-    تحفظ النتيجة فوق نفس الملف.
-    """
-    try:
-        doc = fitz.open(input_path)
-        qr_link = url_for("file_by_hash", hash=hash_value, _external=True)
-        qr_png = generate_qr_png_bytes(text=qr_link, size=100)
-        for page_index, page in enumerate(doc):
-            page_rect = page.rect
-            # نصوص سفلية يسار
-            try:
-                page.insert_text(
-                    fitz.Point(20, 35),
-                    f"Hash: {hash_value[:10]}...",
-                    fontsize=8,
-                    fontname="helv",
-                    color=(0, 0, 0),
-                )
-                page.insert_text(
-                    fitz.Point(20, 20),
-                    "نسخة أصلية للبنك",
-                    fontsize=12,
-                    fontname="helv",
-                    color=(0, 0, 0),
-                )
-            except Exception:
-                pass
-
-            # QR في أسفل يمين الصفحة الأولى فقط
-            if page_index == 0 and qr_png:
-                try:
-                    qr_size = 100
-                    margin = 20
-                    rect = fitz.Rect(
-                        page_rect.x1 - margin - qr_size,
-                        margin,
-                        page_rect.x1 - margin,
-                        margin + qr_size,
-                    )
-                    page.insert_image(rect, stream=qr_png)
-                except Exception:
-                    pass
-
-        doc.save(input_path, incremental=False, deflate=True)
-        doc.close()
-    except Exception:
-        try:
-            doc.close()
-        except Exception:
-            pass
+ 
 
 # -------- أدوات مساعدة للأرقام (تقبل أرقام عربية وفواصل) --------
 def parse_float_input(value) -> float:
@@ -1780,11 +1695,8 @@ def engineer_upload_report(tid):
     except Exception:
         original_hash = None
 
-    # 2) ختم الملف بالـ QR الذي يشير إلى /file?hash=<hash>
+    # 2) ختم الملف بختم نصي بسيط فقط (بدون أي QR أو روابط)
     try:
-        if original_hash:
-            stamp_pdf_with_qr(filepath, original_hash)
-        # إضافة ختم نصي بسيط إضافي (معلومات أساسية)
         stamp_lines = [
             f"رقم التقرير: {t.report_number or '-'}",
             f"معاملة: {t.id}",
@@ -1829,7 +1741,7 @@ def engineer_upload_report(tid):
     except Exception:
         pass
 
-    # 4) حساب بصمة SHA-256 النهائية (بعد الختم) للاستخدام في /verify و/file
+    # 4) حساب بصمة SHA-256 النهائية (بعد الختم) للاستخدام الداخلي فقط
     try:
         final_hash = compute_file_sha256(filepath)
     except Exception:
@@ -3316,12 +3228,7 @@ def assign_branch(uid):
         flash("✅ تم تحديد فرع الموظف بنجاح", "success")
     return redirect(url_for("manager_dashboard"))
 
-@app.route("/r/<string:token>")
-def public_report(token):
-    t = Transaction.query.filter_by(public_share_token=token).first_or_404()
-    if not t.report_file:
-        abort(404)
-    return send_from_directory(app.config["UPLOAD_FOLDER"], t.report_file)
+ 
 
 # ---------------- عرض الملفات ----------------
 @app.route("/uploads/<path:filename>")
@@ -3330,58 +3237,13 @@ def uploaded_file(filename):
 
 # (تمت إزالة مسارات QR والروابط العامة المرتبطة بها)
 
-# ---------------- تكامل صفحة الباركود (index.html) ----------------
-@app.route("/barcode", endpoint="barcode_page")
-def barcode_page():
-    """تخدم صفحة الباركود/QR (index.html) من جذر المشروع.
-
-    يمكن تمرير ?hash=<sha256>&print=1 ليتم عرض QR والطباعة مباشرة.
-    """
-    index_path = os.path.join(app.root_path, "index.html")
-    if not os.path.exists(index_path):
-        abort(404)
-    return send_file(index_path)
+ 
 
 
-@app.route("/verify")
-def verify_by_hash():
-    """التحقق من أصالة التقرير عبر بصمة SHA-256 المخزنة في قاعدة البيانات.
-
-    مثال: /verify?hash=<sha256>
-    """
-    h = request.args.get("hash", type=str)
-    if not h:
-        return "❌ لا يوجد hash للتحقق", 400
-
-    t = Transaction.query.filter_by(report_sha256=h).first()
-    if not t or not t.report_file:
-        return "<h2>❌ هذا التقرير غير أصلي أو تم التعديل</h2>", 404
-
-    file_url = url_for("uploaded_file", filename=t.report_file)
-    return (
-        f"""
-        <h2>✅ التقرير أصلي</h2>
-        <p>رقم التقرير: {t.report_number or '-'} | المعاملة: {t.id}</p>
-        <p><a href="{file_url}" target="_blank">📄 عرض الملف</a></p>
-        """
-    )
+ 
 
 
-@app.route("/file")
-def file_by_hash():
-    """إرجاع ملف التقرير مباشرةً عبر البصمة.
-
-    مثال: /file?hash=<sha256>
-    """
-    h = request.args.get("hash", type=str)
-    if not h:
-        return "❌ لا يوجد hash", 400
-
-    t = Transaction.query.filter_by(report_sha256=h).first()
-    if not t or not t.report_file:
-        return "❌ لم يتم العثور على ملف مرتبط بهذا الهاش", 404
-
-    return send_from_directory(app.config["UPLOAD_FOLDER"], t.report_file)
+ 
 
 # ---------------- صفحة التقارير المشتركة ----------------
 @app.route("/employee/upload_bank_docs/<int:tid>", methods=["POST"])
