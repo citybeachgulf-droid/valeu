@@ -139,6 +139,9 @@
     <input type="file" class="form-control" name="report_file" accept=".pdf" required>
   </div>
   <button type="submit" class="btn btn-success">⬆️ رفع التقرير</button>
+  {% if t.report_sha256 %}
+    <a class="btn btn-outline-primary ms-2" href="{{ url_for('barcode_page') }}?hash={{ t.report_sha256 }}" target="_blank">🧾 عرض QR والتحقق</a>
+  {% endif %}
 </form>
 
       <hr>

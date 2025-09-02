@@ -16,6 +16,10 @@ from sqlalchemy.exc import OperationalError
 from pywebpush import webpush, WebPushException
 from docx import Document
 from pdf_templates import create_pdf
+from reportlab.graphics.barcode import qr as rl_qr
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics import renderPM
+import requests
 
 # ---------------- إعداد Flask ----------------
 app = Flask(__name__)
@@ -124,6 +128,90 @@ def stamp_pdf_with_seal(input_path: str, title: str, lines: List[str]) -> None:
         doc.close()
     except Exception:
         # في حال حدوث خطأ بالختم، نكتفي بملف الأصل دون إيقاف العملية
+        try:
+            doc.close()
+        except Exception:
+            pass
+
+# -------- توليد صورة QR كـ PNG (بايتس) --------
+def generate_qr_png_bytes(text: str, size: int = 100) -> bytes:
+    """ينشئ صورة QR في الذاكرة ويعيدها كـ PNG bytes.
+
+    يحاول أولاً باستخدام ReportLab. وإن فشل، يستخدم خدمة عامة كحل احتياطي.
+    """
+    try:
+        widget = rl_qr.QrCodeWidget(text)
+        bounds = widget.getBounds()
+        width = bounds[2] - bounds[0]
+        height = bounds[3] - bounds[1]
+        scale = max(size / float(width), size / float(height))
+        drawing = Drawing(width * scale, height * scale)
+        widget.scale(scale, scale)
+        drawing.add(widget)
+        png_bytes = renderPM.drawToString(drawing, fmt='PNG')
+        return png_bytes
+    except Exception:
+        # احتياطي: توليد من خدمة عامة
+        try:
+            url = f"https://api.qrserver.com/v1/create-qr-code/?size={size}x{size}&data=" + requests.utils.quote(text, safe="")
+            r = requests.get(url, timeout=10)
+            r.raise_for_status()
+            return r.content
+        except Exception:
+            # كحل أخير، أعِد بايتس فارغة
+            return b""
+
+# -------- ختم PDF وإدراج QR يشير إلى /file?hash=<hash> --------
+def stamp_pdf_with_qr(input_path: str, hash_value: str) -> None:
+    """يضيف علامة نصية وQR للصفحة الأولى ويكتب مقتطف البصمة.
+
+    - QR يشير إلى /file?hash=<hash_value>
+    - نص مختصر للبصمة يظهر في أسفل اليسار
+    تحفظ النتيجة فوق نفس الملف.
+    """
+    try:
+        doc = fitz.open(input_path)
+        qr_link = url_for("file_by_hash", hash=hash_value, _external=True)
+        qr_png = generate_qr_png_bytes(text=qr_link, size=100)
+        for page_index, page in enumerate(doc):
+            page_rect = page.rect
+            # نصوص سفلية يسار
+            try:
+                page.insert_text(
+                    fitz.Point(20, 35),
+                    f"Hash: {hash_value[:10]}...",
+                    fontsize=8,
+                    fontname="helv",
+                    color=(0, 0, 0),
+                )
+                page.insert_text(
+                    fitz.Point(20, 20),
+                    "نسخة أصلية للبنك",
+                    fontsize=12,
+                    fontname="helv",
+                    color=(0, 0, 0),
+                )
+            except Exception:
+                pass
+
+            # QR في أسفل يمين الصفحة الأولى فقط
+            if page_index == 0 and qr_png:
+                try:
+                    qr_size = 100
+                    margin = 20
+                    rect = fitz.Rect(
+                        page_rect.x1 - margin - qr_size,
+                        margin,
+                        page_rect.x1 - margin,
+                        margin + qr_size,
+                    )
+                    page.insert_image(rect, stream=qr_png)
+                except Exception:
+                    pass
+
+        doc.save(input_path, incremental=False, deflate=True)
+        doc.close()
+    except Exception:
         try:
             doc.close()
         except Exception:
@@ -1686,6 +1774,28 @@ def engineer_upload_report(tid):
     filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(filepath)
 
+    # 1) حساب بصمة الملف الأصلي كما في index.html
+    try:
+        original_hash = compute_file_sha256(filepath)
+    except Exception:
+        original_hash = None
+
+    # 2) ختم الملف بالـ QR الذي يشير إلى /file?hash=<hash>
+    try:
+        if original_hash:
+            stamp_pdf_with_qr(filepath, original_hash)
+        # إضافة ختم نصي بسيط إضافي (معلومات أساسية)
+        stamp_lines = [
+            f"رقم التقرير: {t.report_number or '-'}",
+            f"معاملة: {t.id}",
+            f"التاريخ: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            "ختم النظام - غير قابل للتعديل",
+        ]
+        stamp_pdf_with_seal(filepath, "ختم التقرير", stamp_lines)
+    except Exception:
+        pass
+
+    # 3) حفظ اسم الملف وتحديث الحالة
     t.report_file = filename
     t.status = "📑 تقرير مرفوع"
     # توليد رمز مشاركة عام إن لم يكن موجودًا
@@ -1719,11 +1829,12 @@ def engineer_upload_report(tid):
     except Exception:
         pass
 
-    # حساب بصمة SHA-256 للملف النهائي بعد الختم
+    # 4) حساب بصمة SHA-256 النهائية (بعد الختم) للاستخدام في /verify و/file
     try:
-        t.report_sha256 = compute_file_sha256(filepath)
+        final_hash = compute_file_sha256(filepath)
     except Exception:
-        t.report_sha256 = None
+        final_hash = None
+    t.report_sha256 = final_hash or original_hash
     db.session.commit()
     bump_transactions_version()
 
