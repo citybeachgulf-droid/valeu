@@ -3,6 +3,7 @@ import os, json, re
 import hashlib
 import secrets
 from datetime import datetime, timedelta, date
+from typing import List
 import fitz  # PyMuPDF (kept to preserve functionality if used in templates/utilities)
 import pytesseract  # OCR (kept to preserve functionality if used elsewhere)
 from PIL import Image  # Image handling (kept)
@@ -77,6 +78,56 @@ def compute_file_sha256(file_path: str) -> str:
         for chunk in iter(lambda: f.read(1024 * 1024), b''):
             sha256.update(chunk)
     return sha256.hexdigest()
+
+# -------- ختم PDF بشكل بسيط على الخادم --------
+def stamp_pdf_with_seal(input_path: str, title: str, lines: List[str]) -> None:
+    """يضيف ختمًا نصيًا بسيطًا على كل صفحة من ملف PDF.
+
+    - يرسم صندوقًا في الزاوية العلوية اليمنى
+    - يكتب عنوان الختم وعدة أسطر معلومات
+    تحفظ النتيجة فوق نفس الملف.
+    """
+    try:
+        doc = fitz.open(input_path)
+        for page in doc:
+            page_rect = page.rect
+            # صندوق الختم في أعلى يمين الصفحة
+            margin = 20
+            box_width = 220
+            box_height = 120
+            rect = fitz.Rect(
+                page_rect.x1 - margin - box_width,
+                margin,
+                page_rect.x1 - margin,
+                margin + box_height,
+            )
+
+            # خلفية وصندوق
+            page.draw_rect(rect, color=(0.8, 0.1, 0.1), fill=(1, 1, 1), width=1)
+
+            # نص الختم
+            content = title.strip()
+            if lines:
+                content += "\n" + "\n".join(str(x) for x in lines if x)
+
+            # إدراج النص داخل الصندوق
+            page.insert_textbox(
+                rect.inflate(-8),
+                content,
+                fontsize=9,
+                fontname="helv",
+                color=(0, 0, 0),
+                align=1,  # وسط
+            )
+
+        doc.save(input_path, incremental=False, deflate=True)
+        doc.close()
+    except Exception:
+        # في حال حدوث خطأ بالختم، نكتفي بملف الأصل دون إيقاف العملية
+        try:
+            doc.close()
+        except Exception:
+            pass
 
 # -------- أدوات مساعدة للأرقام (تقبل أرقام عربية وفواصل) --------
 def parse_float_input(value) -> float:
@@ -1635,8 +1686,6 @@ def engineer_upload_report(tid):
     filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(filepath)
 
-    # تم إزالة ختم التقرير برمز QR ورابط التحقق
-
     t.report_file = filename
     t.status = "📑 تقرير مرفوع"
     # توليد رمز مشاركة عام إن لم يكن موجودًا
@@ -1646,6 +1695,7 @@ def engineer_upload_report(tid):
         except Exception:
             t.public_share_token = None
 
+    # توليد رقم التقرير إن لم يوجد مسبقًا
     if not t.report_number:
         last_txn = Transaction.query.filter(
             Transaction.report_number != None
@@ -1657,7 +1707,19 @@ def engineer_upload_report(tid):
         else:
             t.report_number = "ref1001"
 
-    # حساب بصمة SHA-256 للملف النهائي (بعد الختم إن وُجد)
+    # ختم الملف مباشرة بعد الرفع
+    try:
+        stamp_lines = [
+            f"رقم التقرير: {t.report_number}",
+            f"معاملة: {t.id}",
+            f"التاريخ: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            "ختم النظام - غير قابل للتعديل"
+        ]
+        stamp_pdf_with_seal(filepath, "ختم التقرير", stamp_lines)
+    except Exception:
+        pass
+
+    # حساب بصمة SHA-256 للملف النهائي بعد الختم
     try:
         t.report_sha256 = compute_file_sha256(filepath)
     except Exception:
@@ -1676,13 +1738,7 @@ def engineer_upload_report(tid):
 
     flash(f"✅ تم رفع التقرير (الرقم المرجعي: {t.report_number})", "success")
 
-    # بعد الرفع والحفظ، وجّه لصفحة الباركود لعرض/طباعة QR مباشرةً
-    if t.report_sha256:
-        return redirect(url_for("barcode_page", hash=t.report_sha256, print=1))
-    # إن لم تتوفر البصمة لأي سبب، ارجع للسلوك السابق
-    role = session.get("role")
-    if role == "engineer":
-        return redirect(url_for("engineer_transaction_details", tid=tid))
+    # التوجيه مباشرةً إلى قسم التقارير بعد الرفع والختم
     return redirect(url_for("reports_page"))
 
 @app.route("/reports", endpoint="reports_page")
