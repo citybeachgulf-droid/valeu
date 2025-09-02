@@ -41,6 +41,19 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///erp.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
+# ---------------- Service Worker at root scope ----------------
+@app.route('/service-worker.js')
+def serve_service_worker():
+    try:
+        sw_path = os.path.join(app.root_path, 'static', 'service-worker.js')
+        # Ensure correct content type and caching so browser picks updates
+        response = send_file(sw_path, mimetype='application/javascript', max_age=0)
+        response.headers['Service-Worker-Allowed'] = '/'
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return response
+    except Exception:
+        return abort(404)
+
 # ---------------- بث/إشارة تحديث المعاملات (نسخة بسيطة) ----------------
 TRANSACTIONS_VERSION = 0
 
@@ -480,6 +493,17 @@ def send_notification(user_id, title, body):
             )
         except WebPushException as e:
             print("❌ إشعار فشل:", e)
+
+
+@app.route('/notify_me')
+def notify_me():
+    if not session.get("user_id"):
+        return {"error": "Unauthorized"}, 401
+    try:
+        send_notification(session["user_id"], "🔔 اختبار الإشعارات", "هذه رسالة تجريبية")
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}, 500
 
 
 
