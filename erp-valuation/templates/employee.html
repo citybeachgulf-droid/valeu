@@ -381,6 +381,17 @@
     if (real) real.style.display = (type === "real_estate") ? "block" : "none";
     if (veh)  veh.style.display  = (type === "vehicle")     ? "block" : "none";
     if (box)  box.style.display  = (type === "real_estate") ? "block" : "none";
+
+    // تعطيل مدخلات القسم المخفي لتجاوز تحقق required في المتصفح
+    function setSectionDisabled(sectionEl, disabled) {
+      if (!sectionEl) return;
+      sectionEl.querySelectorAll("input, select, textarea").forEach(el => {
+        el.disabled = disabled;
+      });
+    }
+
+    setSectionDisabled(real, type !== "real_estate");
+    setSectionDisabled(veh,  type !== "vehicle");
   }
 
   // تغيّر النوع
