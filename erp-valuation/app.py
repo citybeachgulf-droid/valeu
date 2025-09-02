@@ -782,6 +782,10 @@ def add_transaction():
         engineers = User.query.filter_by(role="engineer", branch_id=user.branch_id).all()
         for eng in engineers:
             send_notification(eng.id, "📋 معاملة جديدة", f"تمت إضافة معاملة رقم {t.id}")
+        # 🔔 إشعار قسم المالية بوجود معاملة جديدة
+        finances = User.query.filter_by(role="finance").all()
+        for fin in finances:
+            send_notification(fin.id, "📋 معاملة جديدة", f"تمت إضافة معاملة رقم {t.id}")
     except Exception:
         pass
     flash("✅ تم إضافة المعاملة بنجاح", "success")
@@ -994,6 +998,15 @@ def update_status(tid, status):
     engineer = User.query.filter_by(role="engineer").first()
     if engineer:
         send_notification(engineer.id, "📩 معاملة جديدة", f"تم إرسال معاملة رقم {t.id} إليك")
+
+    # إشعار المالية عندما تصبح الحالة "بانتظار الدفع"
+    if status == "بانتظار الدفع":
+        try:
+            finances = User.query.filter_by(role="finance").all()
+            for fin in finances:
+                send_notification(fin.id, "💳 معاملة بانتظار الدفع", f"المعاملة رقم {t.id} بانتظار الدفع")
+        except Exception:
+            pass
 
 
     if role == "manager":
