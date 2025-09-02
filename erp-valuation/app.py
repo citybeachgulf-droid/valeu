@@ -1676,11 +1676,14 @@ def engineer_upload_report(tid):
 
     flash(f"✅ تم رفع التقرير (الرقم المرجعي: {t.report_number})", "success")
 
+    # بعد الرفع والحفظ، وجّه لصفحة الباركود لعرض/طباعة QR مباشرةً
+    if t.report_sha256:
+        return redirect(url_for("barcode_page", hash=t.report_sha256, print=1))
+    # إن لم تتوفر البصمة لأي سبب، ارجع للسلوك السابق
     role = session.get("role")
     if role == "engineer":
         return redirect(url_for("engineer_transaction_details", tid=tid))
-    else:
-        return redirect(url_for("reports_page"))
+    return redirect(url_for("reports_page"))
 
 @app.route("/reports", endpoint="reports_page")
 def reports():
@@ -3159,6 +3162,59 @@ def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 # (تمت إزالة مسارات QR والروابط العامة المرتبطة بها)
+
+# ---------------- تكامل صفحة الباركود (index.html) ----------------
+@app.route("/barcode", endpoint="barcode_page")
+def barcode_page():
+    """تخدم صفحة الباركود/QR (index.html) من جذر المشروع.
+
+    يمكن تمرير ?hash=<sha256>&print=1 ليتم عرض QR والطباعة مباشرة.
+    """
+    index_path = os.path.join(app.root_path, "index.html")
+    if not os.path.exists(index_path):
+        abort(404)
+    return send_file(index_path)
+
+
+@app.route("/verify")
+def verify_by_hash():
+    """التحقق من أصالة التقرير عبر بصمة SHA-256 المخزنة في قاعدة البيانات.
+
+    مثال: /verify?hash=<sha256>
+    """
+    h = request.args.get("hash", type=str)
+    if not h:
+        return "❌ لا يوجد hash للتحقق", 400
+
+    t = Transaction.query.filter_by(report_sha256=h).first()
+    if not t or not t.report_file:
+        return "<h2>❌ هذا التقرير غير أصلي أو تم التعديل</h2>", 404
+
+    file_url = url_for("uploaded_file", filename=t.report_file)
+    return (
+        f"""
+        <h2>✅ التقرير أصلي</h2>
+        <p>رقم التقرير: {t.report_number or '-'} | المعاملة: {t.id}</p>
+        <p><a href="{file_url}" target="_blank">📄 عرض الملف</a></p>
+        """
+    )
+
+
+@app.route("/file")
+def file_by_hash():
+    """إرجاع ملف التقرير مباشرةً عبر البصمة.
+
+    مثال: /file?hash=<sha256>
+    """
+    h = request.args.get("hash", type=str)
+    if not h:
+        return "❌ لا يوجد hash", 400
+
+    t = Transaction.query.filter_by(report_sha256=h).first()
+    if not t or not t.report_file:
+        return "❌ لم يتم العثور على ملف مرتبط بهذا الهاش", 404
+
+    return send_from_directory(app.config["UPLOAD_FOLDER"], t.report_file)
 
 # ---------------- صفحة التقارير المشتركة ----------------
 @app.route("/employee/upload_bank_docs/<int:tid>", methods=["POST"])

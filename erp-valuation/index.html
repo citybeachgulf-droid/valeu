@@ -180,9 +180,14 @@ async function generateQRDataUrl(text, size){
     try {
         const u = new URL(window.location.href);
         const hash = u.searchParams.get('hash');
+        const shouldPrint = u.searchParams.get('print') === '1';
         if (hash) {
             const qrBase = (API_BASE && API_BASE.length) ? API_BASE : window.location.origin;
             renderQR(qrBase + '/verify?hash=' + hash);
+            if (shouldPrint) {
+                // امنح QR وقتًا للرسم ثم اطبع
+                setTimeout(()=>{ window.print(); }, 200);
+            }
         }
     } catch(_) {}
 })();
