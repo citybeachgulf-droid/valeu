@@ -21,6 +21,7 @@ from reportlab.graphics.shapes import Drawing
 from reportlab.graphics import renderPM
 import requests
 import time
+from b2sdk.v2 import InMemoryAccountInfo, B2Api
 
 # ---------------- إعداد Flask ----------------
 app = Flask(__name__)
@@ -30,6 +31,35 @@ app.secret_key = "secret_key"
 UPLOAD_FOLDER = os.path.join(app.root_path, "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
+# ---------------- Backblaze B2 ----------------
+# يفضل ضبط بيانات الدخول عبر متغيرات البيئة: B2_KEY_ID و B2_APPLICATION_KEY
+app.config["B2_KEY_ID"] = os.environ.get("B2_KEY_ID")
+app.config["B2_APPLICATION_KEY"] = os.environ.get("B2_APPLICATION_KEY")
+app.config["B2_BUCKET_ID"] = os.environ.get("B2_BUCKET_ID", "d6752dd3f4440ee39e9d0710")
+
+def get_b2_api() -> B2Api:
+    key_id = app.config.get("B2_KEY_ID")
+    app_key = app.config.get("B2_APPLICATION_KEY")
+    if not key_id or not app_key:
+        raise RuntimeError("B2 credentials (B2_KEY_ID/B2_APPLICATION_KEY) are not configured")
+    info = InMemoryAccountInfo()
+    api = B2Api(info)
+    api.authorize_account("production", key_id, app_key)
+    return api
+
+def get_b2_bucket():
+    api = get_b2_api()
+    bucket_id = app.config.get("B2_BUCKET_ID")
+    try:
+        # متوفر في b2sdk v2
+        return api.get_bucket_by_id(bucket_id)
+    except Exception:
+        # احتياطيًا: ابحث ضمن القوائم
+        for b in api.list_buckets():
+            if getattr(b, "id_", None) == bucket_id:
+                return b
+        raise RuntimeError("B2 bucket not found for configured B2_BUCKET_ID")
 
 # ---------------- إعداد مفاتيح Web Push (VAPID) ----------------
 # يمكن ضبطها عبر متغيرات البيئة VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT
@@ -3493,6 +3523,37 @@ def file_by_hash():
         return "❌ لم يتم العثور على ملف مرتبط بهذا الهاش", 404
 
     return send_from_directory(app.config["UPLOAD_FOLDER"], t.report_file)
+
+# ---------------- رفع ملف إلى Backblaze B2 ----------------
+@app.route("/api/upload", methods=["POST"])
+def api_upload_to_b2():
+    if session.get("user_id") is None:
+        return jsonify({"error": "unauthorized"}), 401
+
+    if "file" not in request.files:
+        return jsonify({"error": "no_file"}), 400
+
+    f = request.files["file"]
+    if not f or not f.filename:
+        return jsonify({"error": "empty_filename"}), 400
+
+    fname = secure_filename(f.filename)
+    try:
+        bucket = get_b2_bucket()
+        # نقرأ المحتوى إلى الذاكرة للبساطة. يمكن تحسين ذلك بتدفق chunked عند الحاجة
+        data = f.read()
+        # لتفادي التعارض، نضيف طابعًا زمنيًا لو كان الاسم مستخدمًا
+        unique_name = f"{int(time.time())}_{fname}"
+        uploaded = bucket.upload_bytes(data, file_name=unique_name)
+        file_id = uploaded.id_ if hasattr(uploaded, "id_") else getattr(uploaded, "file_id", None)
+        return jsonify({
+            "status": "ok",
+            "bucket_id": app.config.get("B2_BUCKET_ID"),
+            "file_name": unique_name,
+            "file_id": file_id,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ---------------- صفحة التقارير المشتركة ----------------
 @app.route("/employee/upload_bank_docs/<int:tid>", methods=["POST"])
