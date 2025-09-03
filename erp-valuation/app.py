@@ -766,7 +766,25 @@ def login():
         password = (request.form.get("password") or "").strip()
 
         user = User.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password, password):
+        # دعم خلفي: التعامل مع كلمات مرور مخزنة كنص عادي في قواعد قديمة
+        is_valid = False
+        if user and user.password:
+            try:
+                if user.password.startswith("pbkdf2:"):
+                    is_valid = check_password_hash(user.password, password)
+                else:
+                    # مقارنة نصية ثم ترقية للتجزئة
+                    if user.password == password:
+                        is_valid = True
+                        try:
+                            user.password = generate_password_hash(password)
+                            db.session.commit()
+                        except Exception:
+                            db.session.rollback()
+            except Exception:
+                is_valid = False
+
+        if user and is_valid:
             session["user_id"] = user.id
             session["role"] = user.role
             session["username"] = user.username  # نحتاجه للتقارير والاستلام
