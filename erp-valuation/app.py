@@ -6,7 +6,7 @@ from typing import List
 import fitz  # PyMuPDF (kept to preserve functionality if used in templates/utilities)
 import pytesseract  # OCR (kept to preserve functionality if used elsewhere)
 from PIL import Image  # Image handling (kept)
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, send_file, flash, abort, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, send_file, flash, abort, jsonify, Response
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
@@ -35,7 +35,9 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 # يفضل ضبط بيانات الدخول عبر متغيرات البيئة: B2_KEY_ID و B2_APPLICATION_KEY
 app.config["B2_KEY_ID"] = os.environ.get("B2_KEY_ID")
 app.config["B2_APPLICATION_KEY"] = os.environ.get("B2_APPLICATION_KEY")
-app.config["B2_BUCKET_ID"] = os.environ.get("B2_BUCKET_ID", "d6752dd3f4440ee39e9d0710")
+# يمكن تحديد البكت إما عبر المعرّف أو الاسم. لا نضع قيمة افتراضية صلبة.
+app.config["B2_BUCKET_ID"] = os.environ.get("B2_BUCKET_ID")
+app.config["B2_BUCKET_NAME"] = os.environ.get("B2_BUCKET_NAME") or os.environ.get("B2_BUCKET")
 
 def get_b2_api() -> B2Api:
     key_id = app.config.get("B2_KEY_ID")
@@ -50,15 +52,30 @@ def get_b2_api() -> B2Api:
 def get_b2_bucket():
     api = get_b2_api()
     bucket_id = app.config.get("B2_BUCKET_ID")
-    try:
-        # متوفر في b2sdk v2
-        return api.get_bucket_by_id(bucket_id)
-    except Exception:
-        # احتياطيًا: ابحث ضمن القوائم
-        for b in api.list_buckets():
-            if getattr(b, "id_", None) == bucket_id:
-                return b
-        raise RuntimeError("B2 bucket not found for configured B2_BUCKET_ID")
+    bucket_name = app.config.get("B2_BUCKET_NAME")
+
+    # أولوية: إذا عرّف المستخدم المعرّف نبحث به، وإلا نحاول بالاسم
+    if bucket_id:
+        try:
+            # متوفر في b2sdk v2
+            return api.get_bucket_by_id(bucket_id)
+        except Exception:
+            # احتياطيًا: ابحث ضمن القوائم
+            for b in api.list_buckets():
+                if getattr(b, "id_", None) == bucket_id:
+                    return b
+            raise RuntimeError("B2 bucket not found for configured B2_BUCKET_ID")
+
+    if bucket_name:
+        try:
+            return api.get_bucket_by_name(bucket_name)
+        except Exception:
+            for b in api.list_buckets():
+                if getattr(b, "name", None) == bucket_name:
+                    return b
+            raise RuntimeError("B2 bucket not found for configured B2_BUCKET_NAME/B2_BUCKET")
+
+    raise RuntimeError("B2 bucket is not configured. Set B2_BUCKET_ID or B2_BUCKET_NAME/B2_BUCKET")
 
 # ---------------- إعداد مفاتيح Web Push (VAPID) ----------------
 # يمكن ضبطها عبر متغيرات البيئة VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT
@@ -3599,6 +3616,7 @@ def api_b2_health():
         "has_key_id": bool(app.config.get("B2_KEY_ID")),
         "has_application_key": bool(app.config.get("B2_APPLICATION_KEY")),
         "bucket_id": app.config.get("B2_BUCKET_ID"),
+        "bucket_name": app.config.get("B2_BUCKET_NAME") or app.config.get("B2_BUCKET"),
     }
 
     try:
@@ -3646,6 +3664,40 @@ def api_b2_health():
             "message": str(e),
             "env": env_info,
         }), 500
+
+# ---------------- تنزيل ملف من Backblaze B2 ----------------
+@app.route("/api/b2/download", methods=["GET"])
+def api_b2_download():
+    if session.get("user_id") is None:
+        return jsonify({"error": "unauthorized"}), 401
+
+    # يتوقع query param ?name=path/inside/bucket
+    file_name = request.args.get("name", type=str)
+    if not file_name:
+        return jsonify({"error": "missing_name"}), 400
+
+    try:
+        bucket = get_b2_bucket()
+        # تنزيل المحتوى إلى الذاكرة. يمكن التحسين عبر stream_tmp file عند الكبر.
+        downloaded = bucket.download_file_by_name(file_name)
+        data = downloaded.response.content
+
+        # تخمين نوع المحتوى بشكل بسيط
+        guessed = "application/octet-stream"
+        if file_name.lower().endswith(".pdf"):
+            guessed = "application/pdf"
+        elif file_name.lower().endswith(".png"):
+            guessed = "image/png"
+        elif file_name.lower().endswith(".jpg") or file_name.lower().endswith(".jpeg"):
+            guessed = "image/jpeg"
+        elif file_name.lower().endswith(".docx"):
+            guessed = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+        return Response(data, mimetype=guessed, headers={
+            "Content-Disposition": f"attachment; filename=\"{os.path.basename(file_name)}\""
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ---------------- صفحة التقارير المشتركة ----------------
 @app.route("/employee/upload_bank_docs/<int:tid>", methods=["POST"])
