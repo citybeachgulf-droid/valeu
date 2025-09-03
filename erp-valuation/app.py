@@ -1990,8 +1990,17 @@ def engineer_upload_report(tid):
         uploaded = bucket.upload_bytes(data, file_name=b2_name)
         t.report_b2_file_name = b2_name
         t.report_b2_file_id = getattr(uploaded, "id_", None) or getattr(uploaded, "file_id", None)
-    except Exception:
+    except Exception as e:
         # إذا لم تُضبط مفاتيح B2 أو حدث خطأ، نتجاهل بدون إيقاف العملية
+        try:
+            print(
+                f"⚠️ B2 upload failed for transaction {t.id}: {e} | "
+                f"has_key_id={bool(app.config.get('B2_KEY_ID'))}, "
+                f"has_application_key={bool(app.config.get('B2_APPLICATION_KEY'))}, "
+                f"bucket_id={app.config.get('B2_BUCKET_ID')}"
+            )
+        except Exception:
+            pass
         pass
 
     db.session.commit()
@@ -3546,6 +3555,7 @@ def file_by_hash():
 @app.route("/api/upload", methods=["POST"])
 def api_upload_to_b2():
     if session.get("user_id") is None:
+        print("⚠️ /api/upload unauthorized access: no user_id in session")
         return jsonify({"error": "unauthorized"}), 401
 
     if "file" not in request.files:
@@ -3571,6 +3581,11 @@ def api_upload_to_b2():
             "file_id": file_id,
         })
     except Exception as e:
+        print(
+            f"⚠️ /api/upload B2 error: {e} | "
+            f"has_key_id={bool(app.config.get('B2_KEY_ID'))}, "
+            f"has_application_key={bool(app.config.get('B2_APPLICATION_KEY'))}, "
+            f"bucket_id={app.config.get('B2_BUCKET_ID')}")
         return jsonify({"error": str(e)}), 500
 
 # ---------------- فحص صحة الربط مع Backblaze B2 ----------------
