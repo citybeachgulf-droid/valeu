@@ -1127,6 +1127,12 @@ def manager_dashboard():
 
     now = datetime.utcnow()
     hidden_statuses =     "in_progress"   ,  "بإنتظار المهندس" , "قيد المعاينة", "📑 تقرير مرفوع" ,  "بانتظار المهندس",
+    # Current month boundaries (UTC) for Postgres-compatible filtering
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if now.month == 12:
+        next_month_start = datetime(now.year + 1, 1, 1)
+    else:
+        next_month_start = datetime(now.year, now.month + 1, 1)
     VAPID_PUBLIC_KEY = "BFNeZpjEro8pwFxR1H20twlTd2pL5MZtWrDATu4ME2RcbzhN"  # المفتاح اللي ولدته
 
     # ✅ فقط معاملات العقارات تظهر عند المدير + استبعاد الحالات المخفية
@@ -1156,8 +1162,8 @@ def manager_dashboard():
             .join(Transaction, Transaction.bank_id == Bank.id)
             .filter(Transaction.branch_id == b.id)
             .filter(Transaction.transaction_type == "real_estate")   # 🚫 استبعاد السيارات
-            .filter(func.strftime("%m", Transaction.date) == now.strftime("%m"))
-            .filter(func.strftime("%Y", Transaction.date) == now.strftime("%Y"))
+            .filter(Transaction.date >= month_start)
+            .filter(Transaction.date < next_month_start)
             .group_by(Bank.name)
             .all()
         )
