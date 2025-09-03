@@ -51,7 +51,18 @@ except Exception:
 default_sqlite_path = os.path.join(app.instance_path, "erp.db")
 default_sqlite_uri = f"sqlite:///{default_sqlite_path}"
 
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", default_sqlite_uri)
+# دعم ربط PostgreSQL عبر متغير البيئة DATABASE_URL بما يتوافق مع SQLAlchemy
+database_url = os.environ.get("DATABASE_URL", default_sqlite_uri)
+if database_url.startswith("postgres://"):
+    # تحويل الصيغة القديمة إلى psycopg/psycopg2
+    database_url = database_url.replace("postgres://", "postgresql+psycopg2://", 1)
+
+# فرض SSL على Render وما شابه إذا لم يُذكر صراحةً
+if database_url.startswith("postgresql") and "sslmode=" not in database_url:
+    connector = "&" if "?" in database_url else "?"
+    database_url = f"{database_url}{connector}sslmode=require"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
@@ -766,7 +777,25 @@ def login():
         password = (request.form.get("password") or "").strip()
 
         user = User.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password, password):
+        # دعم خلفي: التعامل مع كلمات مرور مخزنة كنص عادي في قواعد قديمة
+        is_valid = False
+        if user and user.password:
+            try:
+                if user.password.startswith("pbkdf2:"):
+                    is_valid = check_password_hash(user.password, password)
+                else:
+                    # مقارنة نصية ثم ترقية للتجزئة
+                    if user.password == password:
+                        is_valid = True
+                        try:
+                            user.password = generate_password_hash(password)
+                            db.session.commit()
+                        except Exception:
+                            db.session.rollback()
+            except Exception:
+                is_valid = False
+
+        if user and is_valid:
             session["user_id"] = user.id
             session["role"] = user.role
             session["username"] = user.username  # نحتاجه للتقارير والاستلام
