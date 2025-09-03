@@ -54,8 +54,14 @@ default_sqlite_uri = f"sqlite:///{default_sqlite_path}"
 # دعم ربط PostgreSQL عبر متغير البيئة DATABASE_URL بما يتوافق مع SQLAlchemy
 database_url = os.environ.get("DATABASE_URL", default_sqlite_uri)
 if database_url.startswith("postgres://"):
-    # تحويل الصيغة القديمة إلى psycopg/psycopg2
-    database_url = database_url.replace("postgres://", "postgresql+psycopg2://", 1)
+    # تحويل الصيغة القديمة إلى محرك SQLAlchemy psycopg (psycopg v3)
+    database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+elif database_url.startswith("postgresql://"):
+    # فرض استخدام برنامج تشغيل psycopg v3 حتى لو كانت الصيغة حديثة بدون تحديد درايفر
+    database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+elif database_url.startswith("postgresql+psycopg2://"):
+    # ترقية أي توجيه قديم إلى psycopg v3
+    database_url = database_url.replace("postgresql+psycopg2://", "postgresql+psycopg://", 1)
 
 # فرض SSL على Render وما شابه إذا لم يُذكر صراحةً
 if database_url.startswith("postgresql") and "sslmode=" not in database_url:
