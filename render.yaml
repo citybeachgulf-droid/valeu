@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: erp-valuation
+    env: python
+    rootDir: erp-valuation
+    plan: free
+    region: frankfurt
+    buildCommand: |
+      python -m pip install --upgrade pip
+      # استخدام --break-system-packages لأن بيئة Render مُدارة؛ بدلاً من ذلك يمكن استخدام venv
+      python -m pip install --break-system-packages -r requirements.txt
+    startCommand: |
+      # يضبط PATH لأن gunicorn قد يُثبت تحت ~/.local/bin
+      export PATH=$HOME/.local/bin:$PATH
+      # Render يمرر PORT تلقائياً
+      ./start.sh --log-level info
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13
+      - key: WEB_CONCURRENCY
+        value: 2
+      - key: HOST
+        value: 0.0.0.0
+      # إذا استخدمت PostgreSQL على Render، اضبط DATABASE_URL من لوحة Render
+    disk:
+      name: erp-db
+      mountPath: /opt/render/project/src/erp-valuation/instance
+      sizeGB: 1
