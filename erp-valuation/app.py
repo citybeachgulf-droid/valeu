@@ -3555,6 +3555,65 @@ def api_upload_to_b2():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ---------------- فحص صحة الربط مع Backblaze B2 ----------------
+@app.route("/api/b2/health", methods=["GET"])
+def api_b2_health():
+    # نقيّد الوصول على المدراء/المدير العام فقط
+    if session.get("role") not in ["manager", "admin"]:
+        return jsonify({"error": "unauthorized"}), 401
+
+    env_info = {
+        "has_key_id": bool(app.config.get("B2_KEY_ID")),
+        "has_application_key": bool(app.config.get("B2_APPLICATION_KEY")),
+        "bucket_id": app.config.get("B2_BUCKET_ID"),
+    }
+
+    try:
+        api = get_b2_api()
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "stage": "authorize_account",
+            "message": str(e),
+            "env": env_info,
+        }), 500
+
+    try:
+        bucket = get_b2_bucket()
+        result = {
+            "status": "ok",
+            "env": env_info,
+            "bucket": {
+                "id": getattr(bucket, "id_", None),
+                "name": getattr(bucket, "name", None),
+            },
+        }
+
+        # محاولة قراءة خفيفة (اختيارية) للتأكد من الصلاحيات
+        try:
+            sample_files = []
+            try:
+                # قد لا تتوفر في كل الإصدارات؛ ملفّة داخل try
+                for item in bucket.ls(max_entries=1):
+                    file_info, _ = item if isinstance(item, tuple) else (None, None)
+                    if file_info is not None:
+                        sample_files.append(getattr(file_info, "file_name", None))
+            except Exception:
+                # تجاهل إن لم تتوفر الدالة
+                pass
+            result["list_sample"] = sample_files
+        except Exception as inner:
+            result["list_error"] = str(inner)
+
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "stage": "get_bucket",
+            "message": str(e),
+            "env": env_info,
+        }), 500
+
 # ---------------- صفحة التقارير المشتركة ----------------
 @app.route("/employee/upload_bank_docs/<int:tid>", methods=["POST"])
 def employee_upload_bank_docs(tid):
