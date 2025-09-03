@@ -42,7 +42,16 @@ app.config["VAPID_CLAIMS"] = {
 }
 
 # ---------------- إعداد قاعدة البيانات ----------------
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///erp.db"
+# يدعم DATABASE_URL (مثلاً PostgreSQL على Render)، وإلا يستخدم SQLite داخل instance/erp.db
+try:
+    os.makedirs(app.instance_path, exist_ok=True)
+except Exception:
+    pass
+
+default_sqlite_path = os.path.join(app.instance_path, "erp.db")
+default_sqlite_uri = f"sqlite:///{default_sqlite_path}"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", default_sqlite_uri)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
