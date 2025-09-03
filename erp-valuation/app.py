@@ -1,4 +1,3 @@
-from operator import and_
 import os, json, re
 import hashlib
 import secrets
@@ -11,7 +10,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, s
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func, or_, text
+from sqlalchemy import func, or_, and_, text, inspect
 from sqlalchemy.exc import OperationalError
 from pywebpush import webpush, WebPushException
 from docx import Document
@@ -742,9 +741,10 @@ def get_last_price(state, region, bank):
 # فحص وجود عمود داخل جدول (لمشاكل الإصدارات القديمة)
 def column_exists(table_name: str, column_name: str) -> bool:
     try:
-        res = db.session.execute(text(f"PRAGMA table_info({table_name})")).mappings().all()
-        cols = {r["name"] for r in res}
-        return column_name in cols
+        inspector = inspect(db.engine)
+        columns = inspector.get_columns(table_name)
+        column_names = {col.get("name") for col in columns}
+        return column_name in column_names
     except Exception:
         return False
 
@@ -4251,7 +4251,7 @@ with app.app_context():
     # محاولة إضافة أعمدة Backblaze B2 لملف التقرير إن كانت الجداول قديمة
     try:
         if not column_exists("transaction", "report_b2_file_name"):
-            db.session.execute(text("ALTER TABLE transaction ADD COLUMN report_b2_file_name VARCHAR(255)"))
+            db.session.execute(text('ALTER TABLE "transaction" ADD COLUMN report_b2_file_name VARCHAR(255)'))
             db.session.commit()
             print("✅ تمت إضافة عمود report_b2_file_name")
     except Exception:
@@ -4259,7 +4259,7 @@ with app.app_context():
 
     try:
         if not column_exists("transaction", "report_b2_file_id"):
-            db.session.execute(text("ALTER TABLE transaction ADD COLUMN report_b2_file_id VARCHAR(255)"))
+            db.session.execute(text('ALTER TABLE "transaction" ADD COLUMN report_b2_file_id VARCHAR(255)'))
             db.session.commit()
             print("✅ تمت إضافة عمود report_b2_file_id")
     except Exception:
@@ -4276,6 +4276,24 @@ with app.app_context():
         if existing_with_files:
             db.session.commit()
             print(f"✅ تم توليد روابط عامة لـ {len(existing_with_files)} تقارير")
+    except Exception:
+        db.session.rollback()
+
+# ضمان وجود أعمدة Backblaze B2 قبل أول طلب (في بيئات الإنتاج متعددة العمليات)
+@app.before_first_request
+def ensure_b2_columns_exist():
+    try:
+        if not column_exists("transaction", "report_b2_file_name"):
+            db.session.execute(text('ALTER TABLE "transaction" ADD COLUMN report_b2_file_name VARCHAR(255)'))
+            db.session.commit()
+            print("✅ تمت إضافة عمود report_b2_file_name (before_first_request)")
+    except Exception:
+        db.session.rollback()
+    try:
+        if not column_exists("transaction", "report_b2_file_id"):
+            db.session.execute(text('ALTER TABLE "transaction" ADD COLUMN report_b2_file_id VARCHAR(255)'))
+            db.session.commit()
+            print("✅ تمت إضافة عمود report_b2_file_id (before_first_request)")
     except Exception:
         db.session.rollback()
 
