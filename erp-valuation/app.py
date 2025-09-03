@@ -1826,6 +1826,21 @@ def add_transaction_engineer():
             )
 
         if t:
+            # رفع الملفات المرفقة من نموذج المهندس وحفظها داخل uploads
+            try:
+                files = request.files.getlist("files")
+                saved_files = []
+                for file in files:
+                    if file and file.filename:
+                        filename = secure_filename(file.filename)
+                        file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+                        saved_files.append(filename)
+                if saved_files:
+                    t.files = ",".join(saved_files)
+            except Exception:
+                # إن حدث خطأ أثناء رفع الملفات، نُكمل إنشاء المعاملة بدون ملفات
+                pass
+
             db.session.add(t)
             db.session.commit()
             flash("✅ تم إضافة المعاملة بنجاح", "success")
