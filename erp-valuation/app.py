@@ -401,6 +401,9 @@ class Transaction(db.Model):
     report_sha256 = db.Column(db.String(64), nullable=True)
     # رابط مشاركة عام (Token)
     public_share_token = db.Column(db.String(128), nullable=True)
+    # معلومات Backblaze B2 لملف التقرير
+    report_b2_file_name = db.Column(db.String(255), nullable=True)
+    report_b2_file_id = db.Column(db.String(255), nullable=True)
 
     payments = db.relationship("Payment", backref="transaction", lazy=True)
 
@@ -1976,6 +1979,21 @@ def engineer_upload_report(tid):
     except Exception:
         final_hash = None
     t.report_sha256 = final_hash or original_hash
+
+    # 5) رفع التقرير النهائي إلى Backblaze B2 وتخزين بياناته (إن أمكن)
+    try:
+        bucket = get_b2_bucket()
+        with open(filepath, "rb") as fh:
+            data = fh.read()
+        safe_ref = (t.report_number or "ref").replace("/", "-")
+        b2_name = f"reports/{t.id}_{safe_ref}_{int(time.time())}.pdf"
+        uploaded = bucket.upload_bytes(data, file_name=b2_name)
+        t.report_b2_file_name = b2_name
+        t.report_b2_file_id = getattr(uploaded, "id_", None) or getattr(uploaded, "file_id", None)
+    except Exception:
+        # إذا لم تُضبط مفاتيح B2 أو حدث خطأ، نتجاهل بدون إيقاف العملية
+        pass
+
     db.session.commit()
     bump_transactions_version()
 
@@ -4227,6 +4245,23 @@ with app.app_context():
             db.session.execute(text("ALTER TABLE transaction ADD COLUMN public_share_token VARCHAR(128)"))
             db.session.commit()
             print("✅ تمت إضافة عمود public_share_token")
+    except Exception:
+        db.session.rollback()
+
+    # محاولة إضافة أعمدة Backblaze B2 لملف التقرير إن كانت الجداول قديمة
+    try:
+        if not column_exists("transaction", "report_b2_file_name"):
+            db.session.execute(text("ALTER TABLE transaction ADD COLUMN report_b2_file_name VARCHAR(255)"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود report_b2_file_name")
+    except Exception:
+        db.session.rollback()
+
+    try:
+        if not column_exists("transaction", "report_b2_file_id"):
+            db.session.execute(text("ALTER TABLE transaction ADD COLUMN report_b2_file_id VARCHAR(255)"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود report_b2_file_id")
     except Exception:
         db.session.rollback()
 
