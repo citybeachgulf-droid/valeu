@@ -20,6 +20,7 @@ from reportlab.graphics.barcode import qr as rl_qr
 from reportlab.graphics.shapes import Drawing
 from reportlab.graphics import renderPM
 import requests
+import time
 
 # ---------------- إعداد Flask ----------------
 app = Flask(__name__)
@@ -68,8 +69,32 @@ if database_url.startswith("postgresql") and "sslmode=" not in database_url:
     connector = "&" if "?" in database_url else "?"
     database_url = f"{database_url}{connector}sslmode=require"
 
+# تمكين keepalives و connect_timeout لتقليل انقطاعات الاتصال على Postgres
+if database_url.startswith("postgresql"):
+    params_to_add = []
+    if "keepalives=" not in database_url:
+        params_to_add.append("keepalives=1")
+    if "keepalives_idle=" not in database_url:
+        params_to_add.append("keepalives_idle=30")
+    if "keepalives_interval=" not in database_url:
+        params_to_add.append("keepalives_interval=10")
+    if "keepalives_count=" not in database_url:
+        params_to_add.append("keepalives_count=3")
+    if "connect_timeout=" not in database_url:
+        params_to_add.append("connect_timeout=10")
+    if params_to_add:
+        connector = "&" if "?" in database_url else "?"
+        database_url = f"{database_url}{connector}{'&'.join(params_to_add)}"
+
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True,
+    "pool_recycle": 270,
+    "pool_size": int(os.environ.get("SQL_POOL_SIZE", "5")),
+    "max_overflow": int(os.environ.get("SQL_MAX_OVERFLOW", "10")),
+    "pool_timeout": int(os.environ.get("SQL_POOL_TIMEOUT", "30")),
+}
 db = SQLAlchemy(app)
 
 # ---------------- Service Worker at root scope ----------------
@@ -781,8 +806,29 @@ def login():
     if request.method == "POST":
         username = (request.form.get("username") or "").strip()
         password = (request.form.get("password") or "").strip()
-
-        user = User.query.filter_by(username=username).first()
+        # محاولات بسيطة لإعادة المحاولة في حال انقطاع اتصال قاعدة البيانات بشكل عابر
+        user = None
+        last_error = None
+        for attempt_index, sleep_seconds in enumerate([0.0, 0.3, 0.8], start=1):
+            try:
+                if sleep_seconds:
+                    time.sleep(sleep_seconds)
+                user = User.query.filter_by(username=username).first()
+                last_error = None
+                break
+            except OperationalError as op_err:
+                # إنهاء أي معاملة معلّقة وإعادة المحاولة
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                last_error = op_err
+            except Exception as unhandled_err:
+                last_error = unhandled_err
+                break
+        if last_error is not None and user is None:
+            flash("⚠️ تعذّر الاتصال بقاعدة البيانات مؤقتًا. الرجاء المحاولة بعد لحظات.", "warning")
+            return render_template("login.html"), 503
         # دعم خلفي: التعامل مع كلمات مرور مخزنة كنص عادي في قواعد قديمة
         is_valid = False
         if user and user.password:
