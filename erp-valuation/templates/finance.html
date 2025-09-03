@@ -416,6 +416,45 @@
 
 {% block scripts %}
 <script>
+// تتبع إدخال المستخدم لمنع التحديث التلقائي غير المرغوب
+var __isUserEditing = false;
+var __updateBannerEl = null;
+function __setupEditingGuards(){
+  try {
+    var formEl = document.querySelector('form');
+    var inputs = document.querySelectorAll('input, select, textarea');
+    inputs.forEach(function(el){
+      el.addEventListener('focus', function(){ __isUserEditing = true; });
+      el.addEventListener('input', function(){ __isUserEditing = true; });
+      el.addEventListener('blur', function(){ setTimeout(function(){ __isUserEditing = false; }, 1000); });
+    });
+    if (formEl) formEl.addEventListener('submit', function(){ __isUserEditing = false; });
+  } catch (_) {}
+}
+function __ensureUpdateBanner(){
+  if (__updateBannerEl) return __updateBannerEl;
+  var banner = document.createElement('div');
+  banner.style.position = 'fixed';
+  banner.style.bottom = '16px';
+  banner.style.left = '50%';
+  banner.style.transform = 'translateX(-50%)';
+  banner.style.background = '#0d6efd';
+  banner.style.color = '#fff';
+  banner.style.padding = '10px 14px';
+  banner.style.borderRadius = '8px';
+  banner.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+  banner.style.display = 'none';
+  banner.style.zIndex = '2147483647';
+  banner.innerHTML = 'حدث تحديث للبيانات. <button id="__doReloadBtn" style="margin-inline-start:8px" class="btn btn-light btn-sm">تحديث الآن</button>';
+  document.body.appendChild(banner);
+  var btn = banner.querySelector('#__doReloadBtn');
+  if (btn) btn.addEventListener('click', function(){ location.reload(); });
+  __updateBannerEl = banner;
+  return banner;
+}
+document.addEventListener('DOMContentLoaded', __setupEditingGuards);
+</script>
+<script>
 // 🔄 تحديث لحظي بسيط: فحص نسخة المعاملات وإعادة تحميل الصفحة عند تغيّرها
 (function autoReloadOnChanges(){
   var currentVersion = null;
@@ -428,7 +467,12 @@
       if (currentVersion === null) {
         currentVersion = data.version;
       } else if (data.version !== currentVersion) {
-        location.reload();
+        if (!__isUserEditing) {
+          location.reload();
+        } else {
+          var b = __ensureUpdateBanner();
+          b.style.display = 'block';
+        }
       }
     } catch (e) {
       lastPingFail++;
