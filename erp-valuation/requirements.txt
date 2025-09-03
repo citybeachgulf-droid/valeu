@@ -41,3 +41,4 @@ urllib3==2.5.0
 Werkzeug==2.3.8
 yarl==1.20.1
 python-docx==1.1.2
+b2sdk
