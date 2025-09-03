@@ -1990,9 +1990,16 @@ def engineer_upload_report(tid):
         uploaded = bucket.upload_bytes(data, file_name=b2_name)
         t.report_b2_file_name = b2_name
         t.report_b2_file_id = getattr(uploaded, "id_", None) or getattr(uploaded, "file_id", None)
-    except Exception:
-        # إذا لم تُضبط مفاتيح B2 أو حدث خطأ، نتجاهل بدون إيقاف العملية
-        pass
+    except Exception as e:
+        # إذا لم تُضبط مفاتيح B2 أو حدث خطأ، نسجّل السبب للتشخيص ونُظهر تحذيرًا
+        try:
+            print(f"⚠️ فشل رفع Backblaze B2 للمعاملة {t.id}: {e}")
+        except Exception:
+            pass
+        try:
+            flash(f"⚠️ تم حفظ التقرير محليًا ولكن تعذّر رفعه إلى Backblaze: {e}", "warning")
+        except Exception:
+            pass
 
     db.session.commit()
     bump_transactions_version()

@@ -40,13 +40,13 @@
       if (window.AOS) {
         AOS.init({ duration: 600, easing: 'ease-out', once: true });
       }
-      // Helper: fixed base URL for API calls on Render
-      window.API_BASE = 'https://valeu.onrender.com';
+      // Helper: dynamic base URL for API calls (avoids cross-origin issues)
+      window.API_BASE = window.location.origin;
       // Helper: upload file to B2 via backend
       window.uploadToB2 = async function(file) {
         const form = new FormData();
         form.append('file', file);
-        const res = await fetch(`${window.API_BASE}/api/upload`, { method: 'POST', body: form });
+        const res = await fetch(`${window.API_BASE}/api/upload`, { method: 'POST', body: form, credentials: 'include' });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           throw new Error(err.error || `Upload failed (${res.status})`);

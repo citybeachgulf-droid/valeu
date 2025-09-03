@@ -22,6 +22,13 @@ services:
         value: 2
       - key: HOST
         value: 0.0.0.0
+      # Backblaze B2 credentials (set values in Render dashboard)
+      - key: B2_KEY_ID
+        sync: false
+      - key: B2_APPLICATION_KEY
+        sync: false
+      - key: B2_BUCKET_ID
+        sync: false
       # إذا استخدمت PostgreSQL على Render، اضبط DATABASE_URL من لوحة Render
     disk:
       name: erp-db
