@@ -4279,23 +4279,29 @@ with app.app_context():
     except Exception:
         db.session.rollback()
 
-# ضمان وجود أعمدة Backblaze B2 قبل أول طلب (في بيئات الإنتاج متعددة العمليات)
-@app.before_first_request
+# ضمان وجود أعمدة Backblaze B2 عند بدء التشغيل (متوافق مع Flask 3.x)
 def ensure_b2_columns_exist():
     try:
         if not column_exists("transaction", "report_b2_file_name"):
             db.session.execute(text('ALTER TABLE "transaction" ADD COLUMN report_b2_file_name VARCHAR(255)'))
             db.session.commit()
-            print("✅ تمت إضافة عمود report_b2_file_name (before_first_request)")
+            print("✅ تمت إضافة عمود report_b2_file_name")
     except Exception:
         db.session.rollback()
     try:
         if not column_exists("transaction", "report_b2_file_id"):
             db.session.execute(text('ALTER TABLE "transaction" ADD COLUMN report_b2_file_id VARCHAR(255)'))
             db.session.commit()
-            print("✅ تمت إضافة عمود report_b2_file_id (before_first_request)")
+            print("✅ تمت إضافة عمود report_b2_file_id")
     except Exception:
         db.session.rollback()
+
+# تشغيل مهمة التهيئة عند بدء التشغيل لضمان الأعمدة المطلوبة
+try:
+    with app.app_context():
+        ensure_b2_columns_exist()
+except Exception as e:
+    print(f"⚠️ فشل ضمان أعمدة B2 عند بدء التشغيل: {e}")
 
 # ---------------- تقرير دخل موظف ----------------
 @app.route("/employee_income", methods=["GET", "POST"])
