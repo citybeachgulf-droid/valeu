@@ -1931,7 +1931,20 @@ def engineer_upload_report(tid):
         flash("⚠️ يجب رفع ملف بصيغة PDF.", "danger")
         return redirect(url_for("engineer_transaction_details", tid=tid))
 
-    filename = secure_filename(f"{t.id}_{original_name}")
+    # توليد رقم التقرير إن لم يوجد مسبقًا (قبل حفظ الملف لتسمية الملف)
+    if not t.report_number:
+        last_txn = Transaction.query.filter(
+            Transaction.report_number != None
+        ).order_by(Transaction.id.desc()).first()
+
+        if last_txn and last_txn.report_number.startswith("ref"):
+            last_num = int(last_txn.report_number.replace("ref", ""))
+            t.report_number = f"ref{last_num + 1}"
+        else:
+            t.report_number = "ref1001"
+
+    # احفظ الملف باسم رقم التقرير مثل ref1010.pdf
+    filename = secure_filename(f"{t.report_number}.pdf")
     filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(filepath)
 
@@ -1965,18 +1978,6 @@ def engineer_upload_report(tid):
             t.public_share_token = secrets.token_urlsafe(24)
         except Exception:
             t.public_share_token = None
-
-    # توليد رقم التقرير إن لم يوجد مسبقًا
-    if not t.report_number:
-        last_txn = Transaction.query.filter(
-            Transaction.report_number != None
-        ).order_by(Transaction.id.desc()).first()
-
-        if last_txn and last_txn.report_number.startswith("ref"):
-            last_num = int(last_txn.report_number.replace("ref", ""))
-            t.report_number = f"ref{last_num + 1}"
-        else:
-            t.report_number = "ref1001"
 
     # ختم الملف مباشرة بعد الرفع
     try:
