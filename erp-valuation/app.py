@@ -77,6 +77,39 @@ def get_b2_bucket():
 
     raise RuntimeError("B2 bucket is not configured. Set B2_BUCKET_ID or B2_BUCKET_NAME/B2_BUCKET")
 
+# توليد رابط تنزيل عام مباشر لملف داخل Backblaze B2 (يتطلب أن يكون البكت عامًا)
+def build_b2_public_url(file_name: str) -> str | None:
+    try:
+        if not file_name:
+            return None
+        api = get_b2_api()
+        # الحصول على base download url من معلومات الحساب (تختلف حسب نسخة b2sdk)
+        download_base = None
+        try:
+            download_base = api.account_info.get_download_url()  # type: ignore[attr-defined]
+        except Exception:
+            try:
+                download_base = api.session.account_info.get_download_url()  # type: ignore[attr-defined]
+            except Exception:
+                download_base = None
+
+        bucket_name = app.config.get("B2_BUCKET_NAME")
+        if not bucket_name:
+            try:
+                bucket = get_b2_bucket()
+                bucket_name = getattr(bucket, "name", None)
+            except Exception:
+                bucket_name = None
+
+        if not download_base or not bucket_name:
+            return None
+
+        from urllib.parse import quote
+        # ملاحظة: يفترض أن البكت عام. إن كان خاصًا فسيحتاج رابطًا موقّتًا (خارج نطاق هذا الطلب)
+        return f"{download_base}/file/{bucket_name}/{quote(file_name)}"
+    except Exception:
+        return None
+
 # ---------------- إعداد مفاتيح Web Push (VAPID) ----------------
 # يمكن ضبطها عبر متغيرات البيئة VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT
 app.config["VAPID_PUBLIC_KEY"] = os.environ.get(
@@ -3507,6 +3540,11 @@ def public_report(token):
     t = Transaction.query.filter_by(public_share_token=token).first_or_404()
     if not t.report_file:
         abort(404)
+    # إن كان للمعاملة ملف مرفوعًا على B2 ونستطيع توليد رابط عام، حوّل المستخدم له
+    if getattr(t, "report_b2_file_name", None):
+        b2_url = build_b2_public_url(t.report_b2_file_name)
+        if b2_url:
+            return redirect(b2_url)
     return send_from_directory(app.config["UPLOAD_FOLDER"], t.report_file)
 
 # ---------------- عرض الملفات ----------------
@@ -3543,7 +3581,12 @@ def verify_by_hash():
     if not t or not t.report_file:
         return "<h2>❌ هذا التقرير غير أصلي أو تم التعديل</h2>", 404
 
-    file_url = url_for("uploaded_file", filename=t.report_file)
+    # إن توفر ملف على B2 نحاول إنشاء رابط عام دائم
+    if getattr(t, "report_b2_file_name", None):
+        b2_url = build_b2_public_url(t.report_b2_file_name)
+    else:
+        b2_url = None
+    file_url = b2_url or url_for("uploaded_file", filename=t.report_file)
     return (
         f"""
         <h2>✅ التقرير أصلي</h2>
@@ -3567,6 +3610,11 @@ def file_by_hash():
     if not t or not t.report_file:
         return "❌ لم يتم العثور على ملف مرتبط بهذا الهاش", 404
 
+    # إن توفر ملف على B2 نحاول التحويل إليه مباشرة
+    if getattr(t, "report_b2_file_name", None):
+        b2_url = build_b2_public_url(t.report_b2_file_name)
+        if b2_url:
+            return redirect(b2_url)
     return send_from_directory(app.config["UPLOAD_FOLDER"], t.report_file)
 
 # ---------------- رفع ملف إلى Backblaze B2 ----------------
