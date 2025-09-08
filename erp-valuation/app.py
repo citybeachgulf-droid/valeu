@@ -437,6 +437,10 @@ class Transaction(db.Model):
     bank_branch = db.Column(db.String(120), nullable=True)
     # 👇 اسم موظف البنك الذي جلب/قدّم المعاملة
     bank_employee_name = db.Column(db.String(120), nullable=True)
+    # 👇 الموظف الذي جلب المعاملة (من داخل شركتنا)
+    brought_by = db.Column(db.String(120), nullable=True)
+    # 👇 الشخص الذي قام بالزيارة
+    visited_by = db.Column(db.String(120), nullable=True)
 
     price = db.Column(db.Float, nullable=True)   # سعر التثمين (اختياري)
 
@@ -1788,6 +1792,9 @@ def add_transaction_engineer():
         client_name = (request.form.get("client_name") or "").strip()
         client_phone = (request.form.get("client_phone") or "").strip()
         fee = float(request.form.get("fee") or 0)
+        # 🆕 الحقول الجديدة
+        brought_by = (request.form.get("brought_by") or "").strip()
+        visited_by = (request.form.get("visited_by") or "").strip()
 
         # ✅ تحقق من رقم العميل
         if not client_phone:
@@ -1865,6 +1872,8 @@ def add_transaction_engineer():
                 bank_id=bank_id,
                 bank_branch=bank_branch,
                 bank_employee_name=bank_employee_name,
+                brought_by=brought_by,
+                visited_by=visited_by,
                 created_by=user.id,
                 transaction_type="real_estate",
                 payment_status="غير مدفوعة",
@@ -1904,6 +1913,8 @@ def add_transaction_engineer():
                 bank_id=bank_id,
                 bank_branch=bank_branch,
                 bank_employee_name=bank_employee_name,
+                brought_by=brought_by,
+                visited_by=visited_by,
 
                 assigned_to=None   # ✅
             )
@@ -4242,6 +4253,24 @@ with app.app_context():
             db.session.execute(text("ALTER TABLE transaction ADD COLUMN bank_employee_name VARCHAR(120)"))
             db.session.commit()
             print("✅ تمت إضافة عمود bank_employee_name")
+    except Exception:
+        db.session.rollback()
+
+    # محاولة إضافة عمود brought_by للمعاملات إذا كان الجدول قديم
+    try:
+        if not column_exists("transaction", "brought_by"):
+            db.session.execute(text("ALTER TABLE transaction ADD COLUMN brought_by VARCHAR(120)"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود brought_by")
+    except Exception:
+        db.session.rollback()
+
+    # محاولة إضافة عمود visited_by للمعاملات إذا كان الجدول قديم
+    try:
+        if not column_exists("transaction", "visited_by"):
+            db.session.execute(text("ALTER TABLE transaction ADD COLUMN visited_by VARCHAR(120)"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود visited_by")
     except Exception:
         db.session.rollback()
 
