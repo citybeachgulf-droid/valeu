@@ -1032,6 +1032,11 @@ def add_transaction():
     brought_by_form = (request.form.get("brought_by") or "").strip()
     visited_by_form = (request.form.get("visited_by") or "").strip()
 
+    # ✅ تحقق إجباري للحقلين
+    if not brought_by_form or not visited_by_form:
+        flash("⚠️ يجب إدخال من جلب المعاملة ومن قام بالزيارة", "danger")
+        return redirect(url_for("employee_dashboard"))
+
     t = None  # المعاملة
 
     # ✅ تحقق من رقم العميل
@@ -1842,9 +1847,12 @@ def add_transaction_engineer():
         brought_by = (request.form.get("brought_by") or "").strip()
         visited_by = (request.form.get("visited_by") or "").strip()
 
-        # ✅ تحقق من رقم العميل
+        # ✅ تحقق من رقم العميل والحقول الإجبارية الجديدة
         if not client_phone:
             flash("⚠️ يجب إدخال رقم العميل", "danger")
+            return redirect(url_for("add_transaction_engineer"))
+        if not brought_by or not visited_by:
+            flash("⚠️ يجب إدخال من جلب المعاملة ومن قام بالزيارة", "danger")
             return redirect(url_for("add_transaction_engineer"))
 
         # 🧾 حفظ/تحديث العميل في جدول العملاء
