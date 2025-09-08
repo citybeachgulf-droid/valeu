@@ -1028,6 +1028,14 @@ def add_transaction():
     client_name = (request.form.get("client_name") or "").strip()
     client_phone = (request.form.get("client_phone") or "").strip()
     fee = float(request.form.get("fee") or 0)
+    # 🆕 الحقول الجديدة: من جلب المعاملة ومن قام بالزيارة (اختياري)
+    brought_by_form = (request.form.get("brought_by") or "").strip()
+    visited_by_form = (request.form.get("visited_by") or "").strip()
+
+    # ✅ تحقق إجباري للحقلين
+    if not brought_by_form or not visited_by_form:
+        flash("⚠️ يجب إدخال من جلب المعاملة ومن قام بالزيارة", "danger")
+        return redirect(url_for("employee_dashboard"))
 
     t = None  # المعاملة
 
@@ -1108,7 +1116,8 @@ def add_transaction():
             bank_id=bank_id,
             bank_branch=bank_branch,
             bank_employee_name=bank_employee_name,
-            brought_by=user.username,
+            brought_by=(brought_by_form or user.username),
+            visited_by=(visited_by_form or None),
             created_by=user.id,
             payment_status="غير مدفوعة",
             transaction_type="real_estate",
@@ -1131,27 +1140,28 @@ def add_transaction():
             return redirect(url_for("employee_dashboard"))
 
         t = Transaction(
-    client=client_name,
-    employee=user.username,
-    date=datetime.utcnow(),
-    status="بانتظار المهندس",  # ✅ بدون همزة
-    fee=fee,
-    branch_id=user.branch_id,
-    total_estimate=vehicle_value,
-    brought_by=user.username,
-    created_by=user.id,
-    payment_status="غير مدفوعة",
-    transaction_type="vehicle",
-    vehicle_type=vehicle_type,
-    vehicle_model=vehicle_model,
-    vehicle_year=vehicle_year,
-    state=None,
-    region=None,
-    bank_id=bank_id,
-    bank_branch=bank_branch,
-    bank_employee_name=bank_employee_name,
-    assigned_to=None   # ✅
-)
+            client=client_name,
+            employee=user.username,
+            date=datetime.utcnow(),
+            status="بانتظار المهندس",  # ✅ بدون همزة
+            fee=fee,
+            branch_id=user.branch_id,
+            total_estimate=vehicle_value,
+            brought_by=(brought_by_form or user.username),
+            visited_by=(visited_by_form or None),
+            created_by=user.id,
+            payment_status="غير مدفوعة",
+            transaction_type="vehicle",
+            vehicle_type=vehicle_type,
+            vehicle_model=vehicle_model,
+            vehicle_year=vehicle_year,
+            state=None,
+            region=None,
+            bank_id=bank_id,
+            bank_branch=bank_branch,
+            bank_employee_name=bank_employee_name,
+            assigned_to=None   # ✅
+        )
 
 
         # إبقاء معاملة المركبة غير مسندة حتى يقوم مهندس بالاستلام من لوحة المهندس
@@ -1837,9 +1847,12 @@ def add_transaction_engineer():
         brought_by = (request.form.get("brought_by") or "").strip()
         visited_by = (request.form.get("visited_by") or "").strip()
 
-        # ✅ تحقق من رقم العميل
+        # ✅ تحقق من رقم العميل والحقول الإجبارية الجديدة
         if not client_phone:
             flash("⚠️ يجب إدخال رقم العميل", "danger")
+            return redirect(url_for("add_transaction_engineer"))
+        if not brought_by or not visited_by:
+            flash("⚠️ يجب إدخال من جلب المعاملة ومن قام بالزيارة", "danger")
             return redirect(url_for("add_transaction_engineer"))
 
         # 🧾 حفظ/تحديث العميل في جدول العملاء
