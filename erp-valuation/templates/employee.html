@@ -33,6 +33,18 @@
 {% block content %}
   <div class="container mt-5">
     <h2 class="text-center mb-5" data-aos="fade-up">📌 لوحة البيانات</h2>
+    <div class="row mb-4">
+      <div class="col-md-6 mb-2">
+        <div class="alert alert-secondary">
+          🏠 عدد معاملات العقار التي جلبتها: <strong>{{ real_estate_brought_count }}</strong>
+        </div>
+      </div>
+      <div class="col-md-6 mb-2">
+        <div class="alert alert-secondary">
+          🚗 عدد معاملات السيارة التي جلبتها: <strong>{{ vehicle_brought_count }}</strong>
+        </div>
+      </div>
+    </div>
     
     <!-- ✅ خيارات منسّقة: تبويبات للمهام الثلاث -->
     <ul class="nav nav-pills justify-content-center mb-4" id="employeeTabs" role="tablist" data-aos="zoom-in">

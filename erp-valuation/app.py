@@ -958,6 +958,20 @@ def employee_dashboard():
         return redirect(url_for("login"))
 
     transactions = Transaction.query.filter_by(assigned_to=session.get("user_id")).all()
+    # 🧮 إحصائيات حسب من جلب المعاملة (هذا الموظف)
+    current_user = User.query.get(session.get("user_id"))
+    brought_name = current_user.username if current_user else None
+    real_estate_brought_count = 0
+    vehicle_brought_count = 0
+    if brought_name:
+        real_estate_brought_count = Transaction.query.filter(
+            Transaction.brought_by == brought_name,
+            Transaction.transaction_type == "real_estate"
+        ).count()
+        vehicle_brought_count = Transaction.query.filter(
+            Transaction.brought_by == brought_name,
+            Transaction.transaction_type == "vehicle"
+        ).count()
     banks = Bank.query.all()
 
     # مستندات الفرع الخاصة بالموظف
@@ -980,7 +994,9 @@ def employee_dashboard():
         vapid_public_key=VAPID_PUBLIC_KEY,
         price_per_meter=price_per_meter,
         docs=branch_docs,
-        status_for=document_status
+        status_for=document_status,
+        real_estate_brought_count=real_estate_brought_count,
+        vehicle_brought_count=vehicle_brought_count
     )
 
 @app.route("/add_transaction", methods=["POST"])
@@ -1073,6 +1089,7 @@ def add_transaction():
             bank_id=bank_id,
             bank_branch=bank_branch,
             bank_employee_name=bank_employee_name,
+            brought_by=user.username,
             created_by=user.id,
             payment_status="غير مدفوعة",
             transaction_type="real_estate",
@@ -1102,6 +1119,7 @@ def add_transaction():
     fee=fee,
     branch_id=user.branch_id,
     total_estimate=vehicle_value,
+    brought_by=user.username,
     created_by=user.id,
     payment_status="غير مدفوعة",
     transaction_type="vehicle",
