@@ -437,6 +437,10 @@ class Transaction(db.Model):
     bank_branch = db.Column(db.String(120), nullable=True)
     # 👇 اسم موظف البنك الذي جلب/قدّم المعاملة
     bank_employee_name = db.Column(db.String(120), nullable=True)
+    # 👇 الموظف الذي جلب المعاملة (من داخل شركتنا)
+    brought_by = db.Column(db.String(120), nullable=True)
+    # 👇 الشخص الذي قام بالزيارة
+    visited_by = db.Column(db.String(120), nullable=True)
 
     price = db.Column(db.Float, nullable=True)   # سعر التثمين (اختياري)
 
@@ -954,6 +958,37 @@ def employee_dashboard():
         return redirect(url_for("login"))
 
     transactions = Transaction.query.filter_by(assigned_to=session.get("user_id")).all()
+    # 🧮 إحصائيات حسب من جلب المعاملة (هذا الموظف)
+    current_user = User.query.get(session.get("user_id"))
+    brought_name = current_user.username if current_user else None
+    # فلترة فترة زمنية اختيارية من واجهة المستخدم
+    start_date_str = request.args.get("start_date")
+    end_date_str = request.args.get("end_date")
+    start_date = None
+    end_date = None
+    try:
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+        if end_date_str:
+            # اجعل نهاية اليوم شاملة
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d") + timedelta(days=1)
+    except Exception:
+        start_date = None
+        end_date = None
+
+    def base_brought_query(ttype: str):
+        q = Transaction.query.filter(Transaction.brought_by == brought_name, Transaction.transaction_type == ttype)
+        if start_date:
+            q = q.filter(Transaction.date >= start_date)
+        if end_date:
+            q = q.filter(Transaction.date < end_date)
+        return q
+
+    real_estate_brought_count = 0
+    vehicle_brought_count = 0
+    if brought_name:
+        real_estate_brought_count = base_brought_query("real_estate").count()
+        vehicle_brought_count = base_brought_query("vehicle").count()
     banks = Bank.query.all()
 
     # مستندات الفرع الخاصة بالموظف
@@ -976,7 +1011,11 @@ def employee_dashboard():
         vapid_public_key=VAPID_PUBLIC_KEY,
         price_per_meter=price_per_meter,
         docs=branch_docs,
-        status_for=document_status
+        status_for=document_status,
+        start_date=start_date_str,
+        end_date=end_date_str,
+        real_estate_brought_count=real_estate_brought_count,
+        vehicle_brought_count=vehicle_brought_count
     )
 
 @app.route("/add_transaction", methods=["POST"])
@@ -1069,6 +1108,7 @@ def add_transaction():
             bank_id=bank_id,
             bank_branch=bank_branch,
             bank_employee_name=bank_employee_name,
+            brought_by=user.username,
             created_by=user.id,
             payment_status="غير مدفوعة",
             transaction_type="real_estate",
@@ -1098,6 +1138,7 @@ def add_transaction():
     fee=fee,
     branch_id=user.branch_id,
     total_estimate=vehicle_value,
+    brought_by=user.username,
     created_by=user.id,
     payment_status="غير مدفوعة",
     transaction_type="vehicle",
@@ -1207,7 +1248,11 @@ def commissions_page():
     query = Transaction.query.filter(Transaction.payment_status == "مدفوعة")
 
     if selected_user_id:
-        query = query.filter(Transaction.created_by == int(selected_user_id))
+        # احتساب عمولة حسب من جلب المعاملة
+        sel_user = User.query.get(int(selected_user_id))
+        sel_username = sel_user.username if sel_user else None
+        if sel_username:
+            query = query.filter(Transaction.brought_by == sel_username)
 
     transactions = query.all()
 
@@ -1788,6 +1833,9 @@ def add_transaction_engineer():
         client_name = (request.form.get("client_name") or "").strip()
         client_phone = (request.form.get("client_phone") or "").strip()
         fee = float(request.form.get("fee") or 0)
+        # 🆕 الحقول الجديدة
+        brought_by = (request.form.get("brought_by") or "").strip()
+        visited_by = (request.form.get("visited_by") or "").strip()
 
         # ✅ تحقق من رقم العميل
         if not client_phone:
@@ -1865,6 +1913,8 @@ def add_transaction_engineer():
                 bank_id=bank_id,
                 bank_branch=bank_branch,
                 bank_employee_name=bank_employee_name,
+                brought_by=brought_by,
+                visited_by=visited_by,
                 created_by=user.id,
                 transaction_type="real_estate",
                 payment_status="غير مدفوعة",
@@ -1904,6 +1954,8 @@ def add_transaction_engineer():
                 bank_id=bank_id,
                 bank_branch=bank_branch,
                 bank_employee_name=bank_employee_name,
+                brought_by=brought_by,
+                visited_by=visited_by,
 
                 assigned_to=None   # ✅
             )
@@ -4242,6 +4294,24 @@ with app.app_context():
             db.session.execute(text("ALTER TABLE transaction ADD COLUMN bank_employee_name VARCHAR(120)"))
             db.session.commit()
             print("✅ تمت إضافة عمود bank_employee_name")
+    except Exception:
+        db.session.rollback()
+
+    # محاولة إضافة عمود brought_by للمعاملات إذا كان الجدول قديم
+    try:
+        if not column_exists("transaction", "brought_by"):
+            db.session.execute(text("ALTER TABLE transaction ADD COLUMN brought_by VARCHAR(120)"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود brought_by")
+    except Exception:
+        db.session.rollback()
+
+    # محاولة إضافة عمود visited_by للمعاملات إذا كان الجدول قديم
+    try:
+        if not column_exists("transaction", "visited_by"):
+            db.session.execute(text("ALTER TABLE transaction ADD COLUMN visited_by VARCHAR(120)"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود visited_by")
     except Exception:
         db.session.rollback()
 
