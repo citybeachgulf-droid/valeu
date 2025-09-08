@@ -4523,7 +4523,7 @@ def employee_income():
         employee = User.query.get(emp_id)
         selected_emp = employee.username if employee else None
 
-        query = Transaction.query.filter_by(employee=selected_emp)
+        query = Transaction.query.filter(Transaction.brought_by == selected_emp)
         if start_date:
             query = query.filter(Transaction.date >= start_date)
         if end_date:
