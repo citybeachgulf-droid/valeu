@@ -1244,25 +1244,27 @@ def commissions_page():
     if not role:
         return redirect(url_for("login"))
 
-    # 🔹 إذا كان المدير → يقدر يفلتر بالموظفين
-    selected_user_id = None
+    # 🔹 إذا كان المدير → يقدر يفلتر بالأسماء التي جلبت معاملات
+    selected_brought_by = None
+    brought_by_names = []
     if role == "manager":
+        # اجلب كل الأسماء التي جلبت معاملات (بدون تكرار)
+        raw_names = db.session.query(Transaction.brought_by)\
+            .filter(Transaction.brought_by.isnot(None), Transaction.brought_by != "")\
+            .distinct().all()
+        # نظف وميّز الأسماء
+        brought_by_names = sorted({name.strip() for (name,) in raw_names if name and name.strip()})
         if request.method == "POST":
-            selected_user_id = request.form.get("user_id")
-        users = User.query.filter(User.role == "employee").all()
+            selected_brought_by = request.form.get("brought_by") or None
     else:
         # الموظف يشوف بياناته فقط
-        selected_user_id = session["user_id"]
-        users = []
+        selected_brought_by = session.get("username")
 
     query = Transaction.query.filter(Transaction.payment_status == "مدفوعة")
 
-    if selected_user_id:
+    if selected_brought_by:
         # احتساب عمولة حسب من جلب المعاملة
-        sel_user = User.query.get(int(selected_user_id))
-        sel_username = sel_user.username if sel_user else None
-        if sel_username:
-            query = query.filter(Transaction.brought_by == sel_username)
+        query = query.filter(Transaction.brought_by == selected_brought_by)
 
     transactions = query.all()
 
@@ -1288,9 +1290,9 @@ def commissions_page():
 
     return render_template(
         "commission.html",
-        users=users,
+        brought_by_names=brought_by_names,
         role=role,
-        selected_user_id=selected_user_id,
+        selected_brought_by=selected_brought_by,
         real_estate_count=real_estate_count,
         real_estate_income=real_estate_income,
         vehicle_count=vehicle_count,
