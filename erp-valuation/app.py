@@ -3067,6 +3067,16 @@ def finance_update_bank_invoice_status(invoice_id: int):
         db.session.commit()
         flash("✅ تم تحديث حالة الفاتورة: تم التسليم", "success")
     elif action == "receive":
+        # ✅ يجب رفع إيصال الاستلام من البنك
+        receipt = request.files.get("receipt_file")
+        if not receipt or not receipt.filename:
+            flash("⛔ إيصال الاستلام من البنك مطلوب", "danger")
+            return redirect(url_for("finance_dashboard"))
+
+        # حفظ الإيصال
+        filename = secure_filename(receipt.filename)
+        receipt.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+
         invoice.received_at = datetime.utcnow()
         db.session.commit()
 
@@ -3089,6 +3099,7 @@ def finance_update_bank_invoice_status(invoice_id: int):
                         date_received=datetime.utcnow(),
                         received_by=session.get("username"),
                         branch_id=t.branch_id,
+                        receipt_file=filename,
                     )
                     db.session.add(p)
                     db.session.commit()
@@ -3118,6 +3129,7 @@ def finance_update_bank_invoice_status(invoice_id: int):
                     date_received=datetime.utcnow(),
                     received_by=session.get("username"),
                     branch_id=finance_branch_id,
+                    receipt_file=filename,
                 )
                 db.session.add(p)
                 db.session.commit()
@@ -4523,7 +4535,7 @@ def employee_income():
         employee = User.query.get(emp_id)
         selected_emp = employee.username if employee else None
 
-        query = Transaction.query.filter_by(employee=selected_emp)
+        query = Transaction.query.filter(Transaction.brought_by == selected_emp)
         if start_date:
             query = query.filter(Transaction.date >= start_date)
         if end_date:

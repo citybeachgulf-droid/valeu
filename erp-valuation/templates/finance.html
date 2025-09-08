@@ -119,8 +119,9 @@
                           </form>
                           {% endif %}
                           {% if inv.delivered_at and not inv.received_at %}
-                          <form method="post" action="{{ url_for('finance_update_bank_invoice_status', invoice_id=inv.id) }}">
+                          <form method="post" action="{{ url_for('finance_update_bank_invoice_status', invoice_id=inv.id) }}" enctype="multipart/form-data" class="d-flex gap-2 align-items-center">
                             <input type="hidden" name="action" value="receive">
+                            <input type="file" name="receipt_file" class="form-control form-control-sm" accept=".jpg,.jpeg,.png,.pdf" required>
                             <button class="btn btn-sm btn-success">استلام</button>
                           </form>
                           {% endif %}
