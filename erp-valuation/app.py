@@ -1211,7 +1211,11 @@ def commissions_page():
     query = Transaction.query.filter(Transaction.payment_status == "مدفوعة")
 
     if selected_user_id:
-        query = query.filter(Transaction.created_by == int(selected_user_id))
+        # احتساب عمولة حسب من جلب المعاملة
+        sel_user = User.query.get(int(selected_user_id))
+        sel_username = sel_user.username if sel_user else None
+        if sel_username:
+            query = query.filter(Transaction.brought_by == sel_username)
 
     transactions = query.all()
 

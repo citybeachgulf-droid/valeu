@@ -41,6 +41,8 @@
     <div class="card-body">
       <p><strong>العميل:</strong> {{ t.client }}</p>
       <p><strong>الموظف المدخل:</strong> {{ t.employee }}</p>
+      <p><strong>من جلب المعاملة:</strong> {{ t.brought_by or '-' }}</p>
+      <p><strong>من قام بالزيارة:</strong> {{ t.visited_by or '-' }}</p>
       <p><strong>التاريخ:</strong> {{ t.date.strftime("%Y-%m-%d %H:%M") }}</p>
       <p><strong>الفرع:</strong> {{ t.branch.name if t.branch else "غير محدد" }}</p>
       <p><strong>الحالة الحالية:</strong> {{ t.status }}</p>
