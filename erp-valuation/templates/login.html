@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
-{% set title = 'تسجيل دخول الموظف' %}
+{% set title = 'تسجيل الدخول ' %}
 
 {% block body_class %}login-gradient d-flex justify-content-center align-items-center vh-100{% endblock %}
 
 {% block content %}
   <div class="card shadow p-4 animate__animated animate__fadeInUp" data-aos="zoom-in" style="min-width:350px">
-    <h4 class="mb-3 text-center fw-bold">👨‍💼 دخول الموظف</h4>
+    <h4 class="mb-3 text-center fw-bold">👨‍💼 تسجيل الدخول</h4>
     <form method="post" action="{{ url_for('login') }}">
       <div class="mb-3">
         <label class="form-label">اسم المستخدم</label>
@@ -21,3 +21,4 @@
     </form>
   </div>
 {% endblock %}
+
