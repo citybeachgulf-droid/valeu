@@ -33,7 +33,23 @@
 {% block content %}
   <div class="container mt-5">
     <h2 class="text-center mb-5" data-aos="fade-up">📌 لوحة البيانات</h2>
-    <div class="row mb-4">
+    <form method="GET" class="row g-2 mb-3">
+      <div class="col-12 col-md-3">
+        <label class="form-label">من تاريخ</label>
+        <input type="date" name="start_date" class="form-control" value="{{ start_date or '' }}">
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label">إلى تاريخ</label>
+        <input type="date" name="end_date" class="form-control" value="{{ end_date or '' }}">
+      </div>
+      <div class="col-12 col-md-3 d-flex align-items-end">
+        <button class="btn btn-outline-primary w-100">تطبيق الفترة</button>
+      </div>
+      <div class="col-12 col-md-3 d-flex align-items-end">
+        <a class="btn btn-outline-secondary w-100" href="{{ url_for('employee_dashboard') }}">مسح الفلتر</a>
+      </div>
+    </form>
+    <div class="row mb-3">
       <div class="col-md-6 mb-2">
         <div class="alert alert-secondary">
           🏠 عدد معاملات العقار التي جلبتها: <strong>{{ real_estate_brought_count }}</strong>

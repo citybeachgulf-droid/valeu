@@ -961,17 +961,34 @@ def employee_dashboard():
     # 🧮 إحصائيات حسب من جلب المعاملة (هذا الموظف)
     current_user = User.query.get(session.get("user_id"))
     brought_name = current_user.username if current_user else None
+    # فلترة فترة زمنية اختيارية من واجهة المستخدم
+    start_date_str = request.args.get("start_date")
+    end_date_str = request.args.get("end_date")
+    start_date = None
+    end_date = None
+    try:
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+        if end_date_str:
+            # اجعل نهاية اليوم شاملة
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d") + timedelta(days=1)
+    except Exception:
+        start_date = None
+        end_date = None
+
+    def base_brought_query(ttype: str):
+        q = Transaction.query.filter(Transaction.brought_by == brought_name, Transaction.transaction_type == ttype)
+        if start_date:
+            q = q.filter(Transaction.date >= start_date)
+        if end_date:
+            q = q.filter(Transaction.date < end_date)
+        return q
+
     real_estate_brought_count = 0
     vehicle_brought_count = 0
     if brought_name:
-        real_estate_brought_count = Transaction.query.filter(
-            Transaction.brought_by == brought_name,
-            Transaction.transaction_type == "real_estate"
-        ).count()
-        vehicle_brought_count = Transaction.query.filter(
-            Transaction.brought_by == brought_name,
-            Transaction.transaction_type == "vehicle"
-        ).count()
+        real_estate_brought_count = base_brought_query("real_estate").count()
+        vehicle_brought_count = base_brought_query("vehicle").count()
     banks = Bank.query.all()
 
     # مستندات الفرع الخاصة بالموظف
@@ -995,6 +1012,8 @@ def employee_dashboard():
         price_per_meter=price_per_meter,
         docs=branch_docs,
         status_for=document_status,
+        start_date=start_date_str,
+        end_date=end_date_str,
         real_estate_brought_count=real_estate_brought_count,
         vehicle_brought_count=vehicle_brought_count
     )
