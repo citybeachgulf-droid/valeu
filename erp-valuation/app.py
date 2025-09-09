@@ -205,6 +205,31 @@ def api_transactions_version():
     return jsonify({"version": TRANSACTIONS_VERSION, "ts": int(datetime.utcnow().timestamp())})
 
 # -------- تجزئة الملفات للتحقق من سلامتها --------
+
+# ---------------- توليد رقم فاتورة فريد ----------------
+def generate_unique_invoice_number(prefix: str = "INV", kind: str | None = None) -> str:
+    """يولّد رقم فاتورة فريدًا على مستوى النظام بشكل متسلسل سنويًا.
+
+    التنسيق: {prefix}-{YYYY}{optional-kind}-{NNNNN}
+    أمثلة: INV-2025-00001 أو INV-2025-CUST-00042
+    يضمن عدم التكرار عبر جميع أنواع الفواتير باستخدام جدول invoice_sequence.
+    """
+    current_year = datetime.utcnow().year
+    # احصل/أنشئ صف السنة الحالية
+    seq = InvoiceSequence.query.filter_by(year=current_year).first()
+    if not seq:
+        seq = InvoiceSequence(year=current_year, last_number=0)
+        db.session.add(seq)
+        db.session.commit()
+
+    # زد الرقم المتسلسل
+    seq.last_number = int(seq.last_number or 0) + 1
+    db.session.commit()
+
+    serial = f"{seq.last_number:05d}"
+    if kind:
+        return f"{prefix}-{current_year}-{kind}-{serial}"
+    return f"{prefix}-{current_year}-{serial}"
 def compute_file_sha256(file_path: str) -> str:
     """إرجاع بصمة SHA-256 لملف كبير بطريقة فعّالة بالذاكرة."""
     sha256 = hashlib.sha256()
@@ -498,6 +523,13 @@ class ReportTemplate(db.Model):
     file = db.Column(db.String(255), nullable=True)  # مسار ملف DOCX المرفوع إن وُجد
 
 
+# تسلسل رقمي عام للفواتير بحسب السنة
+class InvoiceSequence(db.Model):
+    __tablename__ = "invoice_sequence"
+    id = db.Column(db.Integer, primary_key=True)
+    year = db.Column(db.Integer, unique=True, nullable=False)
+    last_number = db.Column(db.Integer, nullable=False, default=0)
+
 # فواتير البنك بمراحلها
 class BankInvoice(db.Model):
     __tablename__ = "bank_invoice"
@@ -509,6 +541,8 @@ class BankInvoice(db.Model):
     delivered_at = db.Column(db.DateTime, nullable=True)  # المرحلة 2: تسليم
     received_at = db.Column(db.DateTime, nullable=True)   # المرحلة 3: استلام المبلغ
     note = db.Column(db.String(255))
+    # رقم فاتورة موحّد عبر النظام
+    invoice_number = db.Column(db.String(50), unique=True, nullable=True)
 
 class Quote(db.Model):
     __tablename__ = "quote"
@@ -530,6 +564,8 @@ class CustomerInvoice(db.Model):
     transaction_id = db.Column(db.Integer, db.ForeignKey("transaction.id"), nullable=True)
     note = db.Column(db.String(255))
     created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    # رقم فاتورة موحّد عبر النظام
+    invoice_number = db.Column(db.String(50), unique=True, nullable=True)
 
 class CustomerQuote(db.Model):
     __tablename__ = "customer_quote"
@@ -2472,8 +2508,11 @@ def _render_docx_from_template(doc_type: str, placeholders: dict, out_name: str,
 
 
 def _get_vat_rate() -> float:
-    # ثابت: ضريبة قيمة مضافة 5%
-    return 0.05
+    # يمكن ضبطها عبر متغير البيئة VAT_RATE كقيمة عشرية (مثال 0.05)
+    try:
+        return float(os.environ.get("VAT_RATE", "0.05"))
+    except Exception:
+        return 0.05
 
 
 def _compute_tax_and_total(base_amount: float) -> tuple[float, float]:
@@ -2682,8 +2721,16 @@ def print_bank_invoice_html(invoice_id: int):
 
     bank_name = bank.name if bank else None
     amount = float(inv.amount or 0)
-    tax, total_with_tax = _compute_tax_and_total(amount)
     details_override = (request.args.get("details") or "").strip()
+    # ضريبة اختيارية
+    apply_vat = (request.args.get("apply_vat") or "1") == "1"
+    vat_percent = request.args.get("vat")
+    if vat_percent is not None:
+        try:
+            os.environ["VAT_RATE"] = str(float(vat_percent) / 100.0)
+        except Exception:
+            pass
+    tax, total_with_tax = _compute_tax_and_total(amount) if apply_vat else (0.0, amount)
 
     org_name = "شركة التثمين"
     org_meta = "العنوان · الهاتف · البريد الإلكتروني"
@@ -2703,7 +2750,7 @@ def print_bank_invoice_html(invoice_id: int):
         notes=_sanitize_description(details_override or (inv.note or ""), transaction),
         # metadata for header
         badge_label="فاتورة",
-        invoice_code=f"INV-BANK-{inv.id}",
+        invoice_code=(inv.invoice_number or f"INV-BANK-{inv.id}"),
         reference_code="INV-BANK",
         client_name=(transaction.client if transaction else (bank_name or "")),
         employee_name=(transaction.employee if transaction else "-"),
@@ -2724,8 +2771,16 @@ def print_customer_invoice_html(invoice_id: int):
         bank_name = bank.name if bank else None
 
     amount = float(inv.amount or 0)
-    tax, total_with_tax = _compute_tax_and_total(amount)
     details_override = (request.args.get("details") or "").strip()
+    # ضريبة اختيارية
+    apply_vat = (request.args.get("apply_vat") or "1") == "1"
+    vat_percent = request.args.get("vat")
+    if vat_percent is not None:
+        try:
+            os.environ["VAT_RATE"] = str(float(vat_percent) / 100.0)
+        except Exception:
+            pass
+    tax, total_with_tax = _compute_tax_and_total(amount) if apply_vat else (0.0, amount)
 
     org_name = "شركة التثمين"
     org_meta = "العنوان · الهاتف · البريد الإلكتروني"
@@ -2745,7 +2800,7 @@ def print_customer_invoice_html(invoice_id: int):
         notes=_sanitize_description(details_override or (inv.note or ""), transaction),
         # metadata for header
         badge_label="فاتورة",
-        invoice_code=f"INV-CUST-{inv.id}",
+        invoice_code=(inv.invoice_number or f"INV-CUST-{inv.id}"),
         reference_code="INV-CUST",
         client_name=(inv.customer_name or (transaction.client if transaction else "")),
         employee_name=(transaction.employee if transaction else "-"),
@@ -2810,7 +2865,15 @@ def download_bank_invoice_doc(invoice_id: int):
         preferred_branch_id = getattr(user, "branch_id", None)
 
     amount = float(inv.amount or 0)
-    tax, total_with_tax = _compute_tax_and_total(amount)
+    # ضريبة اختيارية عبر الاستعلام
+    apply_vat = (request.args.get("apply_vat") or "1") == "1"
+    vat_percent = request.args.get("vat")
+    if vat_percent is not None:
+        try:
+            os.environ["VAT_RATE"] = str(float(vat_percent) / 100.0)
+        except Exception:
+            pass
+    tax, total_with_tax = _compute_tax_and_total(amount) if apply_vat else (0.0, amount)
     placeholders = {
         "NAME": (bank.name if bank else f"Bank #{inv.bank_id}"),
         "CLIENT_NAME": (bank.name if bank else f"Bank #{inv.bank_id}"),
@@ -2822,7 +2885,7 @@ def download_bank_invoice_doc(invoice_id: int):
         "TOTAL": f"{amount:.2f}",
         "DATE": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
         "DETAILS": _sanitize_description(inv.note or "", transaction),
-        "INVOICE_NO": f"INV-BANK-{inv.id}",
+        "INVOICE_NO": (inv.invoice_number or f"INV-BANK-{inv.id}"),
         "TRANSACTION_ID": str(inv.transaction_id or ""),
         "BANK_NAME": (bank.name if bank else ""),
     }
@@ -2866,7 +2929,14 @@ def download_customer_invoice_doc(invoice_id: int):
         preferred_branch_id = getattr(user, "branch_id", None)
 
     amount = float(inv.amount or 0)
-    tax, total_with_tax = _compute_tax_and_total(amount)
+    apply_vat = (request.args.get("apply_vat") or "1") == "1"
+    vat_percent = request.args.get("vat")
+    if vat_percent is not None:
+        try:
+            os.environ["VAT_RATE"] = str(float(vat_percent) / 100.0)
+        except Exception:
+            pass
+    tax, total_with_tax = _compute_tax_and_total(amount) if apply_vat else (0.0, amount)
     placeholders = {
         "NAME": inv.customer_name or "",
         "CLIENT_NAME": inv.customer_name or "",
@@ -2878,7 +2948,7 @@ def download_customer_invoice_doc(invoice_id: int):
         "TOTAL": f"{amount:.2f}",
         "DATE": (inv.issued_at or datetime.utcnow()).strftime("%Y-%m-%d"),
         "DETAILS": _sanitize_description(inv.note or "", transaction),
-        "INVOICE_NO": f"INV-CUST-{inv.id}",
+        "INVOICE_NO": (inv.invoice_number or f"INV-CUST-{inv.id}"),
         "TRANSACTION_ID": str(inv.transaction_id or ""),
     }
     if transaction:
@@ -3052,6 +3122,18 @@ def finance_create_bank_invoice():
     )
     db.session.add(inv)
     db.session.commit()
+
+    # توليد رقم فاتورة فريد بعد إنشاء السجل والحصول على id
+    try:
+        inv.invoice_number = generate_unique_invoice_number(prefix="INV", kind="BANK")
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        try:
+            inv.invoice_number = generate_unique_invoice_number(prefix="INV")
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
     flash("✅ تم إنشاء فاتورة البنك", "success")
     return redirect(url_for("print_bank_invoice_html", invoice_id=inv.id) + "?auto=1")
 
@@ -3197,17 +3279,55 @@ def finance_create_customer_invoice():
         flash("⛔ اسم العميل مطلوب", "danger")
         return redirect(url_for("finance_dashboard"))
 
+    # ربط تلقائي بأحدث معاملة تحمل نفس اسم العميل إن لم يُحدد transaction_id
+    resolved_transaction_id = None
+    try:
+        resolved_transaction_id = int(transaction_id) if transaction_id else None
+    except Exception:
+        resolved_transaction_id = None
+    if not resolved_transaction_id and customer_name:
+        try:
+            candidate_tx = Transaction.query \
+                .filter(Transaction.client == customer_name) \
+                .order_by(Transaction.id.desc()).first()
+            if candidate_tx:
+                resolved_transaction_id = candidate_tx.id
+        except Exception:
+            resolved_transaction_id = None
+
     inv = CustomerInvoice(
         customer_name=customer_name,
         amount=amount,
         note=note,
-        transaction_id=int(transaction_id) if transaction_id else None,
+        transaction_id=resolved_transaction_id,
         created_by=session.get("user_id"),
     )
     db.session.add(inv)
     db.session.commit()
+
+    # توليد رقم فاتورة فريد
+    try:
+        inv.invoice_number = generate_unique_invoice_number(prefix="INV", kind="CUST")
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        try:
+            inv.invoice_number = generate_unique_invoice_number(prefix="INV")
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+    # تمرير مدخلات الضريبة للطباعة إن وُجدت
+    apply_vat = (request.form.get("apply_vat") or "1")
+    vat_percent = request.form.get("vat")
+    qp = {
+        "auto": "1",
+        "apply_vat": apply_vat,
+    }
+    if vat_percent:
+        qp["vat"] = str(vat_percent)
+    from urllib.parse import urlencode
     flash("✅ تم إنشاء فاتورة العميل", "success")
-    return redirect(url_for("print_customer_invoice_html", invoice_id=inv.id) + "?auto=1")
+    return redirect(url_for("print_customer_invoice_html", invoice_id=inv.id) + "?" + urlencode(qp))
 
 # ---------------- صفحة البنوك: نظرة عامة ----------------
 @app.route("/banks")
@@ -4217,7 +4337,8 @@ with app.app_context():
                     issued_at TIMESTAMP,
                     delivered_at TIMESTAMP,
                     received_at TIMESTAMP,
-                    note VARCHAR(255)
+                    note VARCHAR(255),
+                    invoice_number VARCHAR(50) UNIQUE
                 )
                 """
             ))
@@ -4288,12 +4409,32 @@ with app.app_context():
                     issued_at TIMESTAMP,
                     transaction_id INTEGER,
                     note VARCHAR(255),
-                    created_by INTEGER
+                    created_by INTEGER,
+                    invoice_number VARCHAR(50) UNIQUE
                 )
                 """
             ))
             db.session.commit()
             print("✅ تم إنشاء جدول customer_invoice")
+        except Exception:
+            db.session.rollback()
+
+    # محاولة إنشاء جدول invoice_sequence إذا غير موجود
+    try:
+        db.session.execute(text("SELECT 1 FROM invoice_sequence LIMIT 1"))
+    except Exception:
+        try:
+            db.session.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS invoice_sequence (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    year INTEGER UNIQUE NOT NULL,
+                    last_number INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            ))
+            db.session.commit()
+            print("✅ تم إنشاء جدول invoice_sequence")
         except Exception:
             db.session.rollback()
 
@@ -4304,6 +4445,31 @@ with app.app_context():
             db.session.execute(text("ALTER TABLE transaction ADD COLUMN bank_sent_files TEXT"))
             db.session.commit()
             print("✅ تمت إضافة عمود bank_sent_files")
+    except Exception:
+        db.session.rollback()
+
+    try:
+        if not column_exists("bank_invoice", "invoice_number"):
+            db.session.execute(text("ALTER TABLE bank_invoice ADD COLUMN invoice_number VARCHAR(50)"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود invoice_number إلى bank_invoice")
+    except Exception:
+        db.session.rollback()
+
+    try:
+        if not column_exists("customer_invoice", "invoice_number"):
+            db.session.execute(text("ALTER TABLE customer_invoice ADD COLUMN invoice_number VARCHAR(50)"))
+            db.session.commit()
+            print("✅ تمت إضافة عمود invoice_number إلى customer_invoice")
+    except Exception:
+        db.session.rollback()
+
+    # إضافة قيد فريد إذا كان مدعومًا (SQLite لا يدعم بسهولة ALTER ADD CONSTRAINT)
+    # لذلك نكتفي بفهرس فريد عبر CREATE UNIQUE INDEX إذا لم يوجد
+    try:
+        db.session.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_bank_invoice_number ON bank_invoice(invoice_number)"))
+        db.session.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_invoice_number ON customer_invoice(invoice_number)"))
+        db.session.commit()
     except Exception:
         db.session.rollback()
 
