@@ -1418,6 +1418,28 @@ def manager_dashboard():
         BranchDocument.expires_at <= (now + timedelta(days=30))
     ).order_by(BranchDocument.expires_at.asc()).all()
 
+    # ⚠️ معاملات متأخرة (5 ساعات)
+    five_hours_ago = now - timedelta(hours=5)
+    # 1) صار لها 5 ساعات ولم يتم استلامها من المهندس
+    delayed_not_received = Transaction.query.filter(
+        Transaction.transaction_type == "real_estate",
+        Transaction.status == "بانتظار المهندس",
+        or_(Transaction.assigned_to == None, Transaction.assigned_to.is_(None)),
+        Transaction.date <= five_hours_ago,
+    ).order_by(Transaction.date.asc()).all()
+
+    # 2) تم استلامها (قيد المعاينة/التنفيذ) منذ 5 ساعات لكن لم يُرفع التقرير بعد
+    delayed_received_no_report = Transaction.query.filter(
+        Transaction.transaction_type == "real_estate",
+        Transaction.status.in_(["قيد المعاينة", "قيد التنفيذ"]),
+        Transaction.date <= five_hours_ago,
+        and_(
+            or_(Transaction.report_file == None, func.length(func.trim(Transaction.report_file)) == 0),
+            or_(Transaction.engineer_report == None, func.length(func.trim(Transaction.engineer_report)) == 0),
+            or_(Transaction.report_b2_file_name == None, func.length(func.trim(Transaction.report_b2_file_name)) == 0),
+        ),
+    ).order_by(Transaction.date.asc()).all()
+
     # بيانات مساعدة لرفع قوالب الفواتير مباشرة من لوحة المدير
     current_user = User.query.get(session.get("user_id"))
     current_branch_id = getattr(current_user, "branch_id", None)
@@ -1431,6 +1453,8 @@ def manager_dashboard():
         vapid_public_key=VAPID_PUBLIC_KEY,
         net_profit=sum(b["profit"] for b in branches_data),
         expiring_docs=expiring_docs,
+        delayed_not_received=delayed_not_received,
+        delayed_received_no_report=delayed_received_no_report,
         template_branches=template_branches,
         current_branch_id=current_branch_id
     )
