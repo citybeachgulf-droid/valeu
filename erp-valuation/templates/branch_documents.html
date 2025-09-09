@@ -74,12 +74,18 @@
               <td>
                 <div class="btn-group btn-group-sm" role="group">
                   {% set b2url = build_b2_public_url(d.b2_file_name) if d.b2_file_name else None %}
-                  {% if b2url %}
-                    <a href="{{ b2url }}" class="btn btn-outline-primary" target="_blank">عرض</a>
-                    <a href="{{ url_for('download_b2_file') }}?file={{ d.b2_file_name }}" class="btn btn-outline-secondary">تنزيل</a>
-                  {% elif d.file %}
-                    <a href="{{ url_for('uploaded_file', filename=d.file) }}" class="btn btn-outline-primary" target="_blank">عرض</a>
-                    <a href="{{ url_for('download_local_file', filename=d.file) }}" class="btn btn-outline-secondary">تنزيل</a>
+                  {% if b2url or d.file %}
+                    {% set src = b2url if b2url else url_for('uploaded_file', filename=d.file, _external=True) %}
+                    {% set name = d.b2_file_name if b2url else d.file %}
+                    {% set ext = (name.rsplit('.', 1)[1] | lower) if (name and '.' in name) else '' %}
+                    {% set office_exts = ['doc','docx','xls','xlsx','ppt','pptx'] %}
+                    {% set view_href = ('https://view.officeapps.live.com/op/view.aspx?src=' ~ (src | urlencode)) if ext in office_exts else src %}
+                    <a href="{{ view_href }}" class="btn btn-outline-primary" target="_blank">عرض</a>
+                    {% if b2url %}
+                      <a href="{{ url_for('download_b2_file') }}?file={{ d.b2_file_name }}" class="btn btn-outline-secondary">تنزيل</a>
+                    {% else %}
+                      <a href="{{ url_for('download_local_file', filename=d.file) }}" class="btn btn-outline-secondary">تنزيل</a>
+                    {% endif %}
                   {% else %}
                     -
                   {% endif %}
