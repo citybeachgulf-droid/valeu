@@ -3789,7 +3789,20 @@ def public_report(token):
 # ---------------- عرض الملفات ----------------
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
-    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    resp = send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    try:
+        # Ensure inline display in browser tabs instead of forced download
+        basename = os.path.basename(filename)
+        resp.headers["Content-Disposition"] = f'inline; filename="{basename}"'
+        # Make sure Content-Type is set appropriately for better inline rendering
+        if not resp.headers.get("Content-Type") or resp.headers.get("Content-Type") == "application/octet-stream":
+            import mimetypes
+            guessed, _ = mimetypes.guess_type(basename)
+            if guessed:
+                resp.headers["Content-Type"] = guessed
+    except Exception:
+        pass
+    return resp
 
 # تنزيل ملف محلي من مجلد الرفع مع إجبار التنزيل
 @app.route("/download/local/<path:filename>")
