@@ -58,6 +58,58 @@
   </div>
   {% endif %}
 
+  {% if (delayed_not_received and delayed_not_received|length) or (delayed_received_no_report and delayed_received_no_report|length) %}
+  <div class="row mb-4" data-aos="fade-up">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+          <span>⏱️ معاملات متأخرة (أكثر من 5 ساعات)</span>
+          <span class="badge bg-light text-dark">
+            {{ (delayed_not_received|length if delayed_not_received else 0) + (delayed_received_no_report|length if delayed_received_no_report else 0) }}
+          </span>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-12 col-md-6">
+              <h6 class="mb-2">لم يتم استلامها</h6>
+              <div class="list-group">
+                {% for t in delayed_not_received %}
+                <a href="{{ url_for('transaction_detail', tid=t.id) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                  <div class="me-2 text-truncate">
+                    <div class="fw-semibold">#{{ t.id }} · {{ t.client or '-' }}</div>
+                    <div class="small text-muted">منذ: {{ t.date|ago }}</div>
+                  </div>
+                  <span class="badge bg-secondary">بانتظار المهندس</span>
+                </a>
+                {% else %}
+                <div class="text-muted small">لا توجد</div>
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <h6 class="mb-2">تم استلامها ولم يُرفع تقرير</h6>
+              <div class="list-group">
+                {% for t in delayed_received_no_report %}
+                <a href="{{ url_for('transaction_detail', tid=t.id) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                  <div class="me-2 text-truncate">
+                    <div class="fw-semibold">#{{ t.id }} · {{ t.client or '-' }}</div>
+                    <div class="small text-muted">منذ: {{ t.date|ago }}</div>
+                  </div>
+                  <span class="badge bg-warning text-dark">{{ t.status }}</span>
+                </a>
+                {% else %}
+                <div class="text-muted small">لا توجد</div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <h4 class="mb-3 text-center" data-aos="fade-up">📋 جميع المعاملات</h4>
   <div class="row">
     {% for t in transactions %}

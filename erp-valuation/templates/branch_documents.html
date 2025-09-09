@@ -53,7 +53,7 @@
               <th>الإصدار</th>
               <th>الانتهاء</th>
               <th>الحالة</th>
-              <th>عرض</th>
+              <th>الملف</th>
             </tr>
           </thead>
           <tbody>
@@ -72,12 +72,18 @@
                 {% else %}<span class="badge bg-success">ساري</span>{% endif %}
               </td>
               <td>
-                {% set b2url = build_b2_public_url(d.b2_file_name) if d.b2_file_name else None %}
-                {% if b2url %}
-                <a href="{{ b2url }}" class="btn btn-sm btn-outline-primary" target="_blank">فتح</a>
-                {% elif d.file %}
-                <a href="{{ url_for('uploaded_file', filename=d.file) }}" class="btn btn-sm btn-outline-primary" target="_blank">فتح</a>
-                {% else %}-{% endif %}
+                <div class="btn-group btn-group-sm" role="group">
+                  {% set b2url = build_b2_public_url(d.b2_file_name) if d.b2_file_name else None %}
+                  {% if b2url %}
+                    <a href="{{ b2url }}" class="btn btn-outline-primary" target="_blank">عرض</a>
+                    <a href="{{ url_for('download_b2_file') }}?file={{ d.b2_file_name }}" class="btn btn-outline-secondary">تنزيل</a>
+                  {% elif d.file %}
+                    <a href="{{ url_for('uploaded_file', filename=d.file) }}" class="btn btn-outline-primary" target="_blank">عرض</a>
+                    <a href="{{ url_for('download_local_file', filename=d.file) }}" class="btn btn-outline-secondary">تنزيل</a>
+                  {% else %}
+                    -
+                  {% endif %}
+                </div>
               </td>
             </tr>
             {% else %}
