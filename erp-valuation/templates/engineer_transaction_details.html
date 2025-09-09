@@ -116,7 +116,12 @@
       {% if t.files %}
         <ul>
           {% for f in t.files.split(",") %}
-            <li><a href="{{ url_for('uploaded_file', filename=f) }}" target="_blank">{{ f }}</a></li>
+            {% set name = f %}
+            {% set ext = (name.rsplit('.', 1)[1] | lower) if (name and '.' in name) else '' %}
+            {% set office_exts = ['doc','docx','xls','xlsx','ppt','pptx'] %}
+            {% set src = url_for('uploaded_file', filename=f, _external=True) %}
+            {% set view_href = ('https://view.officeapps.live.com/op/view.aspx?src=' ~ (src | urlencode)) if ext in office_exts else src %}
+            <li><a href="{{ view_href }}" target="_blank">{{ f }}</a></li>
           {% endfor %}
         </ul>
       {% else %}

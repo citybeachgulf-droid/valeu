@@ -302,7 +302,13 @@
                         {% if b2url %}
                           <a href="{{ b2url }}" target="_blank">فتح</a>
                         {% elif d.file %}
-                          <a href="{{ url_for('uploaded_file', filename=d.file) }}" target="_blank">فتح</a>
+                          {# Force inline view for Office docs via Office Viewer; otherwise direct #}
+                          {% set name = d.file %}
+                          {% set ext = (name.rsplit('.', 1)[1] | lower) if (name and '.' in name) else '' %}
+                          {% set office_exts = ['doc','docx','xls','xlsx','ppt','pptx'] %}
+                          {% set src = url_for('uploaded_file', filename=d.file, _external=True) %}
+                          {% set view_href = ('https://view.officeapps.live.com/op/view.aspx?src=' ~ (src | urlencode)) if ext in office_exts else src %}
+                          <a href="{{ view_href }}" target="_blank">فتح</a>
                         {% else %}
                           —
                         {% endif %}

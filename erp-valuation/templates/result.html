@@ -26,7 +26,12 @@
     </div>
 
     {% if filename %}
-      <a class="btn btn-outline-secondary mt-3" href="/uploads/{{ filename }}" target="_blank">📂 عرض المستند المرفوع</a>
+      {% set name = filename %}
+      {% set ext = (name.rsplit('.', 1)[1] | lower) if (name and '.' in name) else '' %}
+      {% set office_exts = ['doc','docx','xls','xlsx','ppt','pptx'] %}
+      {% set src = url_for('uploaded_file', filename=filename, _external=True) %}
+      {% set view_href = ('https://view.officeapps.live.com/op/view.aspx?src=' ~ (src | urlencode)) if ext in office_exts else src %}
+      <a class="btn btn-outline-secondary mt-3" href="{{ view_href }}" target="_blank">📂 عرض المستند المرفوع</a>
     {% endif %}
 
     <div class="mt-3">
