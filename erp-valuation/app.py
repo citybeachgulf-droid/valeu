@@ -3274,6 +3274,7 @@ def finance_create_customer_invoice():
     amount = float(request.form.get("amount") or 0)
     note = request.form.get("note")
     transaction_id = request.form.get("transaction_id")
+    user = User.query.get(session["user_id"]) if session.get("user_id") else None
 
     if not customer_name:
         flash("⛔ اسم العميل مطلوب", "danger")
@@ -3287,9 +3288,11 @@ def finance_create_customer_invoice():
         resolved_transaction_id = None
     if not resolved_transaction_id and customer_name:
         try:
-            candidate_tx = Transaction.query \
-                .filter(Transaction.client == customer_name) \
-                .order_by(Transaction.id.desc()).first()
+            # أحدث معاملة غير مدفوعة بنفس اسم العميل وضمن نفس فرع المستخدم المالي
+            tx_query = Transaction.query.filter_by(client=customer_name, payment_status="غير مدفوعة")
+            if user and getattr(user, "branch_id", None) is not None:
+                tx_query = tx_query.filter(Transaction.branch_id == user.branch_id)
+            candidate_tx = tx_query.order_by(Transaction.id.desc()).first()
             if candidate_tx:
                 resolved_transaction_id = candidate_tx.id
         except Exception:
