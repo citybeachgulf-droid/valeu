@@ -80,17 +80,6 @@
                   <label class="form-label">نسبة الضريبة %</label>
                   <input type="number" step="0.01" min="0" max="100" name="vat" class="form-control" value="{{ vat_default_percent }}">
                 </div>
-                <div class="col-6">
-                  <label class="form-label">تطبيق الضريبة</label>
-                  <select name="apply_vat" class="form-select">
-                    <option value="1" selected>نعم</option>
-                    <option value="0">لا</option>
-                  </select>
-                </div>
-                <div class="col-6">
-                  <label class="form-label">نسبة الضريبة %</label>
-                  <input type="number" step="0.01" min="0" max="100" name="vat" class="form-control" value="{{ vat_default_percent }}">
-                </div>
                 <div class="col-12 d-flex justify-content-end">
                   <button class="btn btn-success">إصدار فاتورة</button>
                 </div>
@@ -110,7 +99,6 @@
                   <thead class="table-dark">
                     <tr>
                       <th>#</th>
-                      <th>رقم الفاتورة</th>
                       <th>رقم الفاتورة</th>
                       <th>البنك</th>
                       <th>المبلغ</th>
@@ -258,10 +246,21 @@
                   <label class="form-label">المبلغ</label>
                   <input type="number" step="0.01" name="amount" class="form-control" required>
                 </div>
-                <!-- سيتم ربط الفاتورة تلقائيًا بأحدث معاملة لنفس اسم العميل إن وُجدت -->
+                <!-- سيتم ربط الفاتورة تلقائيًا بأحدث معاملة غير مدفوعة لنفس اسم العميل (ضمن فرعك) إن وُجدت -->
                 <div class="col-md-6">
                   <label class="form-label">ملاحظة</label>
                   <input type="text" name="note" class="form-control" placeholder="ملاحظة">
+                </div>
+                <div class="col-6">
+                  <label class="form-label">تطبيق الضريبة</label>
+                  <select name="apply_vat" class="form-select">
+                    <option value="1" selected>نعم</option>
+                    <option value="0">لا</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label">نسبة الضريبة %</label>
+                  <input type="number" step="0.01" min="0" max="100" name="vat" class="form-control" value="{{ vat_default_percent }}">
                 </div>
                 <div class="col-12 d-flex justify-content-end">
                   <button class="btn btn-success">إصدار فاتورة</button>
