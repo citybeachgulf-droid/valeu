@@ -110,6 +110,13 @@ def build_b2_public_url(file_name: str) -> str | None:
     except Exception:
         return None
 
+# اجعل الدالة متاحة داخل قوالب Jinja مباشرةً
+@app.context_processor
+def inject_template_helpers():
+    return {
+        "build_b2_public_url": build_b2_public_url,
+    }
+
 # ---------------- إعداد مفاتيح Web Push (VAPID) ----------------
 # يمكن ضبطها عبر متغيرات البيئة VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT
 app.config["VAPID_PUBLIC_KEY"] = os.environ.get(
