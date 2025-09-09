@@ -1,4 +1,4 @@
-THIS SHOULD BE A LINTER ERRORimport os, json, re
+import os, json, re
 import hashlib
 import secrets
 from datetime import datetime, timedelta, date
@@ -3245,11 +3245,27 @@ def finance_create_customer_invoice():
         flash("⛔ اسم العميل مطلوب", "danger")
         return redirect(url_for("finance_dashboard"))
 
+    # ربط تلقائي بأحدث معاملة تحمل نفس اسم العميل إن لم يُحدد transaction_id
+    resolved_transaction_id = None
+    try:
+        resolved_transaction_id = int(transaction_id) if transaction_id else None
+    except Exception:
+        resolved_transaction_id = None
+    if not resolved_transaction_id and customer_name:
+        try:
+            candidate_tx = Transaction.query \
+                .filter(Transaction.client == customer_name) \
+                .order_by(Transaction.id.desc()).first()
+            if candidate_tx:
+                resolved_transaction_id = candidate_tx.id
+        except Exception:
+            resolved_transaction_id = None
+
     inv = CustomerInvoice(
         customer_name=customer_name,
         amount=amount,
         note=note,
-        transaction_id=int(transaction_id) if transaction_id else None,
+        transaction_id=resolved_transaction_id,
         created_by=session.get("user_id"),
     )
     db.session.add(inv)
