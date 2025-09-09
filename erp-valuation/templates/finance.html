@@ -88,6 +88,8 @@
                   <thead class="table-dark">
                     <tr>
                       <th>#</th>
+                      <th>رقم الفاتورة</th>
+                      <th>رقم الفاتورة</th>
                       <th>البنك</th>
                       <th>المبلغ</th>
                       <th>إصدار</th>
@@ -101,6 +103,7 @@
                     {% for inv in recent_bank_invoices %}
                     <tr>
                       <td>{{ inv.id }}</td>
+                      <td>{{ inv.invoice_number or ('INV-BANK-' ~ inv.id) }}</td>
                       <td>{{ inv.bank_id }}</td>
                       <td>{{ inv.amount }}</td>
                       <td>{{ inv.issued_at.strftime('%Y-%m-%d') if inv.issued_at else '-' }}</td>
@@ -270,6 +273,7 @@
                     {% for inv in recent_customer_invoices %}
                     <tr>
                       <td>{{ inv.id }}</td>
+                      <td>{{ inv.invoice_number or ('INV-CUST-' ~ inv.id) }}</td>
                       <td>{{ inv.customer_name }}</td>
                       <td>{{ inv.amount }}</td>
                       <td>{{ inv.issued_at.strftime('%Y-%m-%d') if inv.issued_at else '-' }}</td>
