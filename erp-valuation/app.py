@@ -2725,7 +2725,7 @@ def print_invoice_html(transaction_id: int):
 # ✅ طباعة فاتورة بنك HTML بنفس تصميم الطباعة
 @app.route("/finance/print/bank_invoice/<int:invoice_id>")
 def print_bank_invoice_html(invoice_id: int):
-    if session.get("role") != "finance":
+    if session.get("role") not in ["finance", "manager"]:
         return redirect(url_for("login"))
 
     inv = BankInvoice.query.get_or_404(invoice_id)
@@ -2863,7 +2863,7 @@ def print_customer_quote_html(quote_id: int):
 # ✅ تنزيل فاتورة بنك (من جدول BankInvoice)
 @app.route("/finance/download/bank_invoice/<int:invoice_id>")
 def download_bank_invoice_doc(invoice_id: int):
-    if session.get("role") != "finance":
+    if session.get("role") not in ["finance", "manager"]:
         return redirect(url_for("login"))
     inv = BankInvoice.query.get_or_404(invoice_id)
     bank = Bank.query.get(inv.bank_id)
@@ -3766,6 +3766,42 @@ def public_report(token):
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+
+# تنزيل ملف محلي من مجلد الرفع مع إجبار التنزيل
+@app.route("/download/local/<path:filename>")
+def download_local_file(filename):
+    # يسمح للمدير والمالية فقط
+    if session.get("role") not in ["manager", "finance"]:
+        return redirect(url_for("login"))
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename, as_attachment=True)
+
+# تنزيل ملف من B2 عبر قراءة المحتوى وتمريره كمرفق (في حال البكت خاص)
+@app.route("/download/b2")
+def download_b2_file():
+    # يسمح للمدير والمالية فقط
+    if session.get("role") not in ["manager", "finance"]:
+        return redirect(url_for("login"))
+    file_name = request.args.get("file")
+    if not file_name:
+        abort(400)
+    # محاولة بناء رابط عام إن كان البكت عامًا
+    b2_public = build_b2_public_url(file_name)
+    if b2_public:
+        # تمرير تلميح التنزيل للمستخدم عبر هيدر Content-Disposition
+        try:
+            resp = requests.get(b2_public, stream=True, timeout=20)
+            resp.raise_for_status()
+            from flask import Response
+            cd = f"attachment; filename*=UTF-8''{file_name}"
+            headers = {
+                "Content-Disposition": cd,
+                "Content-Type": resp.headers.get("Content-Type", "application/octet-stream"),
+            }
+            return Response(resp.iter_content(chunk_size=8192), headers=headers)
+        except Exception:
+            abort(404)
+    # إن لم نستطع، نفشل بشكل آمن
+    abort(404)
 
 # (تمت إزالة مسارات QR والروابط العامة المرتبطة بها)
 

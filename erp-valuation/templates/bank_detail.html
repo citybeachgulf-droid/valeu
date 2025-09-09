@@ -168,11 +168,17 @@
                   <td>{{ d.title }}</td>
                   <td>
                     {% set b2url = build_b2_public_url(d.b2_file_name) if d.b2_file_name else None %}
-                    {% if b2url %}
-                      <a class="btn btn-sm btn-outline-primary" href="{{ b2url }}" target="_blank">فتح</a>
-                    {% elif d.file %}
-                      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('uploaded_file', filename=d.file) }}" target="_blank">فتح</a>
-                    {% else %} - {% endif %}
+                    <div class="btn-group btn-group-sm" role="group">
+                      {% if b2url %}
+                        <a class="btn btn-outline-primary" href="{{ b2url }}" target="_blank">عرض</a>
+                        <a class="btn btn-outline-secondary" href="{{ url_for('download_b2_file') }}?file={{ d.b2_file_name }}">تنزيل</a>
+                      {% elif d.file %}
+                        <a class="btn btn-outline-primary" href="{{ url_for('uploaded_file', filename=d.file) }}" target="_blank">عرض</a>
+                        <a class="btn btn-outline-secondary" href="{{ url_for('download_local_file', filename=d.file) }}">تنزيل</a>
+                      {% else %}
+                        -
+                      {% endif %}
+                    </div>
                   </td>
                   <td>{{ d.created_at.strftime('%Y-%m-%d %H:%M') if d.created_at else '-' }}</td>
                 </tr>
