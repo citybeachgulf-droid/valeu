@@ -298,7 +298,10 @@
                         <span class="badge {% if s=='ساري' %}bg-success{% elif s=='قريب الانتهاء' %}bg-warning text-dark{% elif s=='منتهي' %}bg-danger{% else %}bg-secondary{% endif %}">{{ s }}</span>
                       </td>
                       <td>
-                        {% if d.file %}
+                        {% set b2url = build_b2_public_url(d.b2_file_name) if d.b2_file_name else None %}
+                        {% if b2url %}
+                          <a href="{{ b2url }}" target="_blank">فتح</a>
+                        {% elif d.file %}
                           <a href="{{ url_for('uploaded_file', filename=d.file) }}" target="_blank">فتح</a>
                         {% else %}
                           —

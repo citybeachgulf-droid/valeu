@@ -638,6 +638,9 @@ class BranchDocument(db.Model):
     title = db.Column(db.String(200), nullable=False)
     doc_type = db.Column(db.String(100), nullable=True)
     file = db.Column(db.String(255), nullable=True)
+    # Backblaze B2 identifiers for the uploaded file (if stored on B2)
+    b2_file_name = db.Column(db.String(255), nullable=True)
+    b2_file_id = db.Column(db.String(255), nullable=True)
     issued_at = db.Column(db.DateTime, nullable=True)
     expires_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -652,6 +655,9 @@ class BankDocument(db.Model):
     message = db.Column(db.Text, nullable=True)
     doc_type = db.Column(db.String(100), nullable=True)  # رسالة، سيرة ذاتية، ...
     file = db.Column(db.String(255), nullable=True)
+    # Backblaze B2 identifiers for the uploaded file (if stored on B2)
+    b2_file_name = db.Column(db.String(255), nullable=True)
+    b2_file_id = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=True)
@@ -4104,9 +4110,25 @@ def employee_add_bank_document():
         return redirect(url_for("employee_dashboard"))
 
     filename = None
+    b2_file_name = None
+    b2_file_id = None
     if file and file.filename:
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+        # Try uploading to Backblaze B2; if fails, fallback to local save
+        safe_name = secure_filename(file.filename)
+        try:
+            bucket = get_b2_bucket()
+            data = file.read()
+            unique_name = f"{int(time.time())}_{safe_name}"
+            uploaded = bucket.upload_bytes(data, file_name=unique_name)
+            b2_file_name = unique_name
+            b2_file_id = getattr(uploaded, "id_", None) or getattr(uploaded, "file_id", None)
+        except Exception:
+            try:
+                filename = safe_name
+                file.stream.seek(0)
+                file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+            except Exception:
+                filename = None
 
     try:
         doc = BankDocument(
@@ -4115,6 +4137,8 @@ def employee_add_bank_document():
             message=message,
             doc_type=doc_type or None,
             file=filename,
+            b2_file_name=b2_file_name,
+            b2_file_id=b2_file_id,
             created_by=user.id,
             branch_id=user.branch_id,
         )
@@ -4204,15 +4228,33 @@ def employee_add_branch_document():
         return redirect(url_for("employee_dashboard"))
 
     filename = None
+    b2_file_name = None
+    b2_file_id = None
     if file and file.filename:
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+        safe_name = secure_filename(file.filename)
+        # Try uploading to B2 first; fallback to local disk
+        try:
+            bucket = get_b2_bucket()
+            data = file.read()
+            unique_name = f"{int(time.time())}_{safe_name}"
+            uploaded = bucket.upload_bytes(data, file_name=unique_name)
+            b2_file_name = unique_name
+            b2_file_id = getattr(uploaded, "id_", None) or getattr(uploaded, "file_id", None)
+        except Exception:
+            try:
+                filename = safe_name
+                file.stream.seek(0)
+                file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+            except Exception:
+                filename = None
 
     doc = BranchDocument(
         branch_id=user.branch_id,
         title=title,
         doc_type=doc_type,
         file=filename,
+        b2_file_name=b2_file_name,
+        b2_file_id=b2_file_id,
         issued_at=datetime.fromisoformat(issued_at) if issued_at else None,
         expires_at=datetime.fromisoformat(expires_at) if expires_at else None,
     )
@@ -4246,9 +4288,32 @@ def employee_edit_branch_document(doc_id):
     doc.expires_at = datetime.fromisoformat(expires_at) if expires_at else None
 
     if file and file.filename:
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
-        doc.file = filename
+        safe_name = secure_filename(file.filename)
+        # Try to upload replacement to B2; fallback to local save
+        new_local = None
+        new_b2_name = None
+        new_b2_id = None
+        try:
+            bucket = get_b2_bucket()
+            data = file.read()
+            unique_name = f"{int(time.time())}_{safe_name}"
+            uploaded = bucket.upload_bytes(data, file_name=unique_name)
+            new_b2_name = unique_name
+            new_b2_id = getattr(uploaded, "id_", None) or getattr(uploaded, "file_id", None)
+        except Exception:
+            try:
+                new_local = safe_name
+                file.stream.seek(0)
+                file.save(os.path.join(app.config["UPLOAD_FOLDER"], new_local))
+            except Exception:
+                new_local = None
+
+        if new_b2_name:
+            doc.b2_file_name = new_b2_name
+            doc.b2_file_id = new_b2_id
+            doc.file = None
+        elif new_local:
+            doc.file = new_local
 
     db.session.commit()
     flash("✅ تم تحديث المستند", "success")
@@ -4546,6 +4611,8 @@ with app.app_context():
                     message TEXT,
                     doc_type VARCHAR(100),
                     file VARCHAR(255),
+                    b2_file_name VARCHAR(255),
+                    b2_file_id VARCHAR(255),
                     created_at TIMESTAMP,
                     created_by INTEGER,
                     branch_id INTEGER
@@ -4571,6 +4638,8 @@ with app.app_context():
                     title VARCHAR(200) NOT NULL,
                     doc_type VARCHAR(100),
                     file VARCHAR(255),
+                    b2_file_name VARCHAR(255),
+                    b2_file_id VARCHAR(255),
                     issued_at TIMESTAMP,
                     expires_at TIMESTAMP,
                     created_at TIMESTAMP
@@ -4675,6 +4744,38 @@ def ensure_b2_columns_exist():
             db.session.execute(text('ALTER TABLE "transaction" ADD COLUMN report_b2_file_id VARCHAR(255)'))
             db.session.commit()
             print("✅ تمت إضافة عمود report_b2_file_id")
+    except Exception:
+        db.session.rollback()
+
+    # Ensure Backblaze columns exist for branch_document
+    try:
+        if not column_exists("branch_document", "b2_file_name"):
+            db.session.execute(text('ALTER TABLE "branch_document" ADD COLUMN b2_file_name VARCHAR(255)'))
+            db.session.commit()
+            print("✅ تمت إضافة عمود b2_file_name إلى branch_document")
+    except Exception:
+        db.session.rollback()
+    try:
+        if not column_exists("branch_document", "b2_file_id"):
+            db.session.execute(text('ALTER TABLE "branch_document" ADD COLUMN b2_file_id VARCHAR(255)'))
+            db.session.commit()
+            print("✅ تمت إضافة عمود b2_file_id إلى branch_document")
+    except Exception:
+        db.session.rollback()
+
+    # Ensure Backblaze columns exist for bank_document
+    try:
+        if not column_exists("bank_document", "b2_file_name"):
+            db.session.execute(text('ALTER TABLE "bank_document" ADD COLUMN b2_file_name VARCHAR(255)'))
+            db.session.commit()
+            print("✅ تمت إضافة عمود b2_file_name إلى bank_document")
+    except Exception:
+        db.session.rollback()
+    try:
+        if not column_exists("bank_document", "b2_file_id"):
+            db.session.execute(text('ALTER TABLE "bank_document" ADD COLUMN b2_file_id VARCHAR(255)'))
+            db.session.commit()
+            print("✅ تمت إضافة عمود b2_file_id إلى bank_document")
     except Exception:
         db.session.rollback()
 
