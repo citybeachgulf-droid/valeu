@@ -2508,8 +2508,11 @@ def _render_docx_from_template(doc_type: str, placeholders: dict, out_name: str,
 
 
 def _get_vat_rate() -> float:
-    # ثابت: ضريبة قيمة مضافة 5%
-    return 0.05
+    # يمكن ضبطها عبر متغير البيئة VAT_RATE كقيمة عشرية (مثال 0.05)
+    try:
+        return float(os.environ.get("VAT_RATE", "0.05"))
+    except Exception:
+        return 0.05
 
 
 def _compute_tax_and_total(base_amount: float) -> tuple[float, float]:
@@ -2718,8 +2721,16 @@ def print_bank_invoice_html(invoice_id: int):
 
     bank_name = bank.name if bank else None
     amount = float(inv.amount or 0)
-    tax, total_with_tax = _compute_tax_and_total(amount)
     details_override = (request.args.get("details") or "").strip()
+    # ضريبة اختيارية
+    apply_vat = (request.args.get("apply_vat") or "1") == "1"
+    vat_percent = request.args.get("vat")
+    if vat_percent is not None:
+        try:
+            os.environ["VAT_RATE"] = str(float(vat_percent) / 100.0)
+        except Exception:
+            pass
+    tax, total_with_tax = _compute_tax_and_total(amount) if apply_vat else (0.0, amount)
 
     org_name = "شركة التثمين"
     org_meta = "العنوان · الهاتف · البريد الإلكتروني"
@@ -2760,8 +2771,16 @@ def print_customer_invoice_html(invoice_id: int):
         bank_name = bank.name if bank else None
 
     amount = float(inv.amount or 0)
-    tax, total_with_tax = _compute_tax_and_total(amount)
     details_override = (request.args.get("details") or "").strip()
+    # ضريبة اختيارية
+    apply_vat = (request.args.get("apply_vat") or "1") == "1"
+    vat_percent = request.args.get("vat")
+    if vat_percent is not None:
+        try:
+            os.environ["VAT_RATE"] = str(float(vat_percent) / 100.0)
+        except Exception:
+            pass
+    tax, total_with_tax = _compute_tax_and_total(amount) if apply_vat else (0.0, amount)
 
     org_name = "شركة التثمين"
     org_meta = "العنوان · الهاتف · البريد الإلكتروني"
@@ -2846,7 +2865,15 @@ def download_bank_invoice_doc(invoice_id: int):
         preferred_branch_id = getattr(user, "branch_id", None)
 
     amount = float(inv.amount or 0)
-    tax, total_with_tax = _compute_tax_and_total(amount)
+    # ضريبة اختيارية عبر الاستعلام
+    apply_vat = (request.args.get("apply_vat") or "1") == "1"
+    vat_percent = request.args.get("vat")
+    if vat_percent is not None:
+        try:
+            os.environ["VAT_RATE"] = str(float(vat_percent) / 100.0)
+        except Exception:
+            pass
+    tax, total_with_tax = _compute_tax_and_total(amount) if apply_vat else (0.0, amount)
     placeholders = {
         "NAME": (bank.name if bank else f"Bank #{inv.bank_id}"),
         "CLIENT_NAME": (bank.name if bank else f"Bank #{inv.bank_id}"),
@@ -2902,7 +2929,14 @@ def download_customer_invoice_doc(invoice_id: int):
         preferred_branch_id = getattr(user, "branch_id", None)
 
     amount = float(inv.amount or 0)
-    tax, total_with_tax = _compute_tax_and_total(amount)
+    apply_vat = (request.args.get("apply_vat") or "1") == "1"
+    vat_percent = request.args.get("vat")
+    if vat_percent is not None:
+        try:
+            os.environ["VAT_RATE"] = str(float(vat_percent) / 100.0)
+        except Exception:
+            pass
+    tax, total_with_tax = _compute_tax_and_total(amount) if apply_vat else (0.0, amount)
     placeholders = {
         "NAME": inv.customer_name or "",
         "CLIENT_NAME": inv.customer_name or "",
@@ -3282,8 +3316,18 @@ def finance_create_customer_invoice():
             db.session.commit()
         except Exception:
             db.session.rollback()
+    # تمرير مدخلات الضريبة للطباعة إن وُجدت
+    apply_vat = (request.form.get("apply_vat") or "1")
+    vat_percent = request.form.get("vat")
+    qp = {
+        "auto": "1",
+        "apply_vat": apply_vat,
+    }
+    if vat_percent:
+        qp["vat"] = str(vat_percent)
+    from urllib.parse import urlencode
     flash("✅ تم إنشاء فاتورة العميل", "success")
-    return redirect(url_for("print_customer_invoice_html", invoice_id=inv.id) + "?auto=1")
+    return redirect(url_for("print_customer_invoice_html", invoice_id=inv.id) + "?" + urlencode(qp))
 
 # ---------------- صفحة البنوك: نظرة عامة ----------------
 @app.route("/banks")
