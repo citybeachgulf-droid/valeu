@@ -686,6 +686,57 @@ class TemplateDoc(db.Model):
     # 🆕 قالب خاص بفرع معين (اختياري). لو كانت NULL فهو قالب عام
     branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=True)
 
+# ================= Consulting Department Models =================
+# Status and types constants (kept simple strings for SQLite compatibility)
+CONSULTATION_STATUSES = [
+    "Pending",
+    "In Progress",
+    "Completed",
+]
+
+CONSULTATION_TYPES = [
+    "Architectural",
+    "Structural",
+    "Mechanical",
+    "Electrical",
+    "Other",
+]
+
+
+class Project(db.Model):
+    __tablename__ = "project"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False, unique=True)
+    description = db.Column(db.Text, nullable=True)
+    client_id = db.Column(db.Integer, db.ForeignKey("customer.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    client = db.relationship("Customer", backref=db.backref("projects", lazy=True))
+
+
+class Consultation(db.Model):
+    __tablename__ = "consultation"
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("project.id"), nullable=True, index=True)
+    client_id = db.Column(db.Integer, db.ForeignKey("customer.id"), nullable=True, index=True)
+    consultant_name = db.Column(db.String(150), nullable=True)
+    consultation_type = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), nullable=False, default="Pending", index=True)
+    start_date = db.Column(db.Date, nullable=True, index=True)
+    end_date = db.Column(db.Date, nullable=True, index=True)
+    cost = db.Column(db.Float, nullable=True)
+    created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    consultant_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project = db.relationship("Project", backref=db.backref("consultations", lazy=True))
+    client = db.relationship("Customer", backref=db.backref("consultations", lazy=True))
+    creator = db.relationship("User", foreign_keys=[created_by])
+    consultant = db.relationship("User", foreign_keys=[consultant_id])
+
 def replace_placeholders_in_docx(doc: Document, replacements: dict) -> None:
     # يدعم الاستبدال حتى لو وُجدت مسافات/علامات RTL داخل الأقواس
     # نبني خريطة بالاسم بدون الأقواس وبحروف كبيرة
@@ -935,6 +986,388 @@ def index():
     elif role == "finance":
         return redirect(url_for("finance_dashboard"))
     return redirect(url_for("login"))
+
+# ================= Consulting Department Routes =================
+def _parse_date(value: str | None) -> date | None:
+    try:
+        if not value:
+            return None
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+
+@app.route("/consultations")
+def consultations_list():
+    if session.get("role") not in ["manager", "finance", "consultant"]:
+        return redirect(url_for("login"))
+
+    # Filters
+    q = (request.args.get("q") or "").strip()
+    status = (request.args.get("status") or "").strip()
+    ctype = (request.args.get("type") or "").strip()
+    project = (request.args.get("project") or "").strip()
+    client = (request.args.get("client") or "").strip()
+    page = int(request.args.get("page") or 1)
+    per_page = min(int(request.args.get("per_page") or 20), 100)
+
+    query = Consultation.query
+    if status:
+        query = query.filter(Consultation.status == status)
+    if ctype:
+        query = query.filter(Consultation.consultation_type == ctype)
+    if project:
+        if project.isdigit():
+            query = query.join(Project, isouter=True).filter(Consultation.project_id == int(project))
+        else:
+            query = query.join(Project, isouter=True).filter(Project.name.ilike(f"%{project}%"))
+    if client:
+        if client.isdigit():
+            query = query.join(Customer, isouter=True).filter(Consultation.client_id == int(client))
+        else:
+            query = query.join(Customer, isouter=True).filter(Customer.name.ilike(f"%{client}%"))
+    if q:
+        query = query.filter(or_(
+            Consultation.consultant_name.ilike(f"%{q}%"),
+            Consultation.description.ilike(f"%{q}%"),
+        ))
+
+    total = query.count()
+    consultations = (
+        query.order_by(Consultation.created_at.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    return render_template(
+        "consultations.html",
+        consultations=consultations,
+        total=total,
+        page=page,
+        per_page=per_page,
+        q=q,
+        status=status,
+        ctype=ctype,
+        project=project,
+        client=client,
+        statuses=CONSULTATION_STATUSES,
+        types=CONSULTATION_TYPES,
+    )
+
+
+def _find_or_create_customer(name: str | None, phone: str | None) -> Customer | None:
+    name = (name or "").strip()
+    phone = (phone or "").strip()
+    if not name and not phone:
+        return None
+    existing = None
+    try:
+        if phone:
+            existing = Customer.query.filter_by(phone=phone).first()
+    except Exception:
+        existing = None
+    if existing:
+        if name and existing.name != name:
+            existing.name = name
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+        return existing
+    c = Customer(name=name or "-", phone=phone or "-")
+    db.session.add(c)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        try:
+            db.session.flush()
+        except Exception:
+            pass
+    return c
+
+
+def _find_or_create_project(project_name: str | None, client_obj: Customer | None) -> Project | None:
+    name = (project_name or "").strip()
+    if not name:
+        return None
+    p = Project.query.filter(func.lower(Project.name) == func.lower(name)).first()
+    if p:
+        return p
+    p = Project(name=name, client_id=(client_obj.id if client_obj else None))
+    db.session.add(p)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        try:
+            db.session.flush()
+        except Exception:
+            pass
+    return p
+
+
+@app.route("/consultations/new", methods=["GET", "POST"])
+def consultations_new():
+    role = session.get("role")
+    if role not in ["manager", "finance", "consultant"]:
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        consultation_type = (request.form.get("consultation_type") or "").strip() or "Architectural"
+        status = (request.form.get("status") or "").strip() or "Pending"
+        description = (request.form.get("description") or "").strip()
+        consultant_name = (request.form.get("consultant_name") or "").strip()
+        client_name = (request.form.get("client_name") or "").strip()
+        client_phone = (request.form.get("client_phone") or "").strip()
+        project_name = (request.form.get("project_name") or "").strip()
+        start_date = _parse_date(request.form.get("start_date"))
+        end_date = _parse_date(request.form.get("end_date"))
+        # Cost can only be set by manager/finance
+        cost = None
+        if role in ["manager", "finance"]:
+            try:
+                cost = float(request.form.get("cost") or 0)
+            except Exception:
+                cost = 0.0
+
+        if consultation_type not in CONSULTATION_TYPES:
+            consultation_type = "Other"
+        if status not in CONSULTATION_STATUSES:
+            status = "Pending"
+
+        # link client and project
+        client_obj = _find_or_create_customer(client_name, client_phone)
+        project_obj = _find_or_create_project(project_name, client_obj)
+
+        c = Consultation(
+            consultation_type=consultation_type,
+            status=status,
+            description=description,
+            consultant_name=consultant_name or (session.get("username") if role == "consultant" else None),
+            client_id=(client_obj.id if client_obj else None),
+            project_id=(project_obj.id if project_obj else None),
+            start_date=start_date,
+            end_date=end_date,
+            cost=cost,
+            created_by=session.get("user_id"),
+            consultant_id=(session.get("user_id") if role == "consultant" else None),
+        )
+        db.session.add(c)
+        db.session.commit()
+
+        # Notify manager
+        try:
+            mgr = User.query.filter_by(role="manager").first()
+            if mgr:
+                send_notification(mgr.id, "New Consultation", f"New consultation #{c.id} added")
+        except Exception:
+            pass
+
+        flash("✅ Consultation created", "success")
+        return redirect(url_for("consultations_detail", cid=c.id))
+
+    return render_template(
+        "consultation_form.html",
+        consultation=None,
+        statuses=CONSULTATION_STATUSES,
+        types=CONSULTATION_TYPES,
+        mode="new",
+    )
+
+
+@app.route("/consultations/<int:cid>")
+def consultations_detail(cid: int):
+    if session.get("role") not in ["manager", "finance", "consultant"]:
+        return redirect(url_for("login"))
+    c = Consultation.query.get_or_404(cid)
+    # prefetch project and client
+    project = Project.query.get(c.project_id) if c.project_id else None
+    client = Customer.query.get(c.client_id) if c.client_id else None
+    return render_template(
+        "consultation_detail.html",
+        c=c,
+        project=project,
+        client=client,
+        statuses=CONSULTATION_STATUSES,
+        types=CONSULTATION_TYPES,
+    )
+
+
+@app.route("/consultations/<int:cid>/edit", methods=["GET", "POST"])
+def consultations_edit(cid: int):
+    role = session.get("role")
+    if role not in ["manager", "finance", "consultant"]:
+        return redirect(url_for("login"))
+    c = Consultation.query.get_or_404(cid)
+
+    if request.method == "POST":
+        prev_status = c.status
+        # role-based updates
+        if role == "manager":
+            # full control
+            c.consultant_name = (request.form.get("consultant_name") or c.consultant_name)
+            c.consultation_type = request.form.get("consultation_type") or c.consultation_type
+            c.description = request.form.get("description") or c.description
+            new_status = request.form.get("status") or c.status
+            c.status = new_status if new_status in CONSULTATION_STATUSES else c.status
+            c.start_date = _parse_date(request.form.get("start_date")) or c.start_date
+            c.end_date = _parse_date(request.form.get("end_date")) or c.end_date
+            try:
+                c.cost = float(request.form.get("cost") or c.cost or 0)
+            except Exception:
+                pass
+            # client/project
+            client_name = (request.form.get("client_name") or "").strip()
+            client_phone = (request.form.get("client_phone") or "").strip()
+            project_name = (request.form.get("project_name") or "").strip()
+            cl = _find_or_create_customer(client_name, client_phone) if (client_name or client_phone) else None
+            if cl:
+                c.client_id = cl.id
+            pr = _find_or_create_project(project_name, cl or (Customer.query.get(c.client_id) if c.client_id else None)) if project_name else None
+            if pr:
+                c.project_id = pr.id
+        elif role == "finance":
+            # can edit cost/status
+            new_status = request.form.get("status") or c.status
+            c.status = new_status if new_status in CONSULTATION_STATUSES else c.status
+            try:
+                c.cost = float(request.form.get("cost") or c.cost or 0)
+            except Exception:
+                pass
+        elif role == "consultant":
+            # can edit description and status
+            c.description = request.form.get("description") or c.description
+            new_status = request.form.get("status") or c.status
+            c.status = new_status if new_status in CONSULTATION_STATUSES else c.status
+        else:
+            return redirect(url_for("login"))
+
+        db.session.commit()
+
+        try:
+            if prev_status != c.status:
+                mgr = User.query.filter_by(role="manager").first()
+                if mgr:
+                    send_notification(mgr.id, "Consultation status updated", f"Consultation #{c.id} → {c.status}")
+        except Exception:
+            pass
+
+        flash("✅ Consultation updated", "success")
+        return redirect(url_for("consultations_detail", cid=c.id))
+
+    project = Project.query.get(c.project_id) if c.project_id else None
+    client = Customer.query.get(c.client_id) if c.client_id else None
+    return render_template(
+        "consultation_form.html",
+        consultation=c,
+        project=project,
+        client=client,
+        statuses=CONSULTATION_STATUSES,
+        types=CONSULTATION_TYPES,
+        mode="edit",
+    )
+
+
+@app.route("/consultations/<int:cid>/delete", methods=["POST"])
+def consultations_delete(cid: int):
+    if session.get("role") != "manager":
+        return redirect(url_for("login"))
+    c = Consultation.query.get_or_404(cid)
+    db.session.delete(c)
+    db.session.commit()
+    flash("🗑️ Consultation deleted", "success")
+    return redirect(url_for("consultations_list"))
+
+
+@app.route("/consultations/export.csv")
+def consultations_export_csv():
+    if session.get("role") not in ["manager", "finance"]:
+        return redirect(url_for("login"))
+    # reuse filters
+    q = (request.args.get("q") or "").strip()
+    status = (request.args.get("status") or "").strip()
+    ctype = (request.args.get("type") or "").strip()
+    project = (request.args.get("project") or "").strip()
+    client = (request.args.get("client") or "").strip()
+
+    query = Consultation.query
+    if status:
+        query = query.filter(Consultation.status == status)
+    if ctype:
+        query = query.filter(Consultation.consultation_type == ctype)
+    if project:
+        if project.isdigit():
+            query = query.join(Project, isouter=True).filter(Consultation.project_id == int(project))
+        else:
+            query = query.join(Project, isouter=True).filter(Project.name.ilike(f"%{project}%"))
+    if client:
+        if client.isdigit():
+            query = query.join(Customer, isouter=True).filter(Consultation.client_id == int(client))
+        else:
+            query = query.join(Customer, isouter=True).filter(Customer.name.ilike(f"%{client}%"))
+    if q:
+        query = query.filter(or_(
+            Consultation.consultant_name.ilike(f"%{q}%"),
+            Consultation.description.ilike(f"%{q}%"),
+        ))
+
+    rows = query.order_by(Consultation.created_at.desc()).all()
+    import csv
+    from io import StringIO
+
+    buf = StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "ID", "Project", "Client", "Type", "Status", "Start", "End", "Cost", "Consultant", "Created At",
+    ])
+    for r in rows:
+        pr = Project.query.get(r.project_id) if r.project_id else None
+        cl = Customer.query.get(r.client_id) if r.client_id else None
+        writer.writerow([
+            r.id,
+            (pr.name if pr else ""),
+            (cl.name if cl else ""),
+            r.consultation_type or "",
+            r.status or "",
+            (r.start_date.isoformat() if r.start_date else ""),
+            (r.end_date.isoformat() if r.end_date else ""),
+            (f"{float(r.cost or 0):.2f}"),
+            r.consultant_name or "",
+            (r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else ""),
+        ])
+    buf.seek(0)
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": "attachment; filename=consultations.csv"
+        },
+    )
+
+
+@app.route("/consultations/<int:cid>/invoice", methods=["POST"])
+def consultations_invoice(cid: int):
+    if session.get("role") not in ["finance", "manager"]:
+        return redirect(url_for("login"))
+    c = Consultation.query.get_or_404(cid)
+    amount = float(c.cost or 0)
+    if amount <= 0:
+        flash("⚠️ Consultation has no cost to invoice", "warning")
+        return redirect(url_for("consultations_detail", cid=c.id))
+    client = Customer.query.get(c.client_id) if c.client_id else None
+    inv = CustomerInvoice(
+        customer_name=(client.name if client else (c.consultant_name or "Consultation")),
+        amount=amount,
+        transaction_id=None,
+        note=f"Consultation #{c.id} - {c.consultation_type}",
+        created_by=session.get("user_id"),
+    )
+    db.session.add(inv)
+    db.session.commit()
+    flash("✅ Invoice created", "success")
+    return redirect(url_for("print_customer_invoice_html", invoice_id=inv.id))
 
 # ---------------- تسجيل الدخول ----------------
 @app.route("/login", methods=["GET", "POST"])
@@ -4583,6 +5016,58 @@ with app.app_context():
             ))
             db.session.commit()
             print("✅ تم إنشاء جدول invoice_sequence")
+        except Exception:
+            db.session.rollback()
+
+    # محاولة إنشاء جدول project إذا غير موجود
+    try:
+        db.session.execute(text("SELECT 1 FROM project LIMIT 1"))
+    except Exception:
+        try:
+            db.session.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS project (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name VARCHAR(200) UNIQUE NOT NULL,
+                    description TEXT,
+                    client_id INTEGER,
+                    created_at TIMESTAMP,
+                    updated_at TIMESTAMP
+                )
+                """
+            ))
+            db.session.commit()
+            print("✅ تم إنشاء جدول project")
+        except Exception:
+            db.session.rollback()
+
+    # محاولة إنشاء جدول consultation إذا غير موجود
+    try:
+        db.session.execute(text("SELECT 1 FROM consultation LIMIT 1"))
+    except Exception:
+        try:
+            db.session.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS consultation (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER,
+                    client_id INTEGER,
+                    consultant_name VARCHAR(150),
+                    consultation_type VARCHAR(50) NOT NULL,
+                    description TEXT,
+                    status VARCHAR(20) NOT NULL,
+                    start_date DATE,
+                    end_date DATE,
+                    cost FLOAT,
+                    created_by INTEGER,
+                    consultant_id INTEGER,
+                    created_at TIMESTAMP,
+                    updated_at TIMESTAMP
+                )
+                """
+            ))
+            db.session.commit()
+            print("✅ تم إنشاء جدول consultation")
         except Exception:
             db.session.rollback()
 

@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% set title = '🧠 الاستشارات' %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">قسم الاستشارات</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a href="{{ url_for('consultations_new') }}" class="btn btn-sm btn-warning">➕ استشارة جديدة</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <form class="row g-2 align-items-end mb-3" method="get">
+    <div class="col-12 col-md-2">
+      <label class="form-label">الحالة</label>
+      <select class="form-select" name="status">
+        <option value="">الكل</option>
+        {% for s in statuses %}
+        <option value="{{ s }}" {% if s==status %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-2">
+      <label class="form-label">النوع</label>
+      <select class="form-select" name="type">
+        <option value="">الكل</option>
+        {% for t in types %}
+        <option value="{{ t }}" {% if t==ctype %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-2">
+      <label class="form-label">المشروع</label>
+      <input class="form-control" name="project" value="{{ project }}" placeholder="اسم/معرف" />
+    </div>
+    <div class="col-12 col-md-2">
+      <label class="form-label">العميل</label>
+      <input class="form-control" name="client" value="{{ client }}" placeholder="اسم/معرف" />
+    </div>
+    <div class="col-12 col-md-3">
+      <label class="form-label">بحث</label>
+      <input class="form-control" name="q" value="{{ q }}" placeholder="كلمة مفتاحية" />
+    </div>
+    <div class="col-12 col-md-1 d-grid">
+      <button class="btn btn-primary">بحث</button>
+    </div>
+  </form>
+
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="text-muted">العدد: {{ total }}</div>
+    {% if total > 0 %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('consultations_export_csv', q=q, status=status, type=ctype, project=project, client=client) }}">⬇️ تصدير CSV</a>
+    {% endif %}
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>المشروع</th>
+          <th>العميل</th>
+          <th>النوع</th>
+          <th>الحالة</th>
+          <th>الفترة</th>
+          <th>التكلفة</th>
+          <th>الاستشاري</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in consultations %}
+        {% set pr = c.project %}
+        {% set cl = c.client %}
+        <tr>
+          <td>{{ c.id }}</td>
+          <td>{{ pr.name if pr else '-' }}</td>
+          <td>{{ cl.name if cl else '-' }}</td>
+          <td>{{ c.consultation_type }}</td>
+          <td><span class="badge bg-{{ 'success' if c.status=='Completed' else ('warning' if c.status=='In Progress' else 'secondary') }}">{{ c.status }}</span></td>
+          <td>{{ c.start_date or '' }}{% if c.end_date %} → {{ c.end_date }}{% endif %}</td>
+          <td>{{ '%.2f'|format(c.cost or 0) }}</td>
+          <td>{{ c.consultant_name or '-' }}</td>
+          <td class="text-nowrap">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consultations_detail', cid=c.id) }}">عرض</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-muted">لا توجد نتائج</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <nav>
+    <ul class="pagination">
+      {% set pages = (total // per_page) + (1 if (total % per_page) else 0) %}
+      {% for p in range(1, pages+1) %}
+      <li class="page-item {% if p==page %}active{% endif %}"><a class="page-link" href="{{ url_for('consultations_list', page=p, per_page=per_page, q=q, status=status, type=ctype, project=project, client=client) }}">{{ p }}</a></li>
+      {% endfor %}
+    </ul>
+  </nav>
+</div>
+{% endblock %}

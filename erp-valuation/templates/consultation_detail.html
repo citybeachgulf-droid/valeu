@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% set title = 'تفاصيل الاستشارة #' ~ c.id %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="{{ url_for('consultations_list') }}">الاستشارات</a>
+  </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <div class="card">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center">
+        <h5 class="card-title">#{{ c.id }} · {{ c.consultation_type }}</h5>
+        <span class="badge bg-{{ 'success' if c.status=='Completed' else ('warning' if c.status=='In Progress' else 'secondary') }}">{{ c.status }}</span>
+      </div>
+      <hr>
+      <div class="row">
+        <div class="col-12 col-md-6">
+          <p><strong>المشروع:</strong> {{ project.name if project else '-' }}</p>
+          <p><strong>العميل:</strong> {{ client.name if client else '-' }}</p>
+          <p><strong>الاستشاري:</strong> {{ c.consultant_name or '-' }}</p>
+          <p><strong>الفترة:</strong> {{ c.start_date or '' }}{% if c.end_date %} → {{ c.end_date }}{% endif %}</p>
+        </div>
+        <div class="col-12 col-md-6">
+          <p><strong>التكلفة:</strong> {{ '%.2f'|format(c.cost or 0) }}</p>
+          <p><strong>أنشئت في:</strong> {{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '' }}</p>
+          <p><strong>آخر تحديث:</strong> {{ c.updated_at.strftime('%Y-%m-%d %H:%M') if c.updated_at else '' }}</p>
+        </div>
+      </div>
+      <hr>
+      <p class="mb-0"><strong>الوصف:</strong></p>
+      <div class="border rounded p-3 bg-light">{{ c.description or '-' }}</div>
+    </div>
+  </div>
+
+  <div class="mt-3 d-flex gap-2">
+    <a class="btn btn-primary" href="{{ url_for('consultations_edit', cid=c.id) }}">تعديل</a>
+    {% if session.get('role') == 'manager' %}
+    <form method="post" action="{{ url_for('consultations_delete', cid=c.id) }}" onsubmit="return confirm('حذف الاستشارة؟');">
+      <button class="btn btn-danger">حذف</button>
+    </form>
+    {% endif %}
+    {% if session.get('role') in ['manager','finance'] and (c.cost or 0) > 0 %}
+    <form method="post" action="{{ url_for('consultations_invoice', cid=c.id) }}">
+      <button class="btn btn-success">إنشاء فاتورة</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
