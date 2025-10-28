@@ -41,10 +41,10 @@
         </div>
         <div class="col-12 col-md-4">
           <select name="department" class="form-select">
-            <option value="">اختر القسم (اختياري)</option>
+            <option value="">اختر القسم الرئيسي (اختياري)</option>
             <option value="valuation">التثمين</option>
             <option value="consultations">الاستشارات</option>
-            <option value="finance">المالية</option>
+            <option value="finance">المالية (ثابتة على مستوى الفرع)</option>
           </select>
         </div>
         <div class="col-12 col-md-2">
@@ -77,8 +77,16 @@
               {% set dept = (b.department or '').lower() %}
               {% if dept == 'consultations' %}الاستشارات{% elif dept == 'finance' %}المالية{% elif dept == 'valuation' %}التثمين{% else %}-{% endif %}
             </td>
-            <td class="d-flex gap-2">
+            <td class="d-flex flex-wrap gap-2 align-items-center">
               <a href="{{ url_for('open_branch_interface', bid=b.id) }}" class="btn btn-sm btn-outline-primary">🔗 فتح الواجهة</a>
+              <!-- روابط سريعة للأقسام في هذا الفرع إن كانت معرفة -->
+              {% if b.sections %}
+                {% for s in b.sections %}
+                <a href="{{ url_for('open_branch_section', bid=b.id, section=s.name) }}" class="btn btn-sm btn-light">قسم: {{ 'الاستشارات' if s.name=='consultations' else ('التثمين' if s.name=='valuation' else s.name) }}</a>
+                {% endfor %}
+              {% endif %}
+              <!-- المالية ثابتة لكل الأقسام -->
+              <a href="{{ url_for('open_branch_section', bid=b.id, section='finance') }}" class="btn btn-sm btn-warning">المالية</a>
               <a href="{{ url_for('delete_branch', bid=b.id) }}" class="btn btn-sm btn-danger"
                  onclick="return confirm('هل أنت متأكد من الحذف؟')">🗑 حذف</a>
             </td>

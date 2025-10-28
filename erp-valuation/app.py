@@ -418,6 +418,14 @@ class Branch(db.Model):
     department = db.Column(db.String(50), nullable=True)
     users = db.relationship("User", backref="branch", lazy=True)
     transactions = db.relationship("Transaction", backref="branch", lazy=True)
+    # أقسام متعددة مرتبطة بالفرع (بدلاً من عمود واحد قديم department)
+    sections = db.relationship("BranchSection", backref="branch", lazy=True, cascade="all, delete-orphan")
+
+class BranchSection(db.Model):
+    __tablename__ = "branch_section"
+    id = db.Column(db.Integer, primary_key=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=False, index=True)
+    name = db.Column(db.String(50), nullable=False)  # valuation | consultations
 
 class Bank(db.Model):
     __tablename__ = "bank"
@@ -833,6 +841,43 @@ def ensure_branch_department_column():
         if not column_exists("branch", "department"):
             db.session.execute(text("ALTER TABLE branch ADD COLUMN department VARCHAR(50)"))
             db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+def ensure_branch_sections_from_department():
+    """إنشاء سجلات أقسام للفرع من القيمة القديمة branch.department (مرة واحدة).
+
+    نطبع الأقسام المقبولة فقط (valuation | consultations). المالية ثابتة للفرع
+    ولا تحتاج لتسجيل كقسم منفصل.
+    """
+    try:
+        # تأكد أن جدول الأقسام موجود
+        db.session.execute(text("SELECT 1 FROM branch_section LIMIT 1"))
+    except Exception:
+        # في حال لم يتم إنشاؤه بعد، لعل create_all سيقوم بذلك
+        try:
+            db.create_all()
+        except Exception:
+            pass
+
+    try:
+        branches = Branch.query.all()
+        for b in branches:
+            dept = (getattr(b, "department", None) or "").strip().lower()
+            if not dept:
+                continue
+            normalized = None
+            if dept in ("consultations", "consultation", "consulting", "الاستشارات"):
+                normalized = "consultations"
+            elif dept in ("valuation", "التثمين", "تثمين"):
+                normalized = "valuation"
+            # المالية قسم ثابت على مستوى الفرع، نتجاهله هنا
+            if not normalized:
+                continue
+            exists = BranchSection.query.filter_by(branch_id=b.id, name=normalized).first()
+            if not exists:
+                db.session.add(BranchSection(branch_id=b.id, name=normalized))
+        db.session.commit()
     except Exception:
         db.session.rollback()
 
@@ -1708,8 +1753,9 @@ def manage_branches():
     if session.get("role") != "manager":
         return redirect(url_for("login"))
 
-    # تأكد من وجود عمود department
+    # تأكد من وجود عمود department + ترحيل الأقسام إلى الجدول الجديد
     ensure_branch_department_column()
+    ensure_branch_sections_from_department()
 
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
@@ -2012,9 +2058,23 @@ def open_branch_interface(bid: int):
     if not session.get("user_id"):
         return redirect(url_for("login"))
 
+    # السماح بتمرير القسم المطلوب عبر باراميتر
+    section_param = (request.args.get("section") or "").strip().lower()
+    if section_param:
+        return _redirect_to_section(section_param)
+
     ensure_branch_department_column()
+    ensure_branch_sections_from_department()
     b = Branch.query.get_or_404(bid)
     dept = (b.department or "").lower()
+
+    # لو تم تعريف أقسام متعددة لهذا الفرع، وُجد قسم واحد فقط، افتحه مباشرةً
+    try:
+        branch_sections = BranchSection.query.filter_by(branch_id=bid).all()
+    except Exception:
+        branch_sections = []
+    if branch_sections and len(branch_sections) == 1:
+        return _redirect_to_section((branch_sections[0].name or "").lower())
 
     # خرائط بسيطة للأقسام إلى الواجهات الحالية
     if dept in ("consultations", "consultation", "consulting", "الاستشارات"):
@@ -2023,6 +2083,31 @@ def open_branch_interface(bid: int):
         return redirect(url_for("finance_dashboard"))
 
     # الافتراضي: واجهات التثمين المعتادة بحسب دور المستخدم
+    role = session.get("role")
+    if role == "manager":
+        return redirect(url_for("manager_dashboard"))
+    if role == "employee":
+        return redirect(url_for("employee_dashboard"))
+    if role == "engineer":
+        return redirect(url_for("engineer_dashboard"))
+    if role == "finance":
+        return redirect(url_for("finance_dashboard"))
+    return redirect(url_for("index"))
+
+@app.route("/branch/<int:bid>/interface/<string:section>", endpoint="open_branch_section")
+def open_branch_section(bid: int, section: str):
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+    # لا حاجة للتحقق من ملكية الفرع هنا، مجرد توجيه حسب القسم
+    return _redirect_to_section(section)
+
+def _redirect_to_section(section: str):
+    s = (section or "").strip().lower()
+    if s in ("consultations", "consultation", "consulting", "الاستشارات"):
+        return redirect(url_for("consultations_list"))
+    if s in ("finance", "financial", "المالية"):
+        return redirect(url_for("finance_dashboard"))
+    # valuation أو غير معروف => الافتراضي حسب الدور
     role = session.get("role")
     if role == "manager":
         return redirect(url_for("manager_dashboard"))
