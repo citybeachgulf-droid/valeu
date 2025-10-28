@@ -1398,23 +1398,24 @@ def login():
         if last_error is not None and user is None:
             flash("⚠️ تعذّر الاتصال بقاعدة البيانات مؤقتًا. الرجاء المحاولة بعد لحظات.", "warning")
             return render_template("login.html"), 503
-        # دعم خلفي: التعامل مع كلمات مرور مخزنة كنص عادي في قواعد قديمة
+        # دعم التحقق العام لجميع الخوارزميات (pbkdf2, scrypt, ...)
+        # مع مسار توافق للنص الصريح القديم ثم الترقية للتجزئة
         is_valid = False
         if user and user.password:
+            # أولًا حاول التحقق ككلمة مرور مُجزّأة (Werkzeug يدعم عدة خوارزميات تلقائيًا)
             try:
-                if user.password.startswith("pbkdf2:"):
-                    is_valid = check_password_hash(user.password, password)
-                else:
-                    # مقارنة نصية ثم ترقية للتجزئة
-                    if user.password == password:
-                        is_valid = True
-                        try:
-                            user.password = generate_password_hash(password)
-                            db.session.commit()
-                        except Exception:
-                            db.session.rollback()
+                is_valid = check_password_hash(user.password, password)
             except Exception:
                 is_valid = False
+
+            # مسار خلفي: إن كانت مخزّنة كنص صريح قديمًا
+            if not is_valid and user.password == password:
+                is_valid = True
+                try:
+                    user.password = generate_password_hash(password)
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
 
         if user and is_valid:
             session["user_id"] = user.id
