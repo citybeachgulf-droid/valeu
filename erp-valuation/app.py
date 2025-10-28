@@ -414,6 +414,8 @@ def parse_float_input(value) -> float:
 class Branch(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    # القسم/القطاع الخاص بالفرع (مثلاً: valuation | consultations | finance)
+    department = db.Column(db.String(50), nullable=True)
     users = db.relationship("User", backref="branch", lazy=True)
     transactions = db.relationship("Transaction", backref="branch", lazy=True)
 
@@ -825,6 +827,15 @@ def ensure_template_doc_branch_column():
     except Exception:
         db.session.rollback()
 
+def ensure_branch_department_column():
+    """ضمان وجود عمود department في جدول الفروع (للتوافق مع قواعد بيانات قديمة)."""
+    try:
+        if not column_exists("branch", "department"):
+            db.session.execute(text("ALTER TABLE branch ADD COLUMN department VARCHAR(50)"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
 def get_template_filename(doc_type: str, branch_id: int | None = None) -> str | None:
     # يفضّل القالب الخاص بالفرع إن وجد، ثم يعود للقالب العام
     ensure_template_doc_branch_column()
@@ -980,6 +991,19 @@ def index():
     if role == "manager":
         return redirect(url_for("manager_dashboard"))
     elif role == "employee":
+        # توجيه الموظف حسب قسم فرعه إن وجد
+        try:
+            ensure_branch_department_column()
+            user = User.query.get(session.get("user_id"))
+            if user and user.branch_id:
+                b = Branch.query.get(user.branch_id)
+                dept = (b.department or "").lower() if b else ""
+                if dept in ("consultations", "consultation", "consulting", "الاستشارات"):
+                    return redirect(url_for("consultations_list"))
+                if dept in ("finance", "financial", "المالية"):
+                    return redirect(url_for("finance_dashboard"))
+        except Exception:
+            pass
         return redirect(url_for("employee_dashboard"))
     elif role == "engineer":
         return redirect(url_for("engineer_dashboard"))
@@ -1684,8 +1708,12 @@ def manage_branches():
     if session.get("role") != "manager":
         return redirect(url_for("login"))
 
+    # تأكد من وجود عمود department
+    ensure_branch_department_column()
+
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
+        department = (request.form.get("department") or "").strip() or None
         if not name:
             flash("⚠️ يجب إدخال اسم الفرع", "danger")
         else:
@@ -1693,7 +1721,7 @@ def manage_branches():
             if existing:
                 flash("⚠️ الفرع موجود مسبقاً", "warning")
             else:
-                branch = Branch(name=name)
+                branch = Branch(name=name, department=department)
                 db.session.add(branch)
                 db.session.commit()
                 flash("✅ تم إضافة الفرع", "success")
@@ -1964,14 +1992,47 @@ def approve_transaction(tid):
 def add_branch():
     if session.get("role") != "manager":
         return redirect(url_for("login"))
-    name = request.form.get("name")
+    # تأكد من وجود عمود department
+    ensure_branch_department_column()
+
+    name = (request.form.get("name") or "").strip()
+    department = (request.form.get("department") or "").strip() or None
     if name:
-        db.session.add(Branch(name=name))
+        db.session.add(Branch(name=name, department=department))
         db.session.commit()
         flash("✅ تم إضافة الفرع بنجاح", "success")
     else:
         flash("⚠️ يجب إدخال اسم الفرع", "danger")
     return redirect(url_for("manager_dashboard"))
+
+
+# 🔗 فتح واجهة القسم الخاصة بفرع معيّن
+@app.route("/branch/<int:bid>/interface", endpoint="open_branch_interface")
+def open_branch_interface(bid: int):
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+
+    ensure_branch_department_column()
+    b = Branch.query.get_or_404(bid)
+    dept = (b.department or "").lower()
+
+    # خرائط بسيطة للأقسام إلى الواجهات الحالية
+    if dept in ("consultations", "consultation", "consulting", "الاستشارات"):
+        return redirect(url_for("consultations_list"))
+    if dept in ("finance", "financial", "المالية"):
+        return redirect(url_for("finance_dashboard"))
+
+    # الافتراضي: واجهات التثمين المعتادة بحسب دور المستخدم
+    role = session.get("role")
+    if role == "manager":
+        return redirect(url_for("manager_dashboard"))
+    if role == "employee":
+        return redirect(url_for("employee_dashboard"))
+    if role == "engineer":
+        return redirect(url_for("engineer_dashboard"))
+    if role == "finance":
+        return redirect(url_for("finance_dashboard"))
+    return redirect(url_for("index"))
 
 
 # 🏦 إضافة بنك جديد

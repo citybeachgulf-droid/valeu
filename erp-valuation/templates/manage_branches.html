@@ -36,8 +36,16 @@
     <div class="card-body">
       <h5 class="mb-3">➕ إضافة فرع جديد</h5>
       <form method="POST" class="row g-3">
-        <div class="col-12 col-md-10">
+        <div class="col-12 col-md-6">
           <input type="text" name="name" placeholder="اسم الفرع" class="form-control" required>
+        </div>
+        <div class="col-12 col-md-4">
+          <select name="department" class="form-select">
+            <option value="">اختر القسم (اختياري)</option>
+            <option value="valuation">التثمين</option>
+            <option value="consultations">الاستشارات</option>
+            <option value="finance">المالية</option>
+          </select>
         </div>
         <div class="col-12 col-md-2">
           <button type="submit" class="btn btn-primary w-100">إضافة</button>
@@ -56,6 +64,7 @@
           <tr>
             <th>#</th>
             <th>اسم الفرع</th>
+            <th>القسم</th>
             <th>إجراءات</th>
           </tr>
         </thead>
@@ -65,13 +74,18 @@
             <td>{{ b.id }}</td>
             <td>{{ b.name }}</td>
             <td>
+              {% set dept = (b.department or '').lower() %}
+              {% if dept == 'consultations' %}الاستشارات{% elif dept == 'finance' %}المالية{% elif dept == 'valuation' %}التثمين{% else %}-{% endif %}
+            </td>
+            <td class="d-flex gap-2">
+              <a href="{{ url_for('open_branch_interface', bid=b.id) }}" class="btn btn-sm btn-outline-primary">🔗 فتح الواجهة</a>
               <a href="{{ url_for('delete_branch', bid=b.id) }}" class="btn btn-sm btn-danger"
                  onclick="return confirm('هل أنت متأكد من الحذف؟')">🗑 حذف</a>
             </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="3" class="text-center">لا يوجد فروع</td>
+            <td colspan="4" class="text-center">لا يوجد فروع</td>
           </tr>
           {% endfor %}
         </tbody>
