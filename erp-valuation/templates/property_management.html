@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% set title = '🏢 قسم إدارة الممتلكات' %}
+
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-4">🏢 قسم إدارة الممتلكات</h2>
+  <div class="alert alert-info">هذه واجهة مبدئية للقسم. يمكن لاحقًا إضافة جداول وعمليات مخصصة.</div>
+  <div class="card">
+    <div class="card-body">
+      <p class="mb-1">المستخدم: <b>{{ user.username if user else '-' }}</b></p>
+      <p class="mb-0">الفرع: <b>{{ branch.name if branch else '—' }}</b></p>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -426,6 +426,8 @@ class BranchSection(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=False, index=True)
     name = db.Column(db.String(50), nullable=False)  # valuation | consultations
+    # 🧑‍💼 المستخدمون المنتمون لهذا القسم
+    users = db.relationship("User", backref="section", lazy=True)
 
 class Bank(db.Model):
     __tablename__ = "bank"
@@ -442,6 +444,8 @@ class User(db.Model):
     password = db.Column(db.String(200), nullable=False)
     role     = db.Column(db.String(20), nullable=False)  # manager/employee/visit/engineer/finance
     branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=True)
+    # 🆕 ربط الموظف بقسم داخل الفرع (اختياري)
+    section_id = db.Column(db.Integer, db.ForeignKey('branch_section.id'), nullable=True, index=True)
 
 class Transaction(db.Model):
     __tablename__ = "transaction"
@@ -1036,10 +1040,16 @@ def index():
     if role == "manager":
         return redirect(url_for("manager_dashboard"))
     elif role == "employee":
-        # توجيه الموظف حسب قسم فرعه إن وجد
+        # توجيه الموظف حسب القسم المعيّن له إن وجد، وإلا حسب قسم الفرع، وإلا لوحة الموظف الافتراضية
         try:
             ensure_branch_department_column()
             user = User.query.get(session.get("user_id"))
+            # أولوية: قسم الموظف
+            if user and getattr(user, "section_id", None):
+                sec = BranchSection.query.get(user.section_id)
+                if sec:
+                    return _redirect_to_section(sec.name)
+            # fallback: قسم الفرع القديم
             if user and user.branch_id:
                 b = Branch.query.get(user.branch_id)
                 dept = (b.department or "").lower() if b else ""
@@ -1758,20 +1768,80 @@ def manage_branches():
     ensure_branch_sections_from_department()
 
     if request.method == "POST":
-        name = (request.form.get("name") or "").strip()
-        department = (request.form.get("department") or "").strip() or None
-        if not name:
-            flash("⚠️ يجب إدخال اسم الفرع", "danger")
-        else:
-            existing = Branch.query.filter_by(name=name).first()
-            if existing:
-                flash("⚠️ الفرع موجود مسبقاً", "warning")
+        action = (request.form.get("_action") or "create_branch").strip()
+        if action == "create_branch":
+            name = (request.form.get("name") or "").strip()
+            department = (request.form.get("department") or "").strip() or None
+            if not name:
+                flash("⚠️ يجب إدخال اسم الفرع", "danger")
             else:
-                branch = Branch(name=name, department=department)
-                db.session.add(branch)
-                db.session.commit()
-                flash("✅ تم إضافة الفرع", "success")
+                existing = Branch.query.filter_by(name=name).first()
+                if existing:
+                    flash("⚠️ الفرع موجود مسبقاً", "warning")
+                else:
+                    branch = Branch(name=name, department=department)
+                    db.session.add(branch)
+                    db.session.commit()
+                    flash("✅ تم إضافة الفرع", "success")
+                    return redirect(url_for("manage_branches"))
+        elif action == "add_section":
+            branch_id = request.form.get("branch_id")
+            section_name = (request.form.get("section_name") or "").strip()
+            try:
+                branch_id = int(branch_id)
+            except Exception:
+                branch_id = None
+            if not branch_id or not section_name:
+                flash("⚠️ يرجى اختيار الفرع واسم القسم", "danger")
+            else:
+                # توحيد كتابة اسم القسم لسهولة التوجيه
+                normalized = section_name.strip().lower()
+                # أسماء مختصرة مقبولة
+                aliases = {
+                    "consultation": "consultations",
+                    "consulting": "consultations",
+                    "الاستشارات": "consultations",
+                    "الاستشارات الهندسية": "consultations",
+                    "valuation": "valuation",
+                    "التثمين": "valuation",
+                    "owners": "owners_associations",
+                    "جمعيات": "owners_associations",
+                    "جمعيات الملاك": "owners_associations",
+                    "ادارة جمعيات الملاك": "owners_associations",
+                    "إدارة جمعيات الملاك": "owners_associations",
+                    "properties": "property_management",
+                    "الممتلكات": "property_management",
+                    "ادارة الممتلكات": "property_management",
+                    "إدارة الممتلكات": "property_management",
+                    "ادارة العقارات": "property_management",
+                    "إدارة العقارات": "property_management",
+                }
+                normalized = aliases.get(normalized, normalized)
+                exists = BranchSection.query.filter_by(branch_id=branch_id, name=normalized).first()
+                if exists:
+                    flash("⚠️ القسم موجود لهذا الفرع", "warning")
+                else:
+                    db.session.add(BranchSection(branch_id=branch_id, name=normalized))
+                    db.session.commit()
+                    flash("✅ تم إضافة القسم للفرع", "success")
                 return redirect(url_for("manage_branches"))
+        elif action == "delete_section":
+            sid = request.form.get("section_id")
+            try:
+                sid = int(sid)
+            except Exception:
+                sid = None
+            if not sid:
+                flash("⚠️ قسم غير صالح", "danger")
+            else:
+                s = BranchSection.query.get(sid)
+                if not s:
+                    flash("⚠️ القسم غير موجود", "warning")
+                else:
+                    db.session.delete(s)
+                    db.session.commit()
+                    flash("✅ تم حذف القسم", "success")
+            return redirect(url_for("manage_branches"))
 
     branches = Branch.query.all()
     return render_template("manage_branches.html", branches=branches)
@@ -2107,6 +2177,11 @@ def _redirect_to_section(section: str):
         return redirect(url_for("consultations_list"))
     if s in ("finance", "financial", "المالية"):
         return redirect(url_for("finance_dashboard"))
+    # 🆕 أقسام إضافية: إدارة جمعيات الملاك / إدارة الممتلكات
+    if s in ("owners_associations", "جمعيات الملاك", "owners", "associations"):
+        return redirect(url_for("owners_associations_dashboard"))
+    if s in ("property_management", "ادارة الممتلكات", "properties"):
+        return redirect(url_for("property_management_dashboard"))
     # valuation أو غير معروف => الافتراضي حسب الدور
     role = session.get("role")
     if role == "manager":
@@ -2118,6 +2193,26 @@ def _redirect_to_section(section: str):
     if role == "finance":
         return redirect(url_for("finance_dashboard"))
     return redirect(url_for("index"))
+
+
+# ================= Department Dashboards (Owners Associations / Property Management) =================
+@app.route("/owners_associations")
+def owners_associations_dashboard():
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+    # سياق بسيط: فرع المستخدم (إن وُجد)
+    user = User.query.get(session.get("user_id"))
+    branch = Branch.query.get(user.branch_id) if user and getattr(user, "branch_id", None) else None
+    return render_template("owners_associations.html", user=user, branch=branch)
+
+
+@app.route("/property_management")
+def property_management_dashboard():
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+    user = User.query.get(session.get("user_id"))
+    branch = Branch.query.get(user.branch_id) if user and getattr(user, "branch_id", None) else None
+    return render_template("property_management.html", user=user, branch=branch)
 
 
 # 🏦 إضافة بنك جديد
@@ -4321,8 +4416,17 @@ def manage_employees():
         password = request.form["password"]
         role = request.form["role"]
         branch_id = request.form.get("branch_id")
+        section_id = request.form.get("section_id") or None
+        try:
+            section_id = int(section_id) if section_id else None
+        except Exception:
+            section_id = None
+        try:
+            branch_id = int(branch_id) if branch_id else None
+        except Exception:
+            branch_id = None
         hashed_pw = generate_password_hash(password)
-        user = User(username=username, password=hashed_pw, role=role, branch_id=branch_id)
+        user = User(username=username, password=hashed_pw, role=role, branch_id=branch_id, section_id=section_id)
         db.session.add(user)
         db.session.commit()
         flash("✅ تم إضافة الموظف بنجاح", "success")
@@ -5217,6 +5321,20 @@ with app.app_context():
             print("✅ تم إنشاء جدول consultation")
         except Exception:
             db.session.rollback()
+
+    # 🆕 إضافة عمود section_id لجدول المستخدمين إذا كان الجدول قديم
+    try:
+        if not column_exists("user", "section_id"):
+            db.session.execute(text("ALTER TABLE user ADD COLUMN section_id INTEGER"))
+            db.session.commit()
+            try:
+                db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_user_section_id ON user(section_id)"))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+            print("✅ تمت إضافة عمود section_id إلى user")
+    except Exception:
+        db.session.rollback()
 
     # محاولة إضافة عمود bank_branch للمعاملات إذا كان الجدول قديم
     # محاولة إضافة عمود bank_sent_files إذا كان الجدول قديم

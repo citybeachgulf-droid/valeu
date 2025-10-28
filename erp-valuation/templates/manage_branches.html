@@ -36,6 +36,7 @@
     <div class="card-body">
       <h5 class="mb-3">➕ إضافة فرع جديد</h5>
       <form method="POST" class="row g-3">
+        <input type="hidden" name="_action" value="create_branch">
         <div class="col-12 col-md-6">
           <input type="text" name="name" placeholder="اسم الفرع" class="form-control" required>
         </div>
@@ -49,6 +50,30 @@
         </div>
         <div class="col-12 col-md-2">
           <button type="submit" class="btn btn-primary w-100">إضافة</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 🆕 إدارة الأقسام للفرع -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h5 class="mb-3">🏷️ إضافة قسم لفرع</h5>
+      <form method="POST" class="row g-3">
+        <input type="hidden" name="_action" value="add_section">
+        <div class="col-12 col-md-4">
+          <select name="branch_id" class="form-select" required>
+            <option value="">اختر الفرع</option>
+            {% for b in branches %}
+              <option value="{{ b.id }}">{{ b.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-4">
+          <input type="text" name="section_name" class="form-control" placeholder="اسم القسم (التثمين، الاستشارات، ادارة الممتلكات، جمعيات الملاك)" required>
+        </div>
+        <div class="col-12 col-md-2">
+          <button type="submit" class="btn btn-secondary w-100">➕ إضافة قسم</button>
         </div>
       </form>
     </div>
@@ -82,7 +107,12 @@
               <!-- روابط سريعة للأقسام في هذا الفرع إن كانت معرفة -->
               {% if b.sections %}
                 {% for s in b.sections %}
-                <a href="{{ url_for('open_branch_section', bid=b.id, section=s.name) }}" class="btn btn-sm btn-light">قسم: {{ 'الاستشارات' if s.name=='consultations' else ('التثمين' if s.name=='valuation' else s.name) }}</a>
+                <a href="{{ url_for('open_branch_section', bid=b.id, section=s.name) }}" class="btn btn-sm btn-light">قسم: {{ 'الاستشارات' if s.name=='consultations' else ('التثمين' if s.name=='valuation' else ('إدارة الممتلكات' if s.name=='property_management' else ('جمعيات الملاك' if s.name=='owners_associations' else s.name))) }}</a>
+                <form method="POST" action="{{ url_for('manage_branches') }}" style="display:inline">
+                  <input type="hidden" name="_action" value="delete_section">
+                  <input type="hidden" name="section_id" value="{{ s.id }}">
+                  <button class="btn btn-sm btn-outline-danger" onclick="return confirm('حذف القسم من هذا الفرع؟');">حذف القسم</button>
+                </form>
                 {% endfor %}
               {% endif %}
               <!-- المالية ثابتة لكل الأقسام -->
