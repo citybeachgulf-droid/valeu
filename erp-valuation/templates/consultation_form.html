@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% set title = ("تعديل استشارة" if mode=='edit' else "استشارة جديدة") %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="{{ url_for('consultations_list') }}">الاستشارات</a>
+  </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <form method="post" class="row g-3">
+    <div class="col-12 col-md-6">
+      <label class="form-label">نوع الاستشارة</label>
+      <select class="form-select" name="consultation_type" required>
+        {% for t in types %}
+        <option value="{{ t }}" {% if consultation and consultation.consultation_type==t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">الحالة</label>
+      <select class="form-select" name="status" required>
+        {% for s in statuses %}
+        <option value="{{ s }}" {% if consultation and consultation.status==s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-12 col-md-6">
+      <label class="form-label">اسم المشروع</label>
+      <input class="form-control" name="project_name" value="{{ project.name if project else '' }}" placeholder="مثال: مشروع مبنى إداري" />
+    </div>
+    <div class="col-12 col-md-3">
+      <label class="form-label">اسم العميل</label>
+      <input class="form-control" name="client_name" value="{{ client.name if client else '' }}" />
+    </div>
+    <div class="col-12 col-md-3">
+      <label class="form-label">هاتف العميل</label>
+      <input class="form-control" name="client_phone" value="" />
+    </div>
+
+    <div class="col-12">
+      <label class="form-label">الوصف</label>
+      <textarea class="form-control" name="description" rows="4">{{ consultation.description if consultation else '' }}</textarea>
+    </div>
+
+    <div class="col-12 col-md-4">
+      <label class="form-label">تاريخ البدء</label>
+      <input class="form-control" type="date" name="start_date" value="{{ consultation.start_date if consultation else '' }}" />
+    </div>
+    <div class="col-12 col-md-4">
+      <label class="form-label">تاريخ الانتهاء</label>
+      <input class="form-control" type="date" name="end_date" value="{{ consultation.end_date if consultation else '' }}" />
+    </div>
+    <div class="col-12 col-md-4">
+      <label class="form-label">الاستشاري</label>
+      <input class="form-control" name="consultant_name" value="{{ consultation.consultant_name if consultation else '' }}" />
+    </div>
+
+    {% set role = session.get('role') %}
+    {% if role in ['manager', 'finance'] %}
+    <div class="col-12 col-md-4">
+      <label class="form-label">التكلفة</label>
+      <input class="form-control" type="number" step="0.01" name="cost" value="{{ consultation.cost if consultation and consultation.cost else '' }}" />
+    </div>
+    {% endif %}
+
+    <div class="col-12 d-flex gap-2">
+      <button class="btn btn-primary">حفظ</button>
+      <a class="btn btn-secondary" href="{{ url_for('consultations_list') }}">رجوع</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
