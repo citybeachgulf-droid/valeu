@@ -7,7 +7,7 @@ from app import db
 
 
 # Keep table names prefixed to avoid collisions with core app tables
-class Project(db.Model):
+class ConsultingProject(db.Model):
     __tablename__ = "consulting_project"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -38,7 +38,7 @@ class Project(db.Model):
     client = db.relationship(
         "Client",
         backref=db.backref("projects", lazy=True),
-        primaryjoin="Client.id==Project.client_id",
+        primaryjoin="Client.id==ConsultingProject.client_id",
     )
     files = db.relationship(
         "ProjectFile",
@@ -48,7 +48,7 @@ class Project(db.Model):
     )
 
     def __repr__(self) -> str:  # pragma: no cover
-        return f"<Project {self.id} {self.name!r} status={self.status} progress={self.progress}>"
+        return f"<ConsultingProject {self.id} {self.name!r} status={self.status} progress={self.progress}>"
 
     def is_active(self) -> bool:
         return self.status == "قيد التنفيذ"

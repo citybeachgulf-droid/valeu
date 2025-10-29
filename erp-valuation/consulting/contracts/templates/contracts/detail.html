@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">تفاصيل العقد - {{ contract.contract_number }}</h3>
+    <a class="btn btn-secondary" href="{{ url_for('consulting_contracts.list_contracts') }}">رجوع</a>
+  </div>
+
+  {% if contract.is_near_expiry() %}
+    <div class="alert alert-warning">⚠️ هذا العقد ينتهي خلال {{ contract.days_to_expiry() }} يوم.</div>
+  {% endif %}
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div><strong>المشروع:</strong> {{ contract.project.name if contract.project else '-' }}</div>
+          <div><strong>العميل:</strong> {{ contract.client.name if contract.client else '-' }}</div>
+          <div><strong>الحالة:</strong> {{ contract.status }}</div>
+          <div><strong>القيمة:</strong> {{ '%.2f'|format(contract.value) if contract.value is not none else '-' }}</div>
+        </div>
+        <div class="col-md-6">
+          <div><strong>تاريخ البدء:</strong> {{ contract.start_date.strftime('%Y-%m-%d') if contract.start_date else '-' }}</div>
+          <div><strong>تاريخ الانتهاء:</strong> {{ contract.end_date.strftime('%Y-%m-%d') if contract.end_date else '-' }}</div>
+          <div><strong>أضيفت في:</strong> {{ contract.created_at.strftime('%Y-%m-%d') if contract.created_at else '-' }}</div>
+        </div>
+        <div class="col-12">
+          <div><strong>شروط الدفع:</strong></div>
+          <div class="text-muted">{{ contract.payment_terms or '-' }}</div>
+        </div>
+        <div class="col-12">
+          <div><strong>ملاحظات:</strong></div>
+          <div class="text-muted">{{ contract.notes or '-' }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">ملف العقد (PDF)</h5>
+      {% if contract.file_path %}
+        <p>
+          <a class="btn btn-outline-primary" target="_blank" href="{{ url_for('uploaded_file', filename=contract.file_path) }}">📄 عرض الملف</a>
+          <a class="btn btn-outline-secondary" href="{{ url_for('download_local_file', filename=contract.file_path) }}">⬇️ تنزيل</a>
+        </p>
+      {% else %}
+        <p class="text-muted">لا يوجد ملف مرفق.</p>
+      {% endif %}
+
+      <form class="mt-3" method="post" enctype="multipart/form-data" action="{{ url_for('consulting_contracts.upload_contract_file', contract_id=contract.id) }}">
+        <div class="row g-2 align-items-center">
+          <div class="col-md-6">
+            <input type="file" name="file" accept="application/pdf" class="form-control" required>
+          </div>
+          <div class="col-md-3 d-grid">
+            <button class="btn btn-primary" type="submit">رفع/استبدال الملف</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

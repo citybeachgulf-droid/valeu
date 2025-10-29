@@ -19,7 +19,7 @@ from sqlalchemy import or_
 
 from app import db
 from consulting.clients.models import Client
-from .models import Project, ProjectFile
+from .models import ConsultingProject, ProjectFile
 from .forms import (
     PROJECT_TYPES,
     PROJECT_STATUSES,
@@ -65,25 +65,25 @@ def list_projects():
     page = max(int(request.args.get("page", 1) or 1), 1)
     per_page = min(max(int(request.args.get("per_page", 20) or 20), 1), 100)
 
-    query = Project.query
+    query = ConsultingProject.query
     if q:
         like = f"%{q}%"
         query = query.filter(
             or_(
-                Project.name.ilike(like),
-                Project.location.ilike(like),
-                Project.description.ilike(like),
+                ConsultingProject.name.ilike(like),
+                ConsultingProject.location.ilike(like),
+                ConsultingProject.description.ilike(like),
             )
         )
     if status_filter:
-        query = query.filter(Project.status == status_filter)
+        query = query.filter(ConsultingProject.status == status_filter)
     if client_id:
         try:
-            query = query.filter(Project.client_id == int(client_id))
+            query = query.filter(ConsultingProject.client_id == int(client_id))
         except Exception:
             pass
 
-    query = query.order_by(Project.id.desc())
+    query = query.order_by(ConsultingProject.id.desc())
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
     # Clients for filter dropdown
@@ -108,7 +108,7 @@ def project_detail(project_id: int):
     if maybe_redirect:
         return maybe_redirect
 
-    project = Project.query.get_or_404(project_id)
+    project = ConsultingProject.query.get_or_404(project_id)
 
     # Placeholder data for contracts and engineers (no schema defined yet)
     related_contracts: List[Dict] = []
@@ -152,7 +152,7 @@ def create_project():
                 PROJECT_STATUSES=PROJECT_STATUSES,
                 title="إضافة مشروع",
             )
-        project = Project(**data)
+        project = ConsultingProject(**data)
         db.session.add(project)
         db.session.commit()
         flash("✅ تم إضافة المشروع بنجاح", "success")
@@ -176,7 +176,7 @@ def edit_project(project_id: int):
     if maybe_redirect:
         return maybe_redirect
 
-    project = Project.query.get_or_404(project_id)
+    project = ConsultingProject.query.get_or_404(project_id)
 
     if request.method == "POST":
         data, errors = validate_project_form(request.form)
@@ -240,7 +240,7 @@ def upload_project_file(project_id: int):
     if maybe_redirect:
         return maybe_redirect
 
-    project = Project.query.get_or_404(project_id)
+    project = ConsultingProject.query.get_or_404(project_id)
 
     files = request.files.getlist("files")
     if not files:
