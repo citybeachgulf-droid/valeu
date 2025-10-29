@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">عملاء الاستشارات</h3>
+    <a href="{{ url_for('consulting_clients.create_client') }}" class="btn btn-primary">➕ إضافة عميل</a>
+  </div>
+
+  <form class="row g-2 mb-3" method="get" action="{{ url_for('consulting_clients.list_clients') }}">
+    <div class="col-md-6">
+      <input type="text" name="q" class="form-control" placeholder="بحث بالاسم / الهاتف / البريد / الرقم الضريبي" value="{{ q or '' }}">
+    </div>
+    <div class="col-md-3">
+      <select name="type" class="form-select">
+        <option value="">كل الأنواع</option>
+        {% for t in CLIENT_TYPES %}
+          <option value="{{ t }}" {% if current_type == t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3 d-grid">
+      <button type="submit" class="btn btn-secondary">🔎 بحث</button>
+    </div>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>الاسم</th>
+          <th>النوع</th>
+          <th>الهاتف</th>
+          <th>البريد</th>
+          <th>الرقم الضريبي</th>
+          <th class="text-nowrap">تاريخ الإضافة</th>
+          <th class="text-end">إجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if clients %}
+          {% for c in clients %}
+          <tr>
+            <td>{{ c.name }}</td>
+            <td>{{ c.type }}</td>
+            <td>{{ c.phone or '-' }}</td>
+            <td>{{ c.email or '-' }}</td>
+            <td>{{ c.tax_number or '-' }}</td>
+            <td class="text-nowrap">{{ c.created_at.strftime('%Y-%m-%d') if c.created_at else '-' }}</td>
+            <td class="text-end text-nowrap">
+              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_clients.client_detail', client_id=c.id) }}">عرض</a>
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('consulting_clients.edit_client', client_id=c.id) }}">تعديل</a>
+              <form action="{{ url_for('consulting_clients.delete_client', client_id=c.id) }}" method="post" class="d-inline" onsubmit="return confirm('هل أنت متأكد من حذف العميل؟');">
+                <button class="btn btn-sm btn-outline-danger" type="submit">حذف</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted">لا توجد بيانات</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if pagination.pages > 1 %}
+  <nav aria-label="clients pagination">
+    <ul class="pagination justify-content-center">
+      <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('consulting_clients.list_clients', q=q, type=current_type, page=pagination.prev_num) }}">السابق</a>
+      </li>
+      <li class="page-item disabled"><span class="page-link">صفحة {{ pagination.page }} / {{ pagination.pages }}</span></li>
+      <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('consulting_clients.list_clients', q=q, type=current_type, page=pagination.next_num) }}">التالي</a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

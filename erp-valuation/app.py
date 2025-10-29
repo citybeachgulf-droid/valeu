@@ -183,6 +183,11 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 db = SQLAlchemy(app)
 
+# ---------------- Register Blueprints (Consulting) ----------------
+# موديول العملاء لقسم الاستشارات
+from consulting.clients.routes import clients_bp
+app.register_blueprint(clients_bp)
+
 # ---------------- Service Worker at root scope ----------------
 @app.route('/service-worker.js')
 def serve_service_worker():

@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+  <h3 class="mb-3">{% if mode == 'edit' %}تعديل عميل{% else %}إضافة عميل{% endif %}</h3>
+
+  <form method="post">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">الاسم <span class="text-danger">*</span></label>
+        <input type="text" name="name" class="form-control" value="{{ (data.name if data.name is defined else data.get('name')) or '' }}" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">نوع العميل <span class="text-danger">*</span></label>
+        <select name="type" class="form-select" required>
+          <option value="">— اختر —</option>
+          {% set current = (data.type if data.type is defined else data.get('type')) or '' %}
+          {% for t in CLIENT_TYPES %}
+            <option value="{{ t }}" {% if current == t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">الهاتف</label>
+        <input type="text" name="phone" class="form-control" value="{{ (data.phone if data.phone is defined else data.get('phone')) or '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">البريد الإلكتروني</label>
+        <input type="email" name="email" class="form-control" value="{{ (data.email if data.email is defined else data.get('email')) or '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">العنوان</label>
+        <input type="text" name="address" class="form-control" value="{{ (data.address if data.address is defined else data.get('address')) or '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">الرقم الضريبي</label>
+        <input type="text" name="tax_number" class="form-control" value="{{ (data.tax_number if data.tax_number is defined else data.get('tax_number')) or '' }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label">ملاحظات</label>
+        <textarea name="notes" rows="4" class="form-control">{{ (data.notes if data.notes is defined else data.get('notes')) or '' }}</textarea>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-4">
+      <button class="btn btn-primary" type="submit">💾 حفظ</button>
+      {% if mode == 'edit' and client %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_clients.client_detail', client_id=client.id) }}">إلغاء</a>
+      {% else %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_clients.list_clients') }}">إلغاء</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+{% endblock %}

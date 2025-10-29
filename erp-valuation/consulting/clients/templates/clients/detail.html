@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">تفاصيل العميل</h3>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_clients.list_clients') }}">↩️ رجوع</a>
+      <a class="btn btn-primary" href="{{ url_for('consulting_clients.edit_client', client_id=client.id) }}">✏️ تعديل</a>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="fw-bold text-muted">الاسم</div>
+          <div>{{ client.name }}</div>
+        </div>
+        <div class="col-md-6">
+          <div class="fw-bold text-muted">النوع</div>
+          <div>{{ client.type }}</div>
+        </div>
+        <div class="col-md-6">
+          <div class="fw-bold text-muted">الهاتف</div>
+          <div>{{ client.phone or '-' }}</div>
+        </div>
+        <div class="col-md-6">
+          <div class="fw-bold text-muted">البريد الإلكتروني</div>
+          <div>{{ client.email or '-' }}</div>
+        </div>
+        <div class="col-md-6">
+          <div class="fw-bold text-muted">العنوان</div>
+          <div>{{ client.address or '-' }}</div>
+        </div>
+        <div class="col-md-6">
+          <div class="fw-bold text-muted">الرقم الضريبي</div>
+          <div>{{ client.tax_number or '-' }}</div>
+        </div>
+        <div class="col-md-6">
+          <div class="fw-bold text-muted">تاريخ الإضافة</div>
+          <div>{{ client.created_at.strftime('%Y-%m-%d %H:%M') if client.created_at else '-' }}</div>
+        </div>
+        <div class="col-md-6">
+          <div class="fw-bold text-muted">آخر تحديث</div>
+          <div>{{ client.updated_at.strftime('%Y-%m-%d %H:%M') if client.updated_at else '-' }}</div>
+        </div>
+        <div class="col-12">
+          <div class="fw-bold text-muted">ملاحظات</div>
+          <div style="white-space: pre-wrap;">{{ client.notes or '-' }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">المشاريع المرتبطة</div>
+        <div class="card-body">
+          {% if related_projects %}
+            <ul class="list-group list-group-flush">
+              {% for p in related_projects %}
+                <li class="list-group-item d-flex justify-content-between">
+                  <span>{{ p.name }}</span>
+                  <a class="btn btn-sm btn-outline-primary" href="#">عرض</a>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="text-muted">لا توجد مشاريع مرتبطة بعد.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">العقود المرتبطة</div>
+        <div class="card-body">
+          {% if related_contracts %}
+            <ul class="list-group list-group-flush">
+              {% for c in related_contracts %}
+                <li class="list-group-item d-flex justify-content-between">
+                  <span>{{ c.title }}</span>
+                  <a class="btn btn-sm btn-outline-primary" href="#">عرض</a>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="text-muted">لا توجد عقود مرتبطة بعد.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
