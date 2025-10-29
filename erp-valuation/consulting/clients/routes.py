@@ -5,7 +5,7 @@ from sqlalchemy import or_
 
 from .models import Client
 from .forms import CLIENT_TYPES, validate_client_form
-from app import db
+from extensions import db
 
 # Blueprint prefix at /consulting
 clients_bp = Blueprint(

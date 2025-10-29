@@ -15,7 +15,7 @@ from flask import (
 )
 from sqlalchemy import or_
 
-from app import db
+from extensions import db
 from consulting.projects.models import ConsultingProject
 from .models import Engineer, Task
 from .forms import ENGINEER_SPECIALTIES, TASK_STATUSES, validate_new_task_form, validate_update_task_form

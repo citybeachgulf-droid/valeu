@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, date
 from typing import Any, Dict, Optional
 
-from app import db
+from extensions import db
 from consulting.clients.models import Client
 from consulting.projects.models import ConsultingProject
 

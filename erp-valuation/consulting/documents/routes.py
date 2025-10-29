@@ -18,7 +18,7 @@ from flask import (
 from werkzeug.utils import secure_filename
 from sqlalchemy import or_
 
-from app import db
+from extensions import db
 from consulting.projects.models import ConsultingProject
 from .models import Document
 from .forms import (

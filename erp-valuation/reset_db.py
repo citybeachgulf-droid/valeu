@@ -1,4 +1,5 @@
-from app import db, app, User
+from extensions import db
+from app import app, User
 from werkzeug.security import generate_password_hash
 
 with app.app_context():
