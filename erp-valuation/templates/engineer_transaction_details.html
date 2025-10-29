@@ -1,197 +1,160 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>🔎 تفاصيل المعاملة</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<meta charset="UTF-8">
+<title>🔎 تفاصيل المعاملة</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" rel="stylesheet">
+<style>
+  body { font-family: 'Cairo', sans-serif; background: #f5f7fa; }
+  h2 { font-weight: 700; margin-bottom: 1.5rem; }
+  .navbar { background: linear-gradient(90deg,#0d6efd,#6610f2); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+  .card { border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); margin-bottom: 25px; transition: transform 0.3s; }
+  .card:hover { transform: translateY(-5px); }
+  .card-header { font-weight: 700; font-size: 1.1rem; background: linear-gradient(90deg,#6610f2,#0d6efd); color: #fff; }
+  .btn-primary, .btn-success, .btn-outline-primary, .btn-outline-secondary { border-radius: 50px; transition: 0.3s; }
+  .btn-primary:hover { background: #6610f2; border-color: #6610f2; }
+  .form-label { font-weight: 600; }
+  ul { padding-left: 1.2rem; }
+  li a { text-decoration: none; transition: 0.2s; }
+  li a:hover { color: #6610f2; }
+  .badge-status { font-size: 0.9rem; padding: 0.5em 0.75em; border-radius: 12px; }
+  .tab-card { border-radius: 15px; box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+  @media(max-width:768px){ .navbar-nav { text-align: center; } }
+</style>
 </head>
-
-
 <body class="container mt-4">
 
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+<nav class="navbar navbar-expand-lg navbar-dark mb-4 shadow-sm" data-aos="fade-down">
   <div class="container-fluid">
-    <a class="navbar-brand" href="#">🛠️ نظام التثمين</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+    <a class="navbar-brand fw-bold" href="#">🛠️ نظام التثمين</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto">
-        <!-- زر الصفحة الرئيسية -->
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('engineer_dashboard') }}">🏠 الصفحة الرئيسية</a>
-        </li>
-        <!-- زر تسجيل الخروج -->
-        <li class="nav-item">
-          <a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 تسجيل الخروج</a>
-        </li>
-          <li class="nav-item">
-            <a class="nav-link text-warning" href="/reports">📑 التقارير</a>
-          </li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('engineer_dashboard') }}">🏠 الصفحة الرئيسية</a></li>
+        <li class="nav-item"><a class="nav-link text-warning" href="/reports">📑 التقارير</a></li>
+        <li class="nav-item"><a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 تسجيل الخروج</a></li>
       </ul>
     </div>
   </div>
 </nav>
 
-  <h2 class="mb-3">تفاصيل المعاملة #{{ t.id }}</h2>
+<h2 data-aos="fade-up">تفاصيل المعاملة #{{ t.id }}</h2>
 
-  <!-- ✅ بيانات عامة -->
-  <div class="card mb-3">
-    <div class="card-header bg-primary text-white">📌 بيانات العميل</div>
-    <div class="card-body">
-      <p><strong>العميل:</strong> {{ t.client }}</p>
-      <p><strong>الموظف المدخل:</strong> {{ t.employee }}</p>
-      <p><strong>من جلب المعاملة:</strong> {{ t.brought_by or '-' }}</p>
-      <p><strong>من قام بالزيارة:</strong> {{ t.visited_by or '-' }}</p>
-      <p><strong>التاريخ:</strong> {{ t.date.strftime("%Y-%m-%d %H:%M") }}</p>
-      <p><strong>الفرع:</strong> {{ t.branch.name if t.branch else "غير محدد" }}</p>
-      <p><strong>الحالة الحالية:</strong> {{ t.status }}</p>
-    </div>
+<!-- بيانات العميل -->
+<div class="card" data-aos="fade-up">
+  <div class="card-header">📌 بيانات العميل</div>
+  <div class="card-body">
+    <p><strong>العميل:</strong> {{ t.client }}</p>
+    <p><strong>الموظف المدخل:</strong> {{ t.employee }}</p>
+    <p><strong>من جلب المعاملة:</strong> {{ t.brought_by or '-' }}</p>
+    <p><strong>من قام بالزيارة:</strong> {{ t.visited_by or '-' }}</p>
+    <p><strong>التاريخ:</strong> {{ t.date.strftime("%Y-%m-%d %H:%M") }}</p>
+    <p><strong>الفرع:</strong> {{ t.branch.name if t.branch else "غير محدد" }}</p>
+    <p><strong>الحالة الحالية:</strong> <span class="badge bg-info text-dark">{{ t.status }}</span></p>
   </div>
+</div>
 
-  <!-- ✅ بيانات خاصة بالعقار -->
-  {% if t.transaction_type == "real_estate" %}
-  <div class="card mb-3">
-    <div class="card-header bg-success text-white">🏠 بيانات العقار</div>
-    <div class="card-body">
-      <p><strong>المحافظة:</strong> {{ t.state }}</p>
-      <p><strong>المنطقة:</strong> {{ t.region }}</p>
-      <p><strong>البنك:</strong> {{ t.bank.name if t.bank else "غير محدد" }}</p>
-      <p><strong>المساحة:</strong> {{ t.area }} م²</p>
-      <p><strong>مساحة المبنى:</strong> {{ t.building_area }} م²</p>
-      <p><strong>عمر المبنى:</strong> {{ t.building_age }} سنة</p>
-      <p><strong>قيمة الأرض:</strong> {{ "{:,.0f}".format(t.land_value or 0) }} ريال</p>
-      <p><strong>قيمة المبنى:</strong> {{ "{:,.0f}".format(t.building_value or 0) }} ريال</p>
-      <p><strong>إجمالي التثمين:</strong> <span class="fw-bold text-success">{{ "{:,.0f}".format(t.total_estimate or 0) }}</span> ريال</p>
+<!-- بيانات العقار -->
+{% if t.transaction_type == "real_estate" %}
+<div class="card" data-aos="fade-up">
+  <div class="card-header bg-success text-white">🏠 بيانات العقار</div>
+  <div class="card-body">
+    <p><strong>المحافظة:</strong> {{ t.state }}</p>
+    <p><strong>المنطقة:</strong> {{ t.region }}</p>
+    <p><strong>البنك:</strong> {{ t.bank.name if t.bank else "غير محدد" }}</p>
+    <p><strong>المساحة:</strong> {{ t.area }} م²</p>
+    <p><strong>مساحة المبنى:</strong> {{ t.building_area }} م²</p>
+    <p><strong>عمر المبنى:</strong> {{ t.building_age }} سنة</p>
+    <p><strong>قيمة الأرض:</strong> {{ "{:,.0f}".format(t.land_value or 0) }} ريال</p>
+    <p><strong>قيمة المبنى:</strong> {{ "{:,.0f}".format(t.building_value or 0) }} ريال</p>
+    <p><strong>إجمالي التثمين:</strong> <span class="fw-bold text-success">{{ "{:,.0f}".format(t.total_estimate or 0) }}</span> ريال</p>
 
-      {% if session.get('role') == 'engineer' %}
-      <hr>
-      <form method="POST" action="{{ url_for('engineer_valuate_transaction', tid=t.id) }}" class="row g-3">
-        <div class="col-md-4">
-          <label class="form-label">قيمة الأرض</label>
-          <input type="number" step="0.01" name="land_value" class="form-control" value="{{ t.land_value or 0 }}" required>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">قيمة المبنى</label>
-          <input type="number" step="0.01" name="building_value" class="form-control" value="{{ t.building_value or 0 }}">
-        </div>
-        <div class="col-md-4 d-flex align-items-end">
-          <button class="btn btn-primary w-100">💾 حفظ التثمين</button>
-        </div>
-      </form>
+    {% if session.get('role') == 'engineer' %}
+    <hr>
+    <form method="POST" action="{{ url_for('engineer_valuate_transaction', tid=t.id) }}" class="row g-3">
+      <div class="col-md-4"><label class="form-label">قيمة الأرض</label><input type="number" step="0.01" name="land_value" class="form-control" value="{{ t.land_value or 0 }}" required></div>
+      <div class="col-md-4"><label class="form-label">قيمة المبنى</label><input type="number" step="0.01" name="building_value" class="form-control" value="{{ t.building_value or 0 }}"></div>
+      <div class="col-md-4 d-flex align-items-end"><button class="btn btn-primary w-100">💾 حفظ التثمين</button></div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<!-- بيانات المركبة -->
+{% if t.transaction_type == "vehicle" %}
+<div class="card" data-aos="fade-up">
+  <div class="card-header bg-warning">🚗 بيانات المركبة</div>
+  <div class="card-body">
+    <p><strong>النوع:</strong> {{ t.vehicle_type }}</p>
+    <p><strong>الموديل:</strong> {{ t.vehicle_model }}</p>
+    <p><strong>سنة الصنع:</strong> {{ t.vehicle_year }}</p>
+    <p><strong>قيمة المركبة:</strong> <span class="fw-bold text-success">{{ t.total_estimate }}</span> ريال</p>
+
+    {% if session.get('role') == 'engineer' %}
+    <hr>
+    <form method="POST" action="{{ url_for('engineer_valuate_transaction', tid=t.id) }}" class="row g-3">
+      <div class="col-md-6"><label class="form-label">قيمة المركبة</label><input type="number" step="0.01" name="vehicle_value" class="form-control" value="{{ t.total_estimate or '' }}" required></div>
+      <div class="col-md-6 d-flex align-items-end"><button class="btn btn-primary w-100">💾 حفظ التثمين</button></div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<!-- المستندات المرفوعة -->
+<div class="card" data-aos="fade-up">
+  <div class="card-header bg-dark text-white">📂 المستندات المرفوعة</div>
+  <div class="card-body">
+    {% if t.files %}
+    <ul class="list-group list-group-flush">
+      {% for f in t.files.split(",") %}
+        {% set name = f %}
+        {% set ext = (name.rsplit('.', 1)[1] | lower) if (name and '.' in name) else '' %}
+        {% set office_exts = ['doc','docx','xls','xlsx','ppt','pptx'] %}
+        {% set src = url_for('uploaded_file', filename=f, _external=True) %}
+        {% set view_href = ('https://view.officeapps.live.com/op/view.aspx?src=' ~ (src | urlencode)) if ext in office_exts else src %}
+        <li class="list-group-item"><a href="{{ view_href }}" target="_blank">{{ f }}</a></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p>❌ لا يوجد مستندات</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if session.get('role') == 'engineer' and (t.status == 'بانتظار المهندس' or t.status == 'بانتظار تقرير المهندس') %}
+<div class="mb-3" data-aos="fade-up">
+  <a href="{{ url_for('engineer_take', tid=t.id) }}" class="btn btn-primary w-100">استلام المعاملة</a>
+</div>
+{% endif %}
+
+<!-- رفع تقرير -->
+<div class="card" data-aos="fade-up">
+  <div class="card-header bg-info text-white">📑 رفع تقرير</div>
+  <div class="card-body">
+    <form action="{{ url_for('engineer_upload_report', tid=t.id) }}" method="POST" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label for="report_file" class="form-label">اختر ملف التقرير (PDF فقط):</label>
+        <input type="file" class="form-control" name="report_file" accept=".pdf" required>
+      </div>
+      <button type="submit" class="btn btn-success w-100">⬆️ رفع التقرير</button>
+      {% if t.report_sha256 %}
+      <a class="btn btn-outline-primary mt-2 w-100" href="{{ url_for('barcode_page') }}?hash={{ t.report_sha256 }}" target="_blank">🧾 عرض QR والتحقق</a>
       {% endif %}
-    </div>
+    </form>
   </div>
-  {% endif %}
+</div>
 
-  <!-- ✅ بيانات خاصة بالسيارة -->
-  {% if t.transaction_type == "vehicle" %}
-  <div class="card mb-3">
-    <div class="card-header bg-warning">🚗 بيانات المركبة</div>
-    <div class="card-body">
-      <p><strong>النوع:</strong> {{ t.vehicle_type }}</p>
-      <p><strong>الموديل:</strong> {{ t.vehicle_model }}</p>
-      <p><strong>سنة الصنع:</strong> {{ t.vehicle_year }}</p>
-      <p><strong>قيمة المركبة:</strong> <span class="fw-bold text-success">{{ t.total_estimate }}</span> ريال</p>
-      {% if session.get('role') == 'engineer' %}
-      <hr>
-      <form method="POST" action="{{ url_for('engineer_valuate_transaction', tid=t.id) }}" class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label">قيمة المركبة</label>
-          <input type="number" step="0.01" name="vehicle_value" class="form-control" value="{{ t.total_estimate or '' }}" required>
-        </div>
-        <div class="col-md-6 d-flex align-items-end">
-          <button class="btn btn-primary w-100">💾 حفظ التثمين</button>
-        </div>
-      </form>
-      {% endif %}
-    </div>
-  </div>
-  {% endif %}
+<a href="{{ url_for('engineer_dashboard') }}" class="btn btn-secondary w-100 mb-4" data-aos="fade-up">🔙 رجوع</a>
 
-  <!-- ✅ المستندات المرفوعة -->
-  <div class="card mb-3">
-    <div class="card-header bg-dark text-white">📂 المستندات المرفوعة</div>
-    <div class="card-body">
-      {% if t.files %}
-        <ul>
-          {% for f in t.files.split(",") %}
-            {% set name = f %}
-            {% set ext = (name.rsplit('.', 1)[1] | lower) if (name and '.' in name) else '' %}
-            {% set office_exts = ['doc','docx','xls','xlsx','ppt','pptx'] %}
-            {% set src = url_for('uploaded_file', filename=f, _external=True) %}
-            {% set view_href = ('https://view.officeapps.live.com/op/view.aspx?src=' ~ (src | urlencode)) if ext in office_exts else src %}
-            <li><a href="{{ view_href }}" target="_blank">{{ f }}</a></li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p>❌ لا يوجد مستندات</p>
-      {% endif %}
-    </div>
-  </div>
-
-  {% if session.get('role') == 'engineer' and (t.status == 'بانتظار المهندس' or t.status == 'بانتظار تقرير المهندس') %}
-  <div class="mb-3">
-    <a href="{{ url_for('engineer_take', tid=t.id) }}" class="btn btn-primary">استلام المعاملة</a>
-  </div>
-  {% endif %}
-
-  <!-- ✅ رفع تقرير -->
-  <div class="card mb-3">
-    <div class="card-header bg-info text-white">📑 رفع تقرير</div>
-    <div class="card-body">
-<form action="{{ url_for('engineer_upload_report', tid=t.id) }}" method="POST" enctype="multipart/form-data">
-  <div class="mb-3">
-    <label for="report_file" class="form-label">اختر ملف التقرير (PDF فقط):</label>
-    <input type="file" class="form-control" name="report_file" accept=".pdf" required>
-  </div>
-  <button type="submit" class="btn btn-success">⬆️ رفع التقرير</button>
-  {% if t.report_sha256 %}
-    <a class="btn btn-outline-primary ms-2" href="{{ url_for('barcode_page') }}?hash={{ t.report_sha256 }}" target="_blank">🧾 عرض QR والتحقق</a>
-  {% endif %}
-</form>
-
-      <hr>
-     
-
-    </div>
-  </div>
-
-  
-
-  <a href="{{ url_for('engineer_dashboard') }}" class="btn btn-secondary">🔙 رجوع</a>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    var copyButton = document.getElementById('copyPublicReportLink');
-    if (copyButton) {
-      copyButton.addEventListener('click', function () {
-        var textToCopy = copyButton.getAttribute('data-clipboard-text');
-        if (!textToCopy) return;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(textToCopy);
-        } else {
-          var tempInput = document.createElement('input');
-          tempInput.value = textToCopy;
-          document.body.appendChild(tempInput);
-          tempInput.select();
-          try { document.execCommand('copy'); } finally { document.body.removeChild(tempInput); }
-        }
-      });
-    }
-
-    var toggleBtn = document.getElementById('toggleQrTool');
-    var toolContainer = document.getElementById('qrToolContainer');
-    if (toggleBtn && toolContainer) {
-      toggleBtn.addEventListener('click', function(){
-        var isHidden = toolContainer.style.display === 'none' || toolContainer.style.display === '';
-        toolContainer.style.display = isHidden ? 'block' : 'none';
-        toggleBtn.textContent = isHidden ? '🧩 إخفاء أداة الختم وQR' : '🧩 فتح أداة الختم وQR';
-      });
-    }
-  });
+  AOS.init({ duration: 800, once: true });
 </script>
-
 </body>
 </html>
-

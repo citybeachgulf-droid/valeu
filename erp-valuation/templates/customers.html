@@ -1,104 +1,120 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>👥 العملاء</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>👥 العملاء</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Tahoma, sans-serif; }
+  body { background:#f4f6f8; color:#333; }
+
+  /* Navbar */
+  nav { background:#1e1e2f; color:#fff; padding:0.8rem 1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; }
+  nav a { color:#fff; text-decoration:none; margin:0 0.5rem; font-weight:bold; }
+  nav a.text-danger { color:#ff4d4d; }
+  .navbar-brand { font-size:1.2rem; }
+
+  .container { max-width:1200px; margin:auto; padding:1rem; }
+
+  /* Cards */
+  .card { background:#fff; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.08); padding:1.5rem; transition:transform 0.3s; text-align:center; }
+  .card:hover { transform: translateY(-5px); }
+
+  h3,h6 { margin-bottom:1rem; text-align:center; }
+
+  /* Forms */
+  form { display:flex; flex-wrap:wrap; gap:1rem; justify-content:center; }
+  input { padding:0.5rem 0.7rem; border-radius:8px; border:1px solid #ccc; width:100%; max-width:250px; }
+  button, a { padding:0.5rem 1rem; border-radius:8px; text-decoration:none; font-weight:bold; cursor:pointer; transition: all 0.3s; border:none; text-align:center; }
+  button:hover, a:hover { opacity:0.9; }
+
+  .btn-primary { background:#0d6efd; color:#fff; }
+  .btn-success { background:#28a745; color:#fff; }
+  .btn-secondary { background:#6c757d; color:#fff; }
+  .btn-outline-secondary { background:transparent; color:#6c757d; border:1px solid #6c757d; }
+
+  /* Table */
+  table { width:100%; border-collapse:collapse; margin-top:1rem; text-align:center; }
+  th, td { padding:0.75rem; border:1px solid #ddd; }
+  thead { background:#1e1e2f; color:#fff; }
+  tbody tr:nth-child(even) { background:#f4f4f4; }
+
+  /* Responsive */
+  @media(max-width:768px) {
+    .row { flex-direction:column; }
+    input, button, a { max-width:100%; }
+  }
+
+  /* Animations */
+  .fade-in { opacity:0; animation: fadeIn 0.6s forwards; }
+  @keyframes fadeIn { to { opacity:1; } }
+</style>
 </head>
-<body class="bg-light">
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="#">🛠️ نظام التثمين</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto">
-        {% if session.get('role') == 'manager' %}
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('manager_dashboard') }}">👨‍💼 المدير</a></li>
-        {% elif session.get('role') == 'employee' %}
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('employee_dashboard') }}">🏗️ الموظف</a></li>
-        {% elif session.get('role') == 'finance' %}
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('finance_dashboard') }}">💰 المالية</a></li>
-        {% endif %}
-        <li class="nav-item"><a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 خروج</a></li>
-      </ul>
-    </div>
+<body>
+
+<nav>
+  <a class="navbar-brand" href="#">🛠️ نظام التثمين</a>
+  <div>
+    {% if session.get('role') == 'manager' %}
+      <a href="{{ url_for('manager_dashboard') }}">👨‍💼 المدير</a>
+    {% elif session.get('role') == 'employee' %}
+      <a href="{{ url_for('employee_dashboard') }}">🏗️ الموظف</a>
+    {% elif session.get('role') == 'finance' %}
+      <a href="{{ url_for('finance_dashboard') }}">💰 المالية</a>
+    {% endif %}
+    <a href="{{ url_for('logout') }}" class="text-danger">🚪 خروج</a>
   </div>
 </nav>
 
-<div class="container py-3">
-  <div class="d-flex justify-content-between align-items-end mb-3">
-    <h3 class="mb-0">👥 العملاء</h3>
-    <form method="get" class="d-flex gap-2 align-items-end">
-      <div>
-        <label class="form-label mb-1">بحث</label>
-        <input type="text" name="q" value="{{ q or '' }}" class="form-control form-control-sm" placeholder="اسم أو رقم">
-      </div>
-      <div>
-        <a class="btn btn-sm btn-outline-secondary mt-4" href="{{ url_for('customers_page') }}">مسح</a>
-      </div>
-      <div>
-        <a class="btn btn-sm btn-success mt-4" href="{{ url_for('customers_export_csv', q=q) }}">⬇️ تصدير CSV</a>
-      </div>
+<div class="container">
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <h3 class="fade-in">👥 العملاء</h3>
+    <form method="get" class="d-flex gap-2 flex-wrap justify-content-center align-items-end fade-in">
+      <input type="text" name="q" value="{{ q or '' }}" placeholder="اسم أو رقم">
+      <a href="{{ url_for('customers_page') }}" class="btn-outline-secondary">مسح</a>
+      <a href="{{ url_for('customers_export_csv', q=q) }}" class="btn-success">⬇️ تصدير CSV</a>
     </form>
   </div>
 
-  <div class="row g-3">
-    <div class="col-md-4">
-      <div class="card">
-        <div class="card-body">
-          <h6 class="mb-3">➕ إضافة عميل</h6>
-          <form method="post" action="{{ url_for('customers_page') }}" class="row g-2">
-            <div class="col-12">
-              <label class="form-label">الاسم</label>
-              <input type="text" name="name" class="form-control" required>
-            </div>
-            <div class="col-12">
-              <label class="form-label">الرقم</label>
-              <input type="text" name="phone" class="form-control" required>
-            </div>
-            <div class="col-12">
-              <button class="btn btn-primary w-100">حفظ</button>
-            </div>
-          </form>
-        </div>
-      </div>
+  <div class="row" style="display:flex; gap:1rem; flex-wrap:wrap; justify-content:center;">
+    <!-- إضافة عميل -->
+    <div class="card fade-in" style="flex:1 1 300px; max-width:400px;">
+      <h6>➕ إضافة عميل</h6>
+      <form method="post" action="{{ url_for('customers_page') }}">
+        <input type="text" name="name" placeholder="الاسم" required>
+        <input type="text" name="phone" placeholder="الرقم" required>
+        <button class="btn-primary" type="submit">حفظ</button>
+      </form>
     </div>
 
-    <div class="col-md-8">
-      <div class="card">
-        <div class="card-body">
-          <h6 class="mb-3">📋 قائمة العملاء</h6>
-          <div class="table-responsive">
-            <table class="table table-bordered table-striped align-middle">
-              <thead class="table-dark">
-                <tr>
-                  <th>#</th>
-                  <th>الاسم</th>
-                  <th>الرقم</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for c in customers %}
-                <tr>
-                  <td>{{ c.id }}</td>
-                  <td>{{ c.name }}</td>
-                  <td>{{ c.phone }}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="3" class="text-center">لا توجد بيانات</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
+    <!-- قائمة العملاء -->
+    <div class="card fade-in" style="flex:1 1 500px; max-width:700px;">
+      <h6>📋 قائمة العملاء</h6>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>الاسم</th>
+              <th>الرقم</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in customers %}
+            <tr>
+              <td>{{ c.id }}</td>
+              <td>{{ c.name }}</td>
+              <td>{{ c.phone }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3">لا توجد بيانات</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-

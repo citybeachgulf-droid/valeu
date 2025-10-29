@@ -1,115 +1,158 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>👥 إدارة الموظفين</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>👥 إدارة الموظفين</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Tahoma, sans-serif; }
+  body { background:#f4f6f8; color:#333; }
+  .container { max-width:1200px; margin:auto; padding:1rem; }
+
+  h2,h5 { text-align:center; margin-bottom:1rem; }
+
+  /* Card */
+  .card { background:#fff; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.08); padding:1.5rem; margin-bottom:2rem; transition: transform 0.3s; text-align:center; }
+  .card:hover { transform:translateY(-5px); }
+
+  form { display:flex; flex-wrap:wrap; gap:1rem; justify-content:center; align-items:end; }
+  input, select { padding:0.5rem 0.7rem; border-radius:8px; border:1px solid #ccc; width:100%; max-width:200px; }
+  button, a { padding:0.5rem 1rem; border-radius:8px; font-weight:bold; cursor:pointer; transition: all 0.3s; border:none; text-align:center; }
+  button:hover, a:hover { opacity:0.9; }
+
+  .btn-primary { background:#0d6efd; color:#fff; }
+  .btn-danger { background:#dc3545; color:#fff; }
+
+  table { width:100%; border-collapse:collapse; margin-top:1rem; text-align:center; }
+  th, td { padding:0.75rem; border:1px solid #ddd; }
+  thead { background:#1e1e2f; color:#fff; }
+  tbody tr:nth-child(even) { background:#f4f4f4; }
+
+  @media(max-width:768px){
+    form { flex-direction:column; align-items:center; }
+    input, select, button { max-width:100%; }
+  }
+
+  /* Fade in animation */
+  .fade-in { opacity:0; animation: fadeIn 0.6s forwards; }
+  @keyframes fadeIn { to { opacity:1; } }
+</style>
 </head>
-<body class="bg-light">
+<body>
 
-<div class="container py-4">
-  <h2 class="mb-4">👥 إدارة الموظفين</h2>
+<div class="container">
+  <h2 class="fade-in">👥 إدارة الموظفين</h2>
 
-  <!-- ✅ إضافة موظف -->
-  <div class="card shadow-sm mb-4">
-    <div class="card-body">
-      <h5 class="mb-3">➕ إضافة موظف جديد</h5>
-      <form method="POST" class="row g-3">
-        <div class="col-12 col-md-3">
-          <input type="text" name="username" placeholder="اسم المستخدم" class="form-control" required>
-        </div>
-        <div class="col-12 col-md-3">
-          <input type="password" name="password" placeholder="كلمة المرور" class="form-control" required>
-        </div>
-        <div class="col-12 col-md-3">
-          <select name="role" class="form-select" required>
-            <option value="">اختر الدور</option>
-            <option value="employee">موظف</option>
-            <option value="engineer">مهندس</option>
-            <option value="visit">مسؤول الزيارات</option>
-            <option value="finance">مالية</option>
-            <option value="manager">مدير</option>
-          </select>
-        </div>
-
-        <!-- ✅ اختيار الفرع -->
-        <div class="col-12 col-md-2">
-          <select name="branch_id" class="form-select" required>
-            <option value="">اختر الفرع</option>
-            {% for b in branches %}
-              <option value="{{ b.id }}">{{ b.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <!-- 🆕 اختيار القسم داخل الفرع (اختياري) -->
-        <div class="col-12 col-md-3">
-          <select name="section_id" class="form-select">
-            <option value="">القسم (اختياري)</option>
-            {% for b in branches %}
-              {% for s in b.sections or [] %}
-                <option value="{{ s.id }}">{{ b.name }} — {{ 'الاستشارات' if s.name=='consultations' else ('التثمين' if s.name=='valuation' else s.name) }}</option>
-              {% endfor %}
-            {% endfor %}
-          </select>
-        </div>
-
-        <div class="col-12 col-md-1">
-          <button type="submit" class="btn btn-primary w-100">إضافة</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- ✅ جدول الموظفين -->
-  <div class="card shadow-sm">
-    <div class="card-body">
-      <h5 class="mb-3">📋 قائمة الموظفين</h5>
-      <div class="table-responsive">
-      <table class="table table-bordered table-striped">
-        <thead class="table-dark">
-          <tr>
-            <th>#</th>
-            <th>اسم المستخدم</th>
-            <th>الدور</th>
-            <th>الفرع</th>
-            <th>القسم</th>
-            <th>إجراءات</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for u in users %}
-          <tr>
-            <td>{{ u.id }}</td>
-            <td>{{ u.username }}</td>
-            <td>{{ u.role }}</td>
-            <td>{{ u.branch.name if u.branch else "غير محدد" }}</td>
-            <td>
-              {% if u.section %}
-                {{ 'الاستشارات' if u.section.name=='consultations' else ('التثمين' if u.section.name=='valuation' else u.section.name) }}
-              {% else %}
-                —
-              {% endif %}
-            </td>
-            <td>
-              {% if u.role != 'manager' %}
-                <a href="{{ url_for('delete_employee', uid=u.id) }}" class="btn btn-sm btn-danger"
-                   onclick="return confirm('هل أنت متأكد من الحذف؟')">🗑 حذف</a>
-              {% else %}
-                <span class="text-muted">🚫</span>
-              {% endif %}
-            </td>
-          </tr>
-          {% else %}
-          <tr>
-            <td colspan="5" class="text-center">لا يوجد موظفين</td>
-          </tr>
+  <!-- إضافة موظف -->
+  <div class="card fade-in">
+    <h5>➕ إضافة موظف جديد</h5>
+    <form method="POST">
+      <input type="text" name="username" placeholder="اسم المستخدم" required>
+      <input type="password" name="password" placeholder="كلمة المرور" required>
+      <select name="role" required>
+        <option value="">اختر الدور</option>
+        <option value="employee">موظف</option>
+        <option value="engineer">مهندس</option>
+        <option value="visit">مسؤول الزيارات</option>
+        <option value="finance">مالية</option>
+        <option value="manager">مدير</option>
+      </select>
+      <select name="branch_id" required>
+        <option value="">اختر الفرع</option>
+        {% for b in branches %}
+          <option value="{{ b.id }}">{{ b.name }}</option>
+        {% endfor %}
+      </select>
+      <select name="section_id">
+        <option value="">القسم (اختياري)</option>
+        {% for b in branches %}
+          {% for s in b.sections or [] %}
+            <option value="{{ s.id }}">{{ b.name }} — {{ 'الاستشارات' if s.name=='consultations' else ('التثمين' if s.name=='valuation' else s.name) }}</option>
           {% endfor %}
-        </tbody>
-      </table>
-      </div>
-    </div>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-primary">إضافة</button>
+    </form>
   </div>
+
+ <!-- جدول الموظفين محسّن -->
+<div class="card fade-in">
+  <h5>📋 قائمة الموظفين</h5>
+  <div style="overflow-x:auto;">
+    <table class="custom-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>اسم المستخدم</th>
+          <th>الدور</th>
+          <th>الفرع</th>
+          <th>القسم</th>
+          <th>إجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>{{ u.id }}</td>
+          <td>{{ u.username }}</td>
+          <td>{{ u.role }}</td>
+          <td>{{ u.branch.name if u.branch else "غير محدد" }}</td>
+          <td>{% if u.section %}{{ 'الاستشارات' if u.section.name=='consultations' else ('التثمين' if u.section.name=='valuation' else u.section.name) }}{% else %}—{% endif %}</td>
+          <td>
+            {% if u.role != 'manager' %}
+              <a href="{{ url_for('delete_employee', uid=u.id) }}" class="btn-delete" onclick="return confirm('هل أنت متأكد من الحذف؟')">🗑 حذف</a>
+            {% else %}
+              <span style="color:#888;">🚫</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">لا يوجد موظفين</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+.custom-table { 
+  width: 100%; 
+  border-collapse: collapse; 
+  text-align: center; 
+  font-size: 0.95rem;
+}
+
+.custom-table thead { 
+  background: linear-gradient(90deg, #0d6efd, #6610f2); 
+  color: #fff; 
+  position: sticky; 
+  top: 0; 
+  z-index: 2;
+}
+
+.custom-table th, .custom-table td { 
+  padding: 0.75rem; 
+  border: 1px solid #ddd; 
+  vertical-align: middle; 
+}
+
+.custom-table tbody tr:nth-child(even) { background:#f9f9f9; }
+.custom-table tbody tr:hover { background:#e2e6ea; transform: scale(1.01); transition: 0.2s; }
+
+.btn-delete {
+  display:inline-block;
+  padding:0.35rem 0.6rem;
+  background:#dc3545;
+  color:#fff;
+  border-radius:6px;
+  text-decoration:none;
+  font-size:0.85rem;
+  transition: all 0.2s;
+}
+.btn-delete:hover { background:#c82333; transform: scale(1.05); }
+</style>
+
+
 </div>
 
 </body>
