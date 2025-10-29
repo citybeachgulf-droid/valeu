@@ -188,6 +188,10 @@ db = SQLAlchemy(app)
 from consulting.clients.routes import clients_bp
 app.register_blueprint(clients_bp)
 
+# موديول المشاريع لقسم الاستشارات
+from consulting.projects.routes import projects_bp
+app.register_blueprint(projects_bp)
+
 # ---------------- Service Worker at root scope ----------------
 @app.route('/service-worker.js')
 def serve_service_worker():

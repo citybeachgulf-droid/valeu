@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">مشاريع الاستشارات</h3>
+    <a href="{{ url_for('consulting_projects.create_project') }}" class="btn btn-primary">➕ إضافة مشروع</a>
+  </div>
+
+  <form class="row g-2 mb-3" method="get" action="{{ url_for('consulting_projects.list_projects') }}">
+    <div class="col-md-4">
+      <input type="text" name="q" class="form-control" placeholder="بحث بالاسم / الموقع / الوصف" value="{{ q or '' }}">
+    </div>
+    <div class="col-md-3">
+      <select name="status" class="form-select">
+        <option value="">كل الحالات</option>
+        {% for s in PROJECT_STATUSES %}
+          <option value="{{ s }}" {% if current_status == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select name="client_id" class="form-select">
+        <option value="">كل العملاء</option>
+        {% for c in clients %}
+          <option value="{{ c.id }}" {% if current_client_id|int == c.id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2 d-grid">
+      <button type="submit" class="btn btn-secondary">🔎 بحث</button>
+    </div>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>المشروع</th>
+          <th>العميل</th>
+          <th>النوع</th>
+          <th>الحالة</th>
+          <th>الإنجاز</th>
+          <th>تاريخ البدء</th>
+          <th class="text-end">إجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if projects %}
+          {% for p in projects %}
+          <tr>
+            <td>{{ p.name }}</td>
+            <td>{{ p.client.name if p.client else '-' }}</td>
+            <td>{{ p.type }}</td>
+            <td>{{ p.status }}</td>
+            <td>
+              <div class="progress" style="height: 10px;">
+                <div class="progress-bar" role="progressbar" style="width: {{ p.progress }}%;" aria-valuenow="{{ p.progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+              </div>
+            </td>
+            <td>{{ p.start_date.strftime('%Y-%m-%d') if p.start_date else '-' }}</td>
+            <td class="text-end text-nowrap">
+              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_projects.project_detail', project_id=p.id) }}">عرض</a>
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('consulting_projects.edit_project', project_id=p.id) }}">تعديل</a>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted">لا توجد بيانات</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if pagination.pages > 1 %}
+  <nav aria-label="projects pagination">
+    <ul class="pagination justify-content-center">
+      <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('consulting_projects.list_projects', q=q, status=current_status, client_id=current_client_id, page=pagination.prev_num) }}">السابق</a>
+      </li>
+      <li class="page-item disabled"><span class="page-link">صفحة {{ pagination.page }} / {{ pagination.pages }}</span></li>
+      <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('consulting_projects.list_projects', q=q, status=current_status, client_id=current_client_id, page=pagination.next_num) }}">التالي</a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}
