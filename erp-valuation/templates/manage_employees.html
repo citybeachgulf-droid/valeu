@@ -42,6 +42,17 @@
             {% endfor %}
           </select>
         </div>
+        <!-- 🆕 اختيار القسم داخل الفرع (اختياري) -->
+        <div class="col-12 col-md-3">
+          <select name="section_id" class="form-select">
+            <option value="">القسم (اختياري)</option>
+            {% for b in branches %}
+              {% for s in b.sections or [] %}
+                <option value="{{ s.id }}">{{ b.name }} — {{ 'الاستشارات' if s.name=='consultations' else ('التثمين' if s.name=='valuation' else s.name) }}</option>
+              {% endfor %}
+            {% endfor %}
+          </select>
+        </div>
 
         <div class="col-12 col-md-1">
           <button type="submit" class="btn btn-primary w-100">إضافة</button>
@@ -62,6 +73,7 @@
             <th>اسم المستخدم</th>
             <th>الدور</th>
             <th>الفرع</th>
+            <th>القسم</th>
             <th>إجراءات</th>
           </tr>
         </thead>
@@ -72,6 +84,13 @@
             <td>{{ u.username }}</td>
             <td>{{ u.role }}</td>
             <td>{{ u.branch.name if u.branch else "غير محدد" }}</td>
+            <td>
+              {% if u.section %}
+                {{ 'الاستشارات' if u.section.name=='consultations' else ('التثمين' if u.section.name=='valuation' else u.section.name) }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
             <td>
               {% if u.role != 'manager' %}
                 <a href="{{ url_for('delete_employee', uid=u.id) }}" class="btn btn-sm btn-danger"
