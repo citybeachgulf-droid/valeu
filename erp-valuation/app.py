@@ -200,6 +200,10 @@ app.register_blueprint(contracts_bp)
 from consulting.hr.routes import hr_bp
 app.register_blueprint(hr_bp)
 
+# موديول الفواتير والمحاسبة لقسم الاستشارات
+from consulting.invoices.routes import invoices_bp
+app.register_blueprint(invoices_bp)
+
 # ---------------- Service Worker at root scope ----------------
 @app.route('/service-worker.js')
 def serve_service_worker():

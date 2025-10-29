@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">فواتير الاستشارات</h3>
+    <a href="{{ url_for('consulting_invoices.create_invoice', client_id=current_client_id, project_id=current_project_id) }}" class="btn btn-primary">➕ إضافة فاتورة</a>
+  </div>
+
+  {% if overdue_count and overdue_count > 0 %}
+    <div class="alert alert-danger">⚠️ هناك {{ overdue_count }} فاتورة متأخرة عن السداد.</div>
+  {% endif %}
+
+  <form class="row g-2 mb-3" method="get" action="{{ url_for('consulting_invoices.list_invoices') }}">
+    <div class="col-md-4">
+      <input type="text" name="q" class="form-control" placeholder="بحث بالعميل / المشروع / رقم العقد" value="{{ q or '' }}">
+    </div>
+    <div class="col-md-2">
+      <select name="status" class="form-select">
+        <option value="">كل الحالات</option>
+        {% for s in INVOICE_STATUSES %}
+          <option value="{{ s }}" {% if current_status == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select name="client_id" class="form-select">
+        <option value="">كل العملاء</option>
+        {% for c in clients %}
+          <option value="{{ c.id }}" {% if current_client_id|int == c.id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select name="project_id" class="form-select">
+        <option value="">كل المشاريع</option>
+        {% for p in projects %}
+          <option value="{{ p.id }}" {% if current_project_id|int == p.id %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>رقم</th>
+          <th>المشروع</th>
+          <th>العميل</th>
+          <th>المبلغ</th>
+          <th>تاريخ الإصدار</th>
+          <th>تاريخ الاستحقاق</th>
+          <th>الحالة</th>
+          <th class="text-end">إجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if invoices %}
+          {% for inv in invoices %}
+          <tr>
+            <td class="text-nowrap">#{{ inv.id }}</td>
+            <td>{{ inv.project.name if inv.project else '-' }}</td>
+            <td>{{ inv.client.name if inv.client else '-' }}</td>
+            <td>{{ '%.2f'|format(inv.amount) }}</td>
+            <td>{{ inv.issue_date.strftime('%Y-%m-%d') if inv.issue_date else '-' }}</td>
+            <td>
+              {% if inv.due_date %}
+                {{ inv.due_date.strftime('%Y-%m-%d') }}
+                {% if inv.is_overdue() %}
+                  <span class="badge bg-danger ms-1">متأخرة</span>
+                {% endif %}
+              {% else %}-{% endif %}
+            </td>
+            <td>
+              {% if inv.status == 'مدفوعة' %}
+                <span class="badge bg-success">{{ inv.status }}</span>
+              {% elif inv.status == 'غير مدفوعة' %}
+                <span class="badge bg-warning text-dark">{{ inv.status }}</span>
+              {% else %}
+                <span class="badge bg-danger">{{ inv.status }}</span>
+              {% endif %}
+            </td>
+            <td class="text-end text-nowrap">
+              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_invoices.invoice_detail', invoice_id=inv.id) }}">عرض</a>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="8" class="text-center text-muted">لا توجد بيانات</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if pagination.pages > 1 %}
+  <nav aria-label="invoices pagination">
+    <ul class="pagination justify-content-center">
+      <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('consulting_invoices.list_invoices', q=q, status=current_status, client_id=current_client_id, project_id=current_project_id, page=pagination.prev_num) }}">السابق</a>
+      </li>
+      <li class="page-item disabled"><span class="page-link">صفحة {{ pagination.page }} / {{ pagination.pages }}</span></li>
+      <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('consulting_invoices.list_invoices', q=q, status=current_status, client_id=current_client_id, project_id=current_project_id, page=pagination.next_num) }}">التالي</a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}
