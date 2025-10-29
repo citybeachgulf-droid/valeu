@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+
+{% block head_extra %}
+  <style>
+    body { font-family: 'Cairo', system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; }
+    .card-title { font-weight: 700; }
+    .metric { font-size: 1.6rem; font-weight: 700; }
+    .subtext { color: #6c757d; font-size: .9rem; }
+    .progress { height: 8px; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h2 class="mb-0">لوحة متابعة الاستشارات الهندسية</h2>
+  </div>
+
+  <!-- Top metrics -->
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-md-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="card-title mb-1">إجمالي المشاريع</div>
+              <div class="metric">{{ total_projects }}</div>
+              <div class="subtext">كل أنواع المشاريع</div>
+            </div>
+            <div class="text-primary" style="font-size:2rem">📁</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="card-title mb-1">الفواتير</div>
+          <div class="metric">{{ paid_invoices }} / {{ total_invoices }}</div>
+          <div class="subtext">مدفوعة / صادرة</div>
+          <div class="progress mt-2">
+            {% set paid_pct = (100.0 * (paid_invoices or 0) / (total_invoices or 1)) | round(0, 'floor') %}
+            <div class="progress-bar bg-success" role="progressbar" style="width: {{ paid_pct }}%" aria-valuenow="{{ paid_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="card-title mb-2">نظرة سريعة</div>
+          <ul class="list-unstyled mb-0 subtext">
+            <li>المشاريع الجارية: <strong>{{ projects_chart.data[0] }}</strong></li>
+            <li>المشاريع المنتهية: <strong>{{ projects_chart.data[1] }}</strong></li>
+            <li>العقود السارية: <strong>{{ contracts_chart.data[0] }}</strong></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts row -->
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-lg-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="card-title">نسبة المشاريع (جارية/منتهية)</div>
+          <canvas id="projectsChart" height="180"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="card-title">العقود (ساري/منتهي)</div>
+          <canvas id="contractsChart" height="180"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="card-title">الفواتير (صادرة/مدفوعة)</div>
+          <canvas id="invoicesChart" height="180"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lists row -->
+  <div class="row g-3">
+    <div class="col-12 col-lg-6">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="card-title d-flex align-items-center justify-content-between">
+            <span>أحدث المشاريع</span>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_projects.list_projects') }}">كل المشاريع</a>
+          </div>
+          {% if latest_projects %}
+          <div class="list-group list-group-flush">
+            {% for p in latest_projects %}
+            <div class="list-group-item">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="fw-semibold">{{ p.name }}</div>
+                  <div class="text-muted small">الحالة: {{ p.status }}{% if p.location %} • {{ p.location }}{% endif %}</div>
+                </div>
+                <a class="btn btn-sm btn-link" href="{{ url_for('consulting_projects.project_detail', project_id=p.id) }}">عرض</a>
+              </div>
+              <div class="progress mt-2">
+                <div class="progress-bar" role="progressbar" style="width: {{ p.progress or 0 }}%" aria-valuenow="{{ p.progress or 0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="text-muted">لا توجد مشاريع بعد</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="card-title">المهام المتأخرة</div>
+          {% if overdue_tasks %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>المهمة</th>
+                  <th>المشروع</th>
+                  <th>الموعد النهائي</th>
+                  <th>التأخير</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for t in overdue_tasks %}
+                {% set rem = t.days_remaining() %}
+                <tr>
+                  <td class="fw-semibold">{{ t.title }}</td>
+                  <td>{% if t.project %}<a href="{{ url_for('consulting_projects.project_detail', project_id=t.project.id) }}">{{ t.project.name }}</a>{% else %}-{% endif %}</td>
+                  <td class="text-danger">{{ t.deadline and t.deadline.strftime('%Y-%m-%d') }}</td>
+                  <td class="text-danger">{% if rem is not none %}{{ (0 - rem) }} يوم{% else %}-{% endif %}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-muted">لا توجد مهام متأخرة 🎉</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const projectsCtx = document.getElementById('projectsChart').getContext('2d');
+    const contractsCtx = document.getElementById('contractsChart').getContext('2d');
+    const invoicesCtx = document.getElementById('invoicesChart').getContext('2d');
+
+    const projectsData = {
+      labels: {{ projects_chart.labels | tojson }},
+      datasets: [{
+        data: {{ projects_chart.data | tojson }},
+        backgroundColor: ['#0d6efd', '#198754'],
+        borderWidth: 0
+      }]
+    };
+    new Chart(projectsCtx, { type: 'doughnut', data: projectsData, options: { plugins: { legend: { position: 'bottom' } } } });
+
+    const contractsData = {
+      labels: {{ contracts_chart.labels | tojson }},
+      datasets: [{
+        data: {{ contracts_chart.data | tojson }},
+        backgroundColor: ['#0dcaf0', '#6c757d'],
+        borderWidth: 0
+      }]
+    };
+    new Chart(contractsCtx, { type: 'bar', data: contractsData, options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } } });
+
+    const invoicesData = {
+      labels: {{ invoices_chart.labels | tojson }},
+      datasets: [{
+        data: {{ invoices_chart.data | tojson }},
+        backgroundColor: ['#ffc107', '#198754'],
+        borderWidth: 0
+      }]
+    };
+    new Chart(invoicesCtx, { type: 'bar', data: invoicesData, options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } } });
+  </script>
+{% endblock %}
