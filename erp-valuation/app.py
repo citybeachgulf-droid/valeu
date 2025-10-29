@@ -10,6 +10,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, s
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
+from extensions import db
 from sqlalchemy import func, or_, and_, text, inspect
 from sqlalchemy.exc import OperationalError
 from pywebpush import webpush, WebPushException
@@ -181,7 +182,7 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "max_overflow": int(os.environ.get("SQL_MAX_OVERFLOW", "10")),
     "pool_timeout": int(os.environ.get("SQL_POOL_TIMEOUT", "30")),
 }
-db = SQLAlchemy(app)
+db.init_app(app)
 
 # ---------------- Register Blueprints (Consulting) ----------------
 # موديول العملاء لقسم الاستشارات

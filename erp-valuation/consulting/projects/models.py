@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, date
 from typing import Optional
 
-from app import db
+from extensions import db
 
 
 # Keep table names prefixed to avoid collisions with core app tables

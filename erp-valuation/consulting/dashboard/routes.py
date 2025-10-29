@@ -12,7 +12,7 @@ from flask import (
 )
 from sqlalchemy import func
 
-from app import db
+from extensions import db
 from consulting.projects.models import ConsultingProject
 from consulting.contracts.models import Contract
 from consulting.invoices.models import Invoice

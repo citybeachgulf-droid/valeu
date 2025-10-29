@@ -14,7 +14,7 @@ from flask import (
 )
 from sqlalchemy import or_, func
 
-from app import db
+from extensions import db
 from consulting.clients.models import Client
 from consulting.projects.models import ConsultingProject
 from consulting.contracts.models import Contract
