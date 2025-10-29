@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">عقود الاستشارات</h3>
+    <a href="{{ url_for('consulting_contracts.create_contract') }}" class="btn btn-primary">➕ إضافة عقد</a>
+  </div>
+
+  <form class="row g-2 mb-3" method="get" action="{{ url_for('consulting_contracts.list_contracts') }}">
+    <div class="col-md-4">
+      <input type="text" name="q" class="form-control" placeholder="بحث برقم العقد / اسم المشروع / العميل" value="{{ q or '' }}">
+    </div>
+    <div class="col-md-3">
+      <select name="status" class="form-select">
+        <option value="">كل الحالات</option>
+        {% for s in CONTRACT_STATUSES %}
+          <option value="{{ s }}" {% if current_status == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select name="client_id" class="form-select">
+        <option value="">كل العملاء</option>
+        {% for c in clients %}
+          <option value="{{ c.id }}" {% if current_client_id|int == c.id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2 d-grid">
+      <button type="submit" class="btn btn-secondary">🔎 بحث</button>
+    </div>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>رقم العقد</th>
+          <th>المشروع</th>
+          <th>العميل</th>
+          <th>القيمة</th>
+          <th>المدة</th>
+          <th>الحالة</th>
+          <th class="text-end">إجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if contracts %}
+          {% for c in contracts %}
+          {% set days_left = c.days_to_expiry() %}
+          <tr>
+            <td class="text-nowrap">{{ c.contract_number }}</td>
+            <td>{{ c.project.name if c.project else '-' }}</td>
+            <td>{{ c.client.name if c.client else '-' }}</td>
+            <td>{{ '%.2f'|format(c.value) if c.value is not none else '-' }}</td>
+            <td>
+              {% if c.start_date %}{{ c.start_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}
+              —
+              {% if c.end_date %}
+                {{ c.end_date.strftime('%Y-%m-%d') }}
+                {% if c.is_near_expiry() %}
+                  <span class="badge bg-warning text-dark ms-1">ينتهي خلال {{ days_left }} يوم</span>
+                {% endif %}
+              {% else %}-{% endif %}
+            </td>
+            <td>
+              {% if c.status == 'ساري' %}
+                <span class="badge bg-success">{{ c.status }}</span>
+              {% elif c.status == 'منتهي' %}
+                <span class="badge bg-secondary">{{ c.status }}</span>
+              {% else %}
+                <span class="badge bg-danger">{{ c.status }}</span>
+              {% endif %}
+            </td>
+            <td class="text-end text-nowrap">
+              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_contracts.contract_detail', contract_id=c.id) }}">عرض</a>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted">لا توجد بيانات</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if pagination.pages > 1 %}
+  <nav aria-label="contracts pagination">
+    <ul class="pagination justify-content-center">
+      <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('consulting_contracts.list_contracts', q=q, status=current_status, client_id=current_client_id, page=pagination.prev_num) }}">السابق</a>
+      </li>
+      <li class="page-item disabled"><span class="page-link">صفحة {{ pagination.page }} / {{ pagination.pages }}</span></li>
+      <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('consulting_contracts.list_contracts', q=q, status=current_status, client_id=current_client_id, page=pagination.next_num) }}">التالي</a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

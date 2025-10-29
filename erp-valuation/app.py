@@ -192,6 +192,10 @@ app.register_blueprint(clients_bp)
 from consulting.projects.routes import projects_bp
 app.register_blueprint(projects_bp)
 
+# موديول العقود لقسم الاستشارات
+from consulting.contracts.routes import contracts_bp
+app.register_blueprint(contracts_bp)
+
 # ---------------- Service Worker at root scope ----------------
 @app.route('/service-worker.js')
 def serve_service_worker():
@@ -755,7 +759,8 @@ class Consultation(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    project = db.relationship("Project", backref=db.backref("consultations", lazy=True))
+    # تأهيل الاسم بالكامل لتفادي التعارض مع consulting.projects.models.Project
+    project = db.relationship("app.Project", backref=db.backref("consultations", lazy=True))
     client = db.relationship("Customer", backref=db.backref("consultations", lazy=True))
     creator = db.relationship("User", foreign_keys=[created_by])
     consultant = db.relationship("User", foreign_keys=[consultant_id])
