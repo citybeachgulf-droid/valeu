@@ -16,7 +16,7 @@ PROJECT_STATUSES = [
     "متوقف",
 ]
 
-ALLOWED_FILE_EXTENSIONS = {"pdf", "dwg", "docx"}
+ALLOWED_FILE_EXTENSIONS = {"pdf", "dwg", "docx", "xlsx"}
 
 
 def _clean(value: Any) -> str:

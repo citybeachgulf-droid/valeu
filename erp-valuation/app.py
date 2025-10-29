@@ -196,6 +196,10 @@ app.register_blueprint(projects_bp)
 from consulting.contracts.routes import contracts_bp
 app.register_blueprint(contracts_bp)
 
+# موديول المستندات لقسم الاستشارات
+from consulting.documents.routes import documents_bp
+app.register_blueprint(documents_bp)
+
 # موديول الموارد البشرية (مهندسون ومهام) لقسم الاستشارات
 from consulting.hr.routes import hr_bp
 app.register_blueprint(hr_bp)

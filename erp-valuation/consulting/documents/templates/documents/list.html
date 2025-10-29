@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">مستندات المشاريع</h3>
+    <a href="{{ url_for('consulting_documents.create_document') }}" class="btn btn-primary">➕ رفع مستند</a>
+  </div>
+
+  <form class="row g-2 mb-3" method="get" action="{{ url_for('consulting_documents.list_documents') }}">
+    <div class="col-md-3">
+      <input type="text" name="q" class="form-control" placeholder="بحث بالعنوان / الرافع" value="{{ q or '' }}">
+    </div>
+    <div class="col-md-3">
+      <select class="form-select" name="category">
+        <option value="">كل التصنيفات</option>
+        {% for c in DOCUMENT_CATEGORIES %}
+          <option value="{{ c }}" {% if current_category == c %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select class="form-select" name="project_id">
+        <option value="">كل المشاريع</option>
+        {% for p in projects %}
+          <option value="{{ p.id }}" {% if current_project_id|string == p.id|string %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <button class="btn btn-secondary w-100" type="submit">🔎 تصفية</button>
+    </div>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-striped table-hover align-middle">
+      <thead>
+        <tr>
+          <th>العنوان</th>
+          <th>التصنيف</th>
+          <th>المشروع</th>
+          <th>مرفوع بواسطة</th>
+          <th>تاريخ الرفع</th>
+          <th class="text-end">إجراء</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in documents %}
+          {% set static_url = url_for('static', filename='uploads/projects/' ~ d.file_path) %}
+          <tr>
+            <td class="text-nowrap">{{ d.title }}</td>
+            <td>{{ d.category }}</td>
+            <td>{{ (project_map.get(d.project_id).name if project_map.get(d.project_id) else '-') }}</td>
+            <td>{{ d.uploaded_by or '-' }}</td>
+            <td>{{ d.upload_date.strftime('%Y-%m-%d %H:%M') if d.upload_date else '-' }}</td>
+            <td class="text-end text-nowrap">
+              <a class="btn btn-sm btn-outline-primary" href="{{ static_url }}" target="_blank">عرض</a>
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('consulting_documents.download_document', doc_id=d.id) }}">تنزيل</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if pagination and pagination.pages > 1 %}
+    <ul class="pagination justify-content-center">
+      <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('consulting_documents.list_documents', q=q, category=current_category, project_id=current_project_id, page=pagination.prev_num) }}">السابق</a>
+      </li>
+      <li class="page-item disabled"><span class="page-link">صفحة {{ pagination.page }} / {{ pagination.pages }}</span></li>
+      <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('consulting_documents.list_documents', q=q, category=current_category, project_id=current_project_id, page=pagination.next_num) }}">التالي</a>
+      </li>
+    </ul>
+  {% endif %}
+{% if pagination and pagination.pages > 1 %}
+{% endif %}
+</div>
+{% endblock %}
