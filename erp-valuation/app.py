@@ -1,4 +1,4 @@
-import os, json, re
+import os, sys, json, re
 import hashlib
 import secrets
 from datetime import datetime, timedelta, date
@@ -22,6 +22,30 @@ from reportlab.graphics import renderPM
 import requests
 import time
 from b2sdk.v2 import InMemoryAccountInfo, B2Api
+
+# Optional override to load the 'consulting' package from a specific directory.
+# If the provided path points to the 'consulting' directory itself, we add its parent
+# to sys.path so that `import consulting...` resolves correctly.
+CONSULTING_DIR_OVERRIDE = (
+    os.environ.get("CONSULTING_DIR")
+    or r"C:\\Users\\User\\Documents\\GitHub\\valeu\\erp-valuation\\consulting"
+)
+if CONSULTING_DIR_OVERRIDE:
+    normalized_path = os.path.normpath(CONSULTING_DIR_OVERRIDE)
+    try:
+        if os.path.isdir(normalized_path):
+            base_name = os.path.basename(normalized_path).lower()
+            candidate_path = (
+                os.path.dirname(normalized_path)
+                if base_name == "consulting"
+                else normalized_path
+            )
+            if candidate_path not in sys.path:
+                sys.path.insert(0, candidate_path)
+    except Exception:
+        # Silently ignore invalid paths to avoid breaking app startup
+        pass
+
 from consulting.projects.models import ConsultingProject
 from consulting.clients.models import Client
 from consulting.projects.forms import PROJECT_TYPES
