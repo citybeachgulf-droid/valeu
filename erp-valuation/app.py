@@ -1124,7 +1124,7 @@ def index():
                 b = Branch.query.get(user.branch_id)
                 dept = (b.department or "").lower() if b else ""
                 if dept in ("consultations", "consultation", "consulting", "الاستشارات"):
-                    return redirect(url_for("consultations_list"))
+                    return redirect(url_for("consulting_dashboard.dashboard_home"))
                 if dept in ("finance", "financial", "المالية"):
                     return redirect(url_for("finance_dashboard"))
         except Exception:
@@ -2253,7 +2253,7 @@ def open_branch_interface(bid: int):
 
     # خرائط بسيطة للأقسام إلى الواجهات الحالية
     if dept in ("consultations", "consultation", "consulting", "الاستشارات"):
-        return redirect(url_for("consultations_list"))
+        return redirect(url_for("consulting_dashboard.dashboard_home"))
     if dept in ("finance", "financial", "المالية"):
         return redirect(url_for("finance_dashboard"))
 
@@ -2279,7 +2279,7 @@ def open_branch_section(bid: int, section: str):
 def _redirect_to_section(section: str):
     s = (section or "").strip().lower()
     if s in ("consultations", "consultation", "consulting", "الاستشارات"):
-        return redirect(url_for("consultations_list"))
+        return redirect(url_for("consulting_dashboard.dashboard_home"))
     if s in ("finance", "financial", "المالية"):
         return redirect(url_for("finance_dashboard"))
     # 🆕 أقسام إضافية: إدارة جمعيات الملاك / إدارة الممتلكات
