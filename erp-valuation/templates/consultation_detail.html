@@ -38,6 +38,7 @@
   </div>
 
   <div class="mt-3 d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('consulting_dashboard.dashboard_home') }}">🧠 لوحة الاستشارات</a>
     <a class="btn btn-primary" href="{{ url_for('consultations_edit', cid=c.id) }}">تعديل</a>
     {% if session.get('role') == 'manager' %}
     <form method="post" action="{{ url_for('consultations_delete', cid=c.id) }}" onsubmit="return confirm('حذف الاستشارة؟');">

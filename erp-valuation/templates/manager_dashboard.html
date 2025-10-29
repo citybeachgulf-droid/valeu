@@ -66,6 +66,11 @@
     <li><a href="{{ url_for('commissions_page') }}" style="color:inherit; text-decoration:none;">💸 عمولة الموظفين</a></li>
     <li><a href="{{ url_for('customers_page') }}" style="color:inherit; text-decoration:none;">👥 العملاء</a></li>
     <li><a href="/reports" style="color:#ffb800; text-decoration:none;">📑 التقارير</a></li>
+    <li style="margin-top:0.5rem; border-top:1px solid #2c2c44;"></li>
+    <li><a href="{{ url_for('consulting_dashboard.dashboard_home') }}" style="color:inherit; text-decoration:none;">🧠 لوحة الاستشارات</a></li>
+    <li><a href="{{ url_for('consulting_projects.list_projects') }}" style="color:inherit; text-decoration:none;">📁 مشاريع الاستشارات</a></li>
+    <li><a href="{{ url_for('consulting_clients.list_clients') }}" style="color:inherit; text-decoration:none;">👥 عملاء الاستشارات</a></li>
+    <li><a href="{{ url_for('consulting_invoices.list_invoices') }}" style="color:inherit; text-decoration:none;">🧾 فواتير الاستشارات</a></li>
   </ul>
 </nav>
 {% endblock %}
