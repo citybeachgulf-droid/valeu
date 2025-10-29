@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4" data-overdue="{{ overdue_count }}">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">{{ engineer.name }} <small class="text-muted">({{ engineer.specialty }})</small></h3>
+    <a href="{{ url_for('consulting_hr.list_engineers') }}" class="btn btn-outline-secondary">عودة للقائمة</a>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title mb-3">بيانات المهندس</h5>
+          <p class="mb-1"><strong>الهاتف:</strong> {{ engineer.phone or '-' }}</p>
+          <p class="mb-1"><strong>البريد:</strong> {{ engineer.email or '-' }}</p>
+          <p class="mb-1"><strong>تاريخ الانضمام:</strong> {% if engineer.join_date %}{{ engineer.join_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</p>
+          <p class="mb-0"><strong>الحالة:</strong> <span class="badge {% if engineer.status=='نشط' %}bg-success{% else %}bg-secondary{% endif %}">{{ engineer.status }}</span></p>
+        </div>
+      </div>
+
+      <div class="card mt-3">
+        <div class="card-body">
+          <h5 class="card-title">إضافة مهمة</h5>
+          <form method="post" action="{{ url_for('consulting_hr.add_task', engineer_id=engineer.id) }}">
+            <div class="mb-2">
+              <label class="form-label">المشروع</label>
+              <select name="project_id" class="form-select" required>
+                <option value="">-- اختر مشروع --</option>
+                {% for p in projects %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">العنوان</label>
+              <input type="text" class="form-control" name="title" required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">الوصف</label>
+              <textarea class="form-control" name="description" rows="3"></textarea>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">الموعد النهائي</label>
+              <input type="date" class="form-control" name="deadline">
+            </div>
+            <div class="d-grid">
+              <button class="btn btn-primary" type="submit">إضافة</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title mb-3">المهام</h5>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle">
+              <thead>
+                <tr>
+                  <th>العنوان</th>
+                  <th>المشروع</th>
+                  <th>الحالة</th>
+                  <th style="width:180px">نسبة الإنجاز</th>
+                  <th>الموعد النهائي</th>
+                  <th>إجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="tasksBody">
+                {% for t in tasks %}
+                <tr data-task-id="{{ t.id }}" class="task-row {% if t.is_overdue() %}table-danger{% endif %}">
+                  <td>
+                    <div class="fw-semibold">{{ t.title }}</div>
+                    {% if t.description %}<div class="small text-muted">{{ t.description }}</div>{% endif %}
+                    <div class="small text-muted">أضيفت في {{ t.created_at.strftime('%Y-%m-%d') }}</div>
+                  </td>
+                  <td>{{ t.project.name if t.project else '-' }}</td>
+                  <td>
+                    <span class="badge status-badge {% if t.status=='مكتملة' %}bg-success{% elif t.status=='قيد التنفيذ' %}bg-info{% else %}bg-secondary{% endif %}">{{ t.status }}</span>
+                  </td>
+                  <td>
+                    <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ t.progress }}">
+                      <div class="progress-bar" style="width: {{ t.progress }}%">{{ t.progress }}%</div>
+                    </div>
+                  </td>
+                  <td>
+                    {% if t.deadline %}
+                      <span class="deadline-label {{ 'text-danger fw-bold' if t.is_overdue() else '' }}">{{ t.deadline.strftime('%Y-%m-%d') }}</span>
+                    {% else %}-{% endif %}
+                  </td>
+                  <td style="width:260px">
+                    <form class="d-flex align-items-center gap-2 task-update-form" data-task-id="{{ t.id }}">
+                      <select class="form-select form-select-sm" name="status" style="width: 150px;">
+                        {% for s in TASK_STATUSES %}
+                        <option value="{{ s }}" {% if t.status==s %}selected{% endif %}>{{ s }}</option>
+                        {% endfor %}
+                      </select>
+                      <input type="number" class="form-control form-control-sm" name="progress" min="0" max="100" value="{{ t.progress }}" style="width:80px;">
+                      <button class="btn btn-sm btn-primary" type="submit">حفظ</button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Overdue alert
+    const container = document.querySelector('.container[data-overdue]');
+    const overdueCount = parseInt(container?.getAttribute('data-overdue') || '0', 10);
+    if (overdueCount > 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'تنبيه المهام المتأخرة',
+        text: `لديك ${overdueCount} مهمة متأخرة لهذا المهندس`,
+        confirmButtonText: 'حسناً',
+      });
+    }
+
+    // Intercept task update forms for AJAX + SweetAlert
+    document.querySelectorAll('.task-update-form').forEach(function(form) {
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const taskId = form.getAttribute('data-task-id');
+        const fd = new FormData(form);
+        try {
+          const res = await fetch(`${location.origin}/consulting/tasks/${taskId}/update`, {
+            method: 'POST',
+            body: fd,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'include'
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data.errors ? Object.values(data.errors)[0] : 'خطأ غير معروف');
+
+          // Update UI row
+          const row = form.closest('tr');
+          // Status badge
+          const statusBadge = row.querySelector('.status-badge');
+          statusBadge.textContent = data.task.status;
+          statusBadge.classList.remove('bg-success','bg-info','bg-secondary');
+          if (data.task.status === 'مكتملة') statusBadge.classList.add('bg-success');
+          else if (data.task.status === 'قيد التنفيذ') statusBadge.classList.add('bg-info');
+          else statusBadge.classList.add('bg-secondary');
+          // Progress
+          const pb = row.querySelector('.progress');
+          const bar = pb.querySelector('.progress-bar');
+          pb.setAttribute('aria-valuenow', String(data.task.progress));
+          bar.style.width = `${data.task.progress}%`;
+          bar.textContent = `${data.task.progress}%`;
+          // Overdue styling
+          if (data.task.overdue) row.classList.add('table-danger'); else row.classList.remove('table-danger');
+
+          await Swal.fire({ icon: 'success', title: 'تم الحفظ', timer: 1000, showConfirmButton: false });
+        } catch (err) {
+          Swal.fire({ icon: 'error', title: 'فشل التحديث', text: String(err || '') });
+        }
+      });
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">المهندسون</h3>
+  </div>
+
+  <form class="row g-2 mb-3" method="get">
+    <div class="col-md-4">
+      <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="بحث بالاسم أو الهاتف أو البريد">
+    </div>
+    <div class="col-md-3">
+      <select class="form-select" name="specialty">
+        <option value="">كل التخصصات</option>
+        {% for sp in ENGINEER_SPECIALTIES %}
+        <option value="{{ sp }}" {% if current_specialty==sp %}selected{% endif %}>{{ sp }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select class="form-select" name="status">
+        <option value="">كل الحالات</option>
+        <option value="نشط" {% if current_status=='نشط' %}selected{% endif %}>نشط</option>
+        <option value="غير نشط" {% if current_status=='غير نشط' %}selected{% endif %}>غير نشط</option>
+      </select>
+    </div>
+    <div class="col-md-2 d-grid">
+      <button class="btn btn-primary" type="submit">بحث</button>
+    </div>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>الاسم</th>
+          <th>التخصص</th>
+          <th>الهاتف</th>
+          <th>البريد</th>
+          <th>تاريخ الانضمام</th>
+          <th>الحالة</th>
+          <th>مهام مفتوحة</th>
+          <th>متأخرة</th>
+          <th>إجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for eng in engineers %}
+        <tr>
+          <td>{{ eng.name }}</td>
+          <td>{{ eng.specialty }}</td>
+          <td>{{ eng.phone or '-' }}</td>
+          <td>{{ eng.email or '-' }}</td>
+          <td>{% if eng.join_date %}{{ eng.join_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</td>
+          <td>
+            <span class="badge {% if eng.status=='نشط' %}bg-success{% else %}bg-secondary{% endif %}">{{ eng.status }}</span>
+          </td>
+          <td>{{ open_counts.get(eng.id, 0) }}</td>
+          <td>
+            {% set oc = overdue_counts.get(eng.id, 0) %}
+            <span class="badge {{ 'bg-danger' if oc>0 else 'bg-success' }}">{{ oc }}</span>
+          </td>
+          <td>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_hr.engineer_detail', engineer_id=eng.id) }}">عرض</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <nav aria-label="Pagination" class="mt-3">
+    <ul class="pagination justify-content-center">
+      <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+        <a class="page-link" href="?page={{ pagination.prev_num }}&q={{ q }}&specialty={{ current_specialty }}&status={{ current_status }}">السابق</a>
+      </li>
+      <li class="page-item disabled"><span class="page-link">صفحة {{ pagination.page }} من {{ pagination.pages }}</span></li>
+      <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+        <a class="page-link" href="?page={{ pagination.next_num }}&q={{ q }}&specialty={{ current_specialty }}&status={{ current_status }}">التالي</a>
+      </li>
+    </ul>
+  </nav>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  // Example: here you can add alerts based on query params or state if needed
+</script>
+{% endblock %}
