@@ -22,6 +22,9 @@ from reportlab.graphics import renderPM
 import requests
 import time
 from b2sdk.v2 import InMemoryAccountInfo, B2Api
+from consulting.projects.models import ConsultingProject
+from consulting.clients.models import Client
+from consulting.projects.forms import PROJECT_TYPES
 
 # ---------------- إعداد Flask ----------------
 app = Flask(__name__)
@@ -762,8 +765,18 @@ class Project(db.Model):
 class Consultation(db.Model):
     __tablename__ = "consultation"
     id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey("project.id"), nullable=True, index=True)
-    client_id = db.Column(db.Integer, db.ForeignKey("customer.id"), nullable=True, index=True)
+    project_id = db.Column(
+        db.Integer,
+        db.ForeignKey("consulting_project.id"),
+        nullable=True,
+        index=True,
+    )
+    client_id = db.Column(
+        db.Integer,
+        db.ForeignKey("consulting_client.id"),
+        nullable=True,
+        index=True,
+    )
     consultant_name = db.Column(db.String(150), nullable=True)
     consultation_type = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text, nullable=True)
@@ -776,9 +789,11 @@ class Consultation(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # تأهيل الاسم بالكامل لتفادي التعارض مع consulting.projects.models.Project
-    project = db.relationship(Project, backref=db.backref("consultations", lazy=True))
-    client = db.relationship("Customer", backref=db.backref("consultations", lazy=True))
+    # اربط بنماذج قسم الاستشارات (ConsultingProject / Client)
+    project = db.relationship(
+        ConsultingProject, backref=db.backref("consultations", lazy=True)
+    )
+    client = db.relationship(Client, backref=db.backref("consultations", lazy=True))
     creator = db.relationship("User", foreign_keys=[created_by])
     consultant = db.relationship("User", foreign_keys=[consultant_id])
 
@@ -1128,14 +1143,26 @@ def consultations_list():
         query = query.filter(Consultation.consultation_type == ctype)
     if project:
         if project.isdigit():
-            query = query.join(Project, isouter=True).filter(Consultation.project_id == int(project))
+            query = (
+                query.join(ConsultingProject, isouter=True)
+                .filter(Consultation.project_id == int(project))
+            )
         else:
-            query = query.join(Project, isouter=True).filter(Project.name.ilike(f"%{project}%"))
+            query = (
+                query.join(ConsultingProject, isouter=True)
+                .filter(ConsultingProject.name.ilike(f"%{project}%"))
+            )
     if client:
         if client.isdigit():
-            query = query.join(Customer, isouter=True).filter(Consultation.client_id == int(client))
+            query = (
+                query.join(Client, isouter=True)
+                .filter(Consultation.client_id == int(client))
+            )
         else:
-            query = query.join(Customer, isouter=True).filter(Customer.name.ilike(f"%{client}%"))
+            query = (
+                query.join(Client, isouter=True)
+                .filter(Client.name.ilike(f"%{client}%"))
+            )
     if q:
         query = query.filter(or_(
             Consultation.consultant_name.ilike(f"%{q}%"),
@@ -1166,7 +1193,7 @@ def consultations_list():
     )
 
 
-def _find_or_create_customer(name: str | None, phone: str | None) -> Customer | None:
+def _find_or_create_customer(name: str | None, phone: str | None) -> Client | None:
     name = (name or "").strip()
     phone = (phone or "").strip()
     if not name and not phone:
@@ -1174,7 +1201,7 @@ def _find_or_create_customer(name: str | None, phone: str | None) -> Customer | 
     existing = None
     try:
         if phone:
-            existing = Customer.query.filter_by(phone=phone).first()
+            existing = Client.query.filter_by(phone=phone).first()
     except Exception:
         existing = None
     if existing:
@@ -1185,7 +1212,8 @@ def _find_or_create_customer(name: str | None, phone: str | None) -> Customer | 
             except Exception:
                 db.session.rollback()
         return existing
-    c = Customer(name=name or "-", phone=phone or "-")
+    # النوع مطلوب في نموذج عملاء الاستشارات
+    c = Client(name=name or "-", phone=phone or "-", type="فرد")
     db.session.add(c)
     try:
         db.session.commit()
@@ -1198,14 +1226,24 @@ def _find_or_create_customer(name: str | None, phone: str | None) -> Customer | 
     return c
 
 
-def _find_or_create_project(project_name: str | None, client_obj: Customer | None) -> Project | None:
+def _find_or_create_project(project_name: str | None, client_obj: Client | None) -> ConsultingProject | None:
     name = (project_name or "").strip()
-    if not name:
+    if not name or not client_obj:
+        # مشروع الاستشارات يتطلب عميلًا
         return None
-    p = Project.query.filter(func.lower(Project.name) == func.lower(name)).first()
+    p = (
+        ConsultingProject.query
+        .filter(func.lower(ConsultingProject.name) == func.lower(name))
+        .first()
+    )
     if p:
         return p
-    p = Project(name=name, client_id=(client_obj.id if client_obj else None))
+    # النوع مطلوب في نموذج مشاريع الاستشارات
+    p = ConsultingProject(
+        name=name,
+        client_id=client_obj.id,
+        type=(PROJECT_TYPES[0] if PROJECT_TYPES else "تصميم معماري"),
+    )
     db.session.add(p)
     try:
         db.session.commit()
@@ -1292,9 +1330,9 @@ def consultations_detail(cid: int):
     if session.get("role") not in ["manager", "finance", "consultant"]:
         return redirect(url_for("login"))
     c = Consultation.query.get_or_404(cid)
-    # prefetch project and client
-    project = Project.query.get(c.project_id) if c.project_id else None
-    client = Customer.query.get(c.client_id) if c.client_id else None
+    # prefetch project and client (from consulting models)
+    project = c.project if c.project_id else None
+    client = c.client if c.client_id else None
     return render_template(
         "consultation_detail.html",
         c=c,
@@ -1335,7 +1373,7 @@ def consultations_edit(cid: int):
             cl = _find_or_create_customer(client_name, client_phone) if (client_name or client_phone) else None
             if cl:
                 c.client_id = cl.id
-            pr = _find_or_create_project(project_name, cl or (Customer.query.get(c.client_id) if c.client_id else None)) if project_name else None
+            pr = _find_or_create_project(project_name, cl or (Client.query.get(c.client_id) if c.client_id else None)) if project_name else None
             if pr:
                 c.project_id = pr.id
         elif role == "finance":
@@ -1367,8 +1405,8 @@ def consultations_edit(cid: int):
         flash("✅ Consultation updated", "success")
         return redirect(url_for("consultations_detail", cid=c.id))
 
-    project = Project.query.get(c.project_id) if c.project_id else None
-    client = Customer.query.get(c.client_id) if c.client_id else None
+    project = c.project if c.project_id else None
+    client = c.client if c.client_id else None
     return render_template(
         "consultation_form.html",
         consultation=c,
@@ -1409,14 +1447,26 @@ def consultations_export_csv():
         query = query.filter(Consultation.consultation_type == ctype)
     if project:
         if project.isdigit():
-            query = query.join(Project, isouter=True).filter(Consultation.project_id == int(project))
+            query = (
+                query.join(ConsultingProject, isouter=True)
+                .filter(Consultation.project_id == int(project))
+            )
         else:
-            query = query.join(Project, isouter=True).filter(Project.name.ilike(f"%{project}%"))
+            query = (
+                query.join(ConsultingProject, isouter=True)
+                .filter(ConsultingProject.name.ilike(f"%{project}%"))
+            )
     if client:
         if client.isdigit():
-            query = query.join(Customer, isouter=True).filter(Consultation.client_id == int(client))
+            query = (
+                query.join(Client, isouter=True)
+                .filter(Consultation.client_id == int(client))
+            )
         else:
-            query = query.join(Customer, isouter=True).filter(Customer.name.ilike(f"%{client}%"))
+            query = (
+                query.join(Client, isouter=True)
+                .filter(Client.name.ilike(f"%{client}%"))
+            )
     if q:
         query = query.filter(or_(
             Consultation.consultant_name.ilike(f"%{q}%"),
@@ -1433,8 +1483,8 @@ def consultations_export_csv():
         "ID", "Project", "Client", "Type", "Status", "Start", "End", "Cost", "Consultant", "Created At",
     ])
     for r in rows:
-        pr = Project.query.get(r.project_id) if r.project_id else None
-        cl = Customer.query.get(r.client_id) if r.client_id else None
+        pr = ConsultingProject.query.get(r.project_id) if r.project_id else None
+        cl = Client.query.get(r.client_id) if r.client_id else None
         writer.writerow([
             r.id,
             (pr.name if pr else ""),
@@ -1466,7 +1516,7 @@ def consultations_invoice(cid: int):
     if amount <= 0:
         flash("⚠️ Consultation has no cost to invoice", "warning")
         return redirect(url_for("consultations_detail", cid=c.id))
-    client = Customer.query.get(c.client_id) if c.client_id else None
+    client = Client.query.get(c.client_id) if c.client_id else None
     inv = CustomerInvoice(
         customer_name=(client.name if client else (c.consultant_name or "Consultation")),
         amount=amount,
