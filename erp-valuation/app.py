@@ -777,7 +777,7 @@ class Consultation(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # تأهيل الاسم بالكامل لتفادي التعارض مع consulting.projects.models.Project
-    project = db.relationship("app.Project", backref=db.backref("consultations", lazy=True))
+    project = db.relationship(Project, backref=db.backref("consultations", lazy=True))
     client = db.relationship("Customer", backref=db.backref("consultations", lazy=True))
     creator = db.relationship("User", foreign_keys=[created_by])
     consultant = db.relationship("User", foreign_keys=[consultant_id])
