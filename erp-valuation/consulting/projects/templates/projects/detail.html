@@ -71,7 +71,11 @@
 
   <div class="card mt-3">
     <div class="card-header d-flex justify-content-between align-items-center">
-      <strong>ملفات المشروع</strong>
+      <div class="d-flex align-items-center gap-2">
+        <strong>ملفات المشروع</strong>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('consulting_documents.list_documents', project_id=project.id) }}">📄 المستندات</a>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_documents.create_document', project_id=project.id) }}">➕ مستند</a>
+      </div>
       <form class="d-flex align-items-center gap-2" method="post" action="{{ url_for('consulting_projects.upload_project_file', project_id=project.id) }}" enctype="multipart/form-data">
         <input class="form-control form-control-sm" type="file" name="files" multiple accept=".pdf,.dwg,.docx">
         <button class="btn btn-sm btn-primary" type="submit">⬆️ رفع</button>

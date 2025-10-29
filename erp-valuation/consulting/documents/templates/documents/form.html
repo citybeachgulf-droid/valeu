@@ -1,0 +1,43 @@
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">رفع مستند مشروع</h3>
+    <a href="{{ url_for('consulting_documents.list_documents') }}" class="btn btn-outline-secondary">↩️ رجوع</a>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('consulting_documents.create_document') }}" class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label">المشروع</label>
+      <select name="project_id" class="form-select" required>
+        <option value="">اختر المشروع</option>
+        {% for p in projects %}
+          <option value="{{ p.id }}" {% if (data.get('project_id')|string) == (p.id|string) %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">التصنيف</label>
+      <select name="category" class="form-select" required>
+        <option value="">اختر التصنيف</option>
+        {% for c in DOCUMENT_CATEGORIES %}
+          <option value="{{ c }}" {% if data.get('category') == c %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-8">
+      <label class="form-label">العنوان</label>
+      <input type="text" name="title" value="{{ data.get('title','') }}" class="form-control" required>
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label">الملف</label>
+      <input type="file" name="file" accept=".pdf,.dwg,.docx,.xlsx" class="form-control" required>
+      <div class="form-text">الأنواع المسموحة: PDF, DWG, DOCX, XLSX</div>
+    </div>
+
+    <div class="col-12 d-flex gap-2">
+      <button type="submit" class="btn btn-primary">⬆️ رفع</button>
+      <a href="{{ url_for('consulting_documents.list_documents') }}" class="btn btn-secondary">إلغاء</a>
+    </div>
+  </form>
+</div>
