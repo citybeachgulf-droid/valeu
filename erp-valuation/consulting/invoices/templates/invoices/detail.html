@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">تفاصيل الفاتورة #{{ invoice.id }}</h3>
+    <a href="{{ url_for('consulting_invoices.list_invoices') }}" class="btn btn-secondary">↩️ رجوع</a>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title mb-3">البيانات الأساسية</h5>
+          <div class="mb-2"><strong>المشروع:</strong> {{ invoice.project.name if invoice.project else '-' }}</div>
+          <div class="mb-2"><strong>العميل:</strong> {{ invoice.client.name if invoice.client else '-' }}</div>
+          <div class="mb-2"><strong>العقد:</strong> {{ invoice.contract.contract_number if invoice.contract else '—' }}</div>
+          <div class="mb-2"><strong>المبلغ:</strong> {{ '%.2f'|format(invoice.amount) }}</div>
+          <div class="mb-2"><strong>تاريخ الإصدار:</strong> {{ invoice.issue_date.strftime('%Y-%m-%d') if invoice.issue_date else '-' }}</div>
+          <div class="mb-2"><strong>تاريخ الاستحقاق:</strong> {{ invoice.due_date.strftime('%Y-%m-%d') if invoice.due_date else '-' }}
+            {% if invoice.is_overdue() %}
+              <span class="badge bg-danger ms-1">متأخرة</span>
+            {% endif %}
+          </div>
+          <div class="mb-2"><strong>الحالة:</strong> {{ invoice.status }}</div>
+          <div class="mb-2"><strong>تاريخ السداد:</strong> {{ invoice.paid_date.strftime('%Y-%m-%d') if invoice.paid_date else '—' }}</div>
+          <div class="mb-0"><strong>ملاحظات:</strong><br>{{ invoice.notes or '—' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-8">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title mb-3">تحديث حالة الدفع</h5>
+          <form method="post" action="{{ url_for('consulting_invoices.update_invoice_status', invoice_id=invoice.id) }}" class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">الحالة</label>
+              <select name="status" class="form-select">
+                {% for s in INVOICE_STATUSES %}
+                  <option value="{{ s }}" {% if invoice.status == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">تاريخ السداد (اختياري)</label>
+              <input type="date" name="paid_date" class="form-control" value="{{ invoice.paid_date.strftime('%Y-%m-%d') if invoice.paid_date else '' }}">
+              <div class="form-text">إذا كانت الحالة "مدفوعة" ولم تدخل تاريخًا، سيتم استخدام تاريخ اليوم.</div>
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-primary">💾 حفظ</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

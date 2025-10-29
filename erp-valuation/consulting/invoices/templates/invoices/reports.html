@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">تقارير الفواتير</h3>
+    <a href="{{ url_for('consulting_invoices.list_invoices') }}" class="btn btn-secondary">📄 قائمة الفواتير</a>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="card text-bg-primary">
+        <div class="card-body">
+          <div class="text-uppercase small">إجمالي الفواتير</div>
+          <div class="fs-3 fw-bold">{{ '%.2f'|format(totals.total) }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-bg-warning">
+        <div class="card-body">
+          <div class="text-uppercase small">فواتير غير مدفوعة</div>
+          <div class="fs-3 fw-bold">{{ '%.2f'|format(totals.unpaid) }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-bg-danger">
+        <div class="card-body">
+          <div class="text-uppercase small">فواتير متأخرة</div>
+          <div class="fs-3 fw-bold">{{ '%.2f'|format(totals.overdue) }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -4,8 +4,10 @@
   <div class="d-flex align-items-center justify-content-between mb-3">
     <h3 class="mb-0">تفاصيل العميل</h3>
     <div class="d-flex gap-2">
+      <a class="btn btn-outline-primary" href="{{ url_for('consulting_invoices.list_invoices', client_id=client.id) }}">📄 فواتير العميل</a>
+      <a class="btn btn-primary" href="{{ url_for('consulting_invoices.create_invoice', client_id=client.id) }}">➕ إضافة فاتورة</a>
       <a class="btn btn-outline-secondary" href="{{ url_for('consulting_clients.list_clients') }}">↩️ رجوع</a>
-      <a class="btn btn-primary" href="{{ url_for('consulting_clients.edit_client', client_id=client.id) }}">✏️ تعديل</a>
+      <a class="btn btn-secondary" href="{{ url_for('consulting_clients.edit_client', client_id=client.id) }}">✏️ تعديل</a>
     </div>
   </div>
 
