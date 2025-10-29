@@ -4,6 +4,8 @@
   <div class="d-flex align-items-center justify-content-between mb-3">
     <h3 class="mb-0">تفاصيل المشروع</h3>
     <div class="d-flex gap-2">
+      <a href="{{ url_for('consulting_invoices.list_invoices', project_id=project.id) }}" class="btn btn-outline-primary">📄 فواتير المشروع</a>
+      <a href="{{ url_for('consulting_invoices.create_invoice', project_id=project.id, client_id=project.client_id) }}" class="btn btn-primary">➕ إضافة فاتورة</a>
       <a href="{{ url_for('consulting_projects.edit_project', project_id=project.id) }}" class="btn btn-secondary">✏️ تعديل</a>
       <a href="{{ url_for('consulting_projects.list_projects') }}" class="btn btn-outline-secondary">↩️ رجوع</a>
     </div>
