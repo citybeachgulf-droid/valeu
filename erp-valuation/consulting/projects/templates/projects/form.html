@@ -60,6 +60,48 @@
       </div>
     </div>
 
+    <hr class="my-4">
+    <div class="alert alert-info">
+      إذا لم يكن العميل موجودًا، يمكنك إضافته هنا وسيتم حفظه وربطه بالمشروع تلقائيًا.
+    </div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">اسم العميل الجديد</label>
+        <input type="text" name="new_client_name" class="form-control" value="{{ data.new_client_name or '' }}" placeholder="اتركه فارغًا إذا اخترت عميلًا موجودًا">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">نوع العميل</label>
+        <select name="new_client_type" class="form-select">
+          <option value="">اختر النوع</option>
+          {% if CLIENT_TYPES %}
+            {% for t in CLIENT_TYPES %}
+              <option value="{{ t }}" {% if data.new_client_type == t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          {% endif %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">هاتف العميل</label>
+        <input type="text" name="new_client_phone" class="form-control" value="{{ data.new_client_phone or '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">البريد الإلكتروني</label>
+        <input type="email" name="new_client_email" class="form-control" value="{{ data.new_client_email or '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">الرقم الضريبي</label>
+        <input type="text" name="new_client_tax_number" class="form-control" value="{{ data.new_client_tax_number or '' }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label">العنوان</label>
+        <input type="text" name="new_client_address" class="form-control" value="{{ data.new_client_address or '' }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label">ملاحظات</label>
+        <textarea name="new_client_notes" class="form-control" rows="2">{{ data.new_client_notes or '' }}</textarea>
+      </div>
+    </div>
+
     <div class="mt-4 d-flex gap-2">
       <button type="submit" class="btn btn-primary">💾 حفظ</button>
       <a class="btn btn-secondary" href="{{ url_for('consulting_projects.list_projects') }}">إلغاء</a>
