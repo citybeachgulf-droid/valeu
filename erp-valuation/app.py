@@ -2153,17 +2153,17 @@ def manager_delayed():
     now = datetime.utcnow()
     five_hours_ago = now - timedelta(hours=5)
 
-    # 1) لم تُستلم بعد
+    # 1) لم تُستلم بعد (يشمل العقار والمركبة)
     delayed_not_received = Transaction.query.filter(
-        Transaction.transaction_type == "real_estate",
+        Transaction.transaction_type.in_(["real_estate", "vehicle"]),
         Transaction.status == "بانتظار المهندس",
         or_(Transaction.assigned_to == None, Transaction.assigned_to.is_(None)),
         Transaction.date <= five_hours_ago,
     ).order_by(Transaction.date.asc()).all()
 
-    # 2) استلمها مهندس ولكن بدون تقرير حتى الآن
+    # 2) استلمها مهندس ولكن بدون تقرير حتى الآن (يشمل العقار والمركبة)
     delayed_received_no_report = Transaction.query.filter(
-        Transaction.transaction_type == "real_estate",
+        Transaction.transaction_type.in_(["real_estate", "vehicle"]),
         Transaction.status.in_(["قيد المعاينة", "قيد التنفيذ"]),
         Transaction.date <= five_hours_ago,
         and_(
