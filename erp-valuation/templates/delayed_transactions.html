@@ -11,7 +11,7 @@
     <a href="{{ url_for('manager_dashboard') }}" class="btn btn-secondary">⬅ رجوع للوحة المدير</a>
   </div>
 
-  <div class="alert alert-warning">تظهر هنا معاملات العقار فقط حسب سياسة لوحة المدير.</div>
+  <!-- تم توسيع الصفحة لعرض معاملات العقار والمركبات -->
 
   <h5 class="mt-4">1) لم تُستلم بعد</h5>
   <div class="table-responsive">
@@ -19,6 +19,7 @@
       <thead class="table-dark">
         <tr>
           <th>#</th>
+          <th>النوع</th>
           <th>العميل</th>
           <th>البنك</th>
           <th>الفرع</th>
@@ -33,6 +34,9 @@
         {% for t in delayed_not_received %}
         <tr>
           <td>{{ t.id }}</td>
+          <td>
+            {% if t.transaction_type == 'vehicle' %}🚗 مركبة{% else %}🏠 عقار{% endif %}
+          </td>
           <td>{{ t.client }}</td>
           <td>{{ t.bank.name if t.bank else '-' }}</td>
           <td>{{ t.bank_branch or '-' }}</td>
@@ -55,6 +59,7 @@
       <thead class="table-dark">
         <tr>
           <th>#</th>
+          <th>النوع</th>
           <th>العميل</th>
           <th>البنك</th>
           <th>الفرع</th>
@@ -69,6 +74,9 @@
         {% set eng = engineers.get(t.assigned_to) %}
         <tr>
           <td>{{ t.id }}</td>
+          <td>
+            {% if t.transaction_type == 'vehicle' %}🚗 مركبة{% else %}🏠 عقار{% endif %}
+          </td>
           <td>{{ t.client }}</td>
           <td>{{ t.bank.name if t.bank else '-' }}</td>
           <td>{{ t.bank_branch or '-' }}</td>
