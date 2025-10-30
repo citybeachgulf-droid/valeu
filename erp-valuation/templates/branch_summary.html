@@ -37,6 +37,31 @@
     </div>
   </div>
 
+  <!-- ملخص الأقسام -->
+  <h4 class="mb-3">🏷️ الأقسام</h4>
+  <table class="table table-bordered">
+    <thead class="table-dark">
+      <tr>
+        <th>القسم</th>
+        <th>المدخلات</th>
+        <th>المصاريف</th>
+        <th>الصافي</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sections %}
+      <tr>
+        <td>{{ s.name }}</td>
+        <td class="text-success">{{ s.income }} ريال</td>
+        <td class="text-danger">{{ s.expenses }} ريال</td>
+        <td class="text-primary">{{ s.net }} ريال</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-center">لا توجد أقسام معرفة لهذا الفرع</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
   <!-- جدول المعاملات -->
   <h4 class="mb-3">📑 المعاملات</h4>
   <table class="table table-bordered">

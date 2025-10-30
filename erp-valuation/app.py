@@ -2088,6 +2088,7 @@ def manager_dashboard():
         banks_list = [{"name": x[0], "count": x[1]} for x in banks_stats]
 
         branches_data.append({
+            "id": b.id,
             "name": b.name,
             "income": income,
             "expenses": expenses,
@@ -2140,6 +2141,104 @@ def manager_dashboard():
         delayed_received_no_report=delayed_received_no_report,
         template_branches=template_branches,
         current_branch_id=current_branch_id
+    )
+
+
+# ---------------- ملخص فرع للمدير مع تفاصيل الأقسام ----------------
+@app.route("/manager/branch/<int:bid>")
+def manager_branch_summary(bid: int):
+    if session.get("role") != "manager":
+        return redirect(url_for("login"))
+
+    branch = Branch.query.get_or_404(bid)
+
+    # إجمالي الدخل: مدفوعات معاملات هذا الفرع + المدفوعات المنسوبة مباشرةً للفرع
+    total_income = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0)) \
+        .select_from(Payment) \
+        .outerjoin(Transaction, Payment.transaction_id == Transaction.id) \
+        .filter(or_(Transaction.branch_id == bid, Payment.branch_id == bid)).scalar() or 0.0
+
+    # إجمالي المصاريف للفرع
+    total_expenses = db.session.query(func.coalesce(func.sum(Expense.amount), 0.0)) \
+        .filter(Expense.branch_id == bid).scalar() or 0.0
+
+    # تقسيمات الدخل حسب نوع المعاملة ودفعات المالية المباشرة
+    income_real_estate = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0)) \
+        .join(Transaction, Payment.transaction_id == Transaction.id) \
+        .filter(Transaction.branch_id == bid) \
+        .filter(Transaction.transaction_type == "real_estate").scalar() or 0.0
+
+    income_vehicle = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0)) \
+        .join(Transaction, Payment.transaction_id == Transaction.id) \
+        .filter(Transaction.branch_id == bid) \
+        .filter(Transaction.transaction_type == "vehicle").scalar() or 0.0
+
+    income_finance_direct = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0)) \
+        .filter(Payment.branch_id == bid, or_(Payment.transaction_id == None, Payment.transaction_id.is_(None))).scalar() or 0.0
+
+    # الأقسام المعرفة لهذا الفرع
+    try:
+        branch_sections = BranchSection.query.filter_by(branch_id=bid).all()
+    except Exception:
+        branch_sections = []
+
+    sections_summary = []
+    for sec in branch_sections:
+        sname = (sec.name or "").strip().lower()
+        income_value = 0.0
+        # مطابقة اسم القسم ببساطة
+        if any(k in sname for k in ["valuation", "تثمين", "عقار", "عقارات"]):
+            income_value = income_real_estate
+        elif any(k in sname for k in ["vehicle", "سيارة", "سيارات"]):
+            income_value = income_vehicle
+        elif any(k in sname for k in ["finance", "financial", "المالية"]):
+            income_value = income_finance_direct
+        elif any(k in sname for k in ["consult", "استشارة", "الاستشارات"]):
+            income_value = 0.0  # لا توجد علاقة مباشرة بالفرع حالياً
+        else:
+            # افتراضي: معاملات التثمين العقاري
+            income_value = income_real_estate
+
+        # لا يوجد ربط قسم للمصاريف حالياً => 0.0 (يمكن تطويره لاحقاً)
+        expenses_value = 0.0
+        sections_summary.append({
+            "name": sec.name,
+            "income": income_value,
+            "expenses": expenses_value,
+            "net": income_value - expenses_value,
+        })
+
+    net_profit = total_income - total_expenses
+
+    # معاملات ومصاريف للعرض التفصيلي
+    txs = Transaction.query.filter_by(branch_id=bid).order_by(Transaction.id.desc()).all()
+    expenses = Expense.query.filter_by(branch_id=bid).order_by(Expense.id.desc()).all()
+
+    # تجهيز بيانات خفيفة للقالب
+    tx_items = [{
+        "id": t.id,
+        "client": t.client,
+        "employee": t.employee,
+        "fee": t.fee,
+        "status": t.status,
+    } for t in txs]
+
+    expense_items = [{
+        "id": e.id,
+        "name": e.description,
+        "amount": e.amount,
+        "date": e.created_at.strftime('%Y-%m-%d') if getattr(e, 'created_at', None) else "",
+    } for e in expenses]
+
+    return render_template(
+        "branch_summary.html",
+        branch_name=branch.name,
+        total_income=total_income,
+        total_expenses=total_expenses,
+        net_profit=net_profit,
+        sections=sections_summary,
+        transactions=tx_items,
+        expenses=expense_items,
     )
 
 
