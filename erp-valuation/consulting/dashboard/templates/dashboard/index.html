@@ -19,7 +19,7 @@
   <!-- Top metrics -->
   <div class="row g-3 mb-4">
     <div class="col-12 col-md-4">
-      <div class="card h-100 shadow-sm">
+      <div class="card h-100 shadow-sm position-relative" style="cursor:pointer;">
         <div class="card-body">
           <div class="d-flex align-items-center justify-content-between">
             <div>
@@ -29,12 +29,13 @@
             </div>
             <div class="text-primary" style="font-size:2rem">📁</div>
           </div>
+          <a href="{{ url_for('consulting_projects.list_projects') }}" class="stretched-link" aria-label="الانتقال إلى صفحة المشاريع"></a>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-md-4">
-      <div class="card h-100 shadow-sm">
+      <div class="card h-100 shadow-sm position-relative" style="cursor:pointer;">
         <div class="card-body">
           <div class="card-title mb-1">الفواتير</div>
           <div class="metric">{{ paid_invoices }} / {{ total_invoices }}</div>
@@ -43,12 +44,13 @@
             {% set paid_pct = (100.0 * (paid_invoices or 0) / (total_invoices or 1)) | round(0, 'floor') %}
             <div class="progress-bar bg-success" role="progressbar" style="width: {{ paid_pct }}%" aria-valuenow="{{ paid_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
           </div>
+          <a href="{{ url_for('consulting_invoices.list_invoices') }}" class="stretched-link" aria-label="الانتقال إلى صفحة الفواتير"></a>
         </div>
       </div>
     </div>
 
     <div class="col-12 col-md-4">
-      <div class="card h-100 shadow-sm">
+      <div class="card h-100 shadow-sm position-relative" style="cursor:pointer;">
         <div class="card-body">
           <div class="card-title mb-2">نظرة سريعة</div>
           <ul class="list-unstyled mb-0 subtext">
@@ -56,6 +58,7 @@
             <li>المشاريع المنتهية: <strong>{{ projects_chart.data[1] }}</strong></li>
             <li>العقود السارية: <strong>{{ contracts_chart.data[0] }}</strong></li>
           </ul>
+          <a href="{{ url_for('consulting_contracts.list_contracts') }}" class="stretched-link" aria-label="الانتقال إلى صفحة العقود"></a>
         </div>
       </div>
     </div>
@@ -64,26 +67,29 @@
   <!-- Charts row -->
   <div class="row g-3 mb-4">
     <div class="col-12 col-lg-4">
-      <div class="card h-100 shadow-sm">
+      <div class="card h-100 shadow-sm position-relative" style="cursor:pointer;">
         <div class="card-body">
           <div class="card-title">نسبة المشاريع (جارية/منتهية)</div>
           <canvas id="projectsChart" height="180"></canvas>
+          <a href="{{ url_for('consulting_projects.list_projects') }}" class="stretched-link" aria-label="عرض كل المشاريع"></a>
         </div>
       </div>
     </div>
     <div class="col-12 col-lg-4">
-      <div class="card h-100 shadow-sm">
+      <div class="card h-100 shadow-sm position-relative" style="cursor:pointer;">
         <div class="card-body">
           <div class="card-title">العقود (ساري/منتهي)</div>
           <canvas id="contractsChart" height="180"></canvas>
+          <a href="{{ url_for('consulting_contracts.list_contracts') }}" class="stretched-link" aria-label="عرض كل العقود"></a>
         </div>
       </div>
     </div>
     <div class="col-12 col-lg-4">
-      <div class="card h-100 shadow-sm">
+      <div class="card h-100 shadow-sm position-relative" style="cursor:pointer;">
         <div class="card-body">
           <div class="card-title">الفواتير (صادرة/مدفوعة)</div>
           <canvas id="invoicesChart" height="180"></canvas>
+          <a href="{{ url_for('consulting_invoices.list_invoices') }}" class="stretched-link" aria-label="عرض كل الفواتير"></a>
         </div>
       </div>
     </div>
