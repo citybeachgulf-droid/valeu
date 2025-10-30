@@ -155,6 +155,10 @@ def create_project():
                 "notes": (form_data.get("new_client_notes") or "").strip(),
             }
 
+            # If user only typed the client name, default the type to the first option
+            if not client_form_payload["type"] and CLIENT_TYPES:
+                client_form_payload["type"] = CLIENT_TYPES[0]
+
             client_clean, client_errors = validate_client_form(client_form_payload)
             if client_errors:
                 for _, msg in client_errors.items():
