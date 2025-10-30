@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>⏱️ المعاملات المتأخرة</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="container my-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">⏱️ المعاملات المتأخرة (أكثر من 5 ساعات)</h3>
+    <a href="{{ url_for('manager_dashboard') }}" class="btn btn-secondary">⬅ رجوع للوحة المدير</a>
+  </div>
+
+  <div class="alert alert-warning">تظهر هنا معاملات العقار فقط حسب سياسة لوحة المدير.</div>
+
+  <h5 class="mt-4">1) لم تُستلم بعد</h5>
+  <div class="table-responsive">
+    <table class="table table-bordered table-striped align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th>#</th>
+          <th>العميل</th>
+          <th>البنك</th>
+          <th>الفرع</th>
+          <th>موظف البنك</th>
+          <th>من جلب المعاملة</th>
+          <th>الحالة</th>
+          <th>تاريخ الإدخال</th>
+          <th>ساعات التأخير</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in delayed_not_received %}
+        <tr>
+          <td>{{ t.id }}</td>
+          <td>{{ t.client }}</td>
+          <td>{{ t.bank.name if t.bank else '-' }}</td>
+          <td>{{ t.bank_branch or '-' }}</td>
+          <td>{{ t.bank_employee_name or '-' }}</td>
+          <td>{{ t.brought_by or '-' }}</td>
+          <td><span class="badge bg-warning text-dark">{{ t.status }}</span></td>
+          <td>{{ t.date.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td>{{ ((now - t.date).total_seconds() // 3600) | int }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-muted">لا توجد معاملات متأخرة غير مستلمة</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h5 class="mt-4">2) مستلمة لكن بدون تقرير</h5>
+  <div class="table-responsive">
+    <table class="table table-bordered table-striped align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th>#</th>
+          <th>العميل</th>
+          <th>البنك</th>
+          <th>الفرع</th>
+          <th>المهندس المستلم</th>
+          <th>الحالة</th>
+          <th>تاريخ الاستلام/الإدخال</th>
+          <th>ساعات التأخير</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in delayed_received_no_report %}
+        {% set eng = engineers.get(t.assigned_to) %}
+        <tr>
+          <td>{{ t.id }}</td>
+          <td>{{ t.client }}</td>
+          <td>{{ t.bank.name if t.bank else '-' }}</td>
+          <td>{{ t.bank_branch or '-' }}</td>
+          <td>{{ eng.username if eng else '-' }}</td>
+          <td><span class="badge bg-danger">{{ t.status }}</span></td>
+          <td>{{ t.date.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td>{{ ((now - t.date).total_seconds() // 3600) | int }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted">لا توجد معاملات متأخرة مستلمة بدون تقرير</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
