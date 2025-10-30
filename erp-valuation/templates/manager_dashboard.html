@@ -120,12 +120,14 @@
   <h3 class="fade-in" style="margin:2rem 0; text-align:center;">📊 أرباح الفروع</h3>
   <div>
     {% for branch in branches %}
-    <div class="card fade-in">
-      <h3>🏢 {{ branch.name }}</h3>
-      <p>💰 الدخل: {{ branch.income }} ريال</p>
-      <p>📉 المصاريف: {{ branch.expenses }} ريال</p>
-      <p class="badge completed">📊 الربح: {{ branch.profit }} ريال</p>
-    </div>
+    <a href="{{ url_for('manager_branch_summary', bid=branch.id) }}" style="text-decoration:none; color:inherit;">
+      <div class="card fade-in">
+        <h3>🏢 {{ branch.name }}</h3>
+        <p>💰 الدخل: {{ branch.income }} ريال</p>
+        <p>📉 المصاريف: {{ branch.expenses }} ريال</p>
+        <p class="badge completed">📊 الربح: {{ branch.profit }} ريال</p>
+      </div>
+    </a>
     {% endfor %}
   </div>
 </div>
