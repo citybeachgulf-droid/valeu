@@ -1131,6 +1131,23 @@ def index():
             pass
         return redirect(url_for("employee_dashboard"))
     elif role == "engineer":
+        # إذا كان المهندس ضمن قسم "الاستشارات" فحوّله مباشرة لواجهة الاستشارات
+        try:
+            ensure_branch_department_column()
+            user = User.query.get(session.get("user_id"))
+            # أولوية: قسم المستخدم إن كان محددًا
+            if user and getattr(user, "section_id", None):
+                sec = BranchSection.query.get(user.section_id)
+                if sec and (sec.name or "").strip().lower() in ("consultations", "consultation", "consulting", "الاستشارات"):
+                    return _redirect_to_section(sec.name)
+            # إن لم يوجد قسم للمستخدم، نعتمد قسم الفرع القديم
+            if user and getattr(user, "branch_id", None):
+                b = Branch.query.get(user.branch_id)
+                dept = (b.department or "").strip().lower() if b else ""
+                if dept in ("consultations", "consultation", "consulting", "الاستشارات"):
+                    return redirect(url_for("consulting_dashboard.dashboard_home"))
+        except Exception:
+            pass
         return redirect(url_for("engineer_dashboard"))
     elif role == "finance":
         return redirect(url_for("finance_dashboard"))
