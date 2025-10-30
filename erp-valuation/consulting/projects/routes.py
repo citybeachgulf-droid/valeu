@@ -26,6 +26,7 @@ from .forms import (
     ALLOWED_FILE_EXTENSIONS,
     validate_project_form,
 )
+from consulting.clients.forms import validate_client_form, CLIENT_TYPES
 
 
 projects_bp = Blueprint(
@@ -138,18 +139,62 @@ def create_project():
         return maybe_redirect
 
     if request.method == "POST":
-        data, errors = validate_project_form(request.form)
+        # Allow inline creation of a new client when adding a project
+        form_data = request.form.to_dict(flat=True)
+
+        new_client_name = (form_data.get("new_client_name") or "").strip()
+        if new_client_name:
+            # Build client form payload from prefixed fields
+            client_form_payload = {
+                "name": new_client_name,
+                "type": (form_data.get("new_client_type") or "").strip(),
+                "phone": (form_data.get("new_client_phone") or "").strip(),
+                "email": (form_data.get("new_client_email") or "").strip(),
+                "address": (form_data.get("new_client_address") or "").strip(),
+                "tax_number": (form_data.get("new_client_tax_number") or "").strip(),
+                "notes": (form_data.get("new_client_notes") or "").strip(),
+            }
+
+            client_clean, client_errors = validate_client_form(client_form_payload)
+            if client_errors:
+                for _, msg in client_errors.items():
+                    flash(f"❌ {msg}", "error")
+                clients = Client.query.order_by(Client.name.asc()).all()
+                # Preserve entered values
+                data = form_data
+                return render_template(
+                    "projects/form.html",
+                    mode="create",
+                    data=data,
+                    clients=clients,
+                    PROJECT_TYPES=PROJECT_TYPES,
+                    PROJECT_STATUSES=PROJECT_STATUSES,
+                    CLIENT_TYPES=CLIENT_TYPES,
+                    title="إضافة مشروع",
+                )
+
+            # Create and persist the client, then inject its id into project form
+            client = Client(**client_clean)
+            db.session.add(client)
+            db.session.commit()
+            form_data["client_id"] = str(client.id)
+            flash("✅ تم إنشاء العميل وربطه بالمشروع", "success")
+
+        data, errors = validate_project_form(form_data)
         if errors:
             for _, msg in errors.items():
                 flash(f"❌ {msg}", "error")
             clients = Client.query.order_by(Client.name.asc()).all()
+            # Preserve also the inline client fields on error
+            data_with_client = {**form_data, **{k: v for k, v in data.items()}}
             return render_template(
                 "projects/form.html",
                 mode="create",
-                data=data,
+                data=data_with_client,
                 clients=clients,
                 PROJECT_TYPES=PROJECT_TYPES,
                 PROJECT_STATUSES=PROJECT_STATUSES,
+                CLIENT_TYPES=CLIENT_TYPES,
                 title="إضافة مشروع",
             )
         project = ConsultingProject(**data)
@@ -166,6 +211,7 @@ def create_project():
         clients=clients,
         PROJECT_TYPES=PROJECT_TYPES,
         PROJECT_STATUSES=PROJECT_STATUSES,
+        CLIENT_TYPES=CLIENT_TYPES,
         title="إضافة مشروع",
     )
 
@@ -192,6 +238,7 @@ def edit_project(project_id: int):
                 project=project,
                 PROJECT_TYPES=PROJECT_TYPES,
                 PROJECT_STATUSES=PROJECT_STATUSES,
+                CLIENT_TYPES=CLIENT_TYPES,
                 title=f"تعديل مشروع - {project.name}",
             )
 
@@ -228,6 +275,7 @@ def edit_project(project_id: int):
         project=project,
         PROJECT_TYPES=PROJECT_TYPES,
         PROJECT_STATUSES=PROJECT_STATUSES,
+        CLIENT_TYPES=CLIENT_TYPES,
         title=f"تعديل مشروع - {project.name}",
     )
 
