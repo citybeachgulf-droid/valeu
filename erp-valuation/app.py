@@ -2143,6 +2143,47 @@ def manager_dashboard():
     )
 
 
+# ---------------- صفحة المعاملات المتأخرة (لوحة المدير) ----------------
+@app.route("/manager/delayed")
+def manager_delayed():
+    """قائمة تفصيلية بالمعاملات المتأخرة مع اسم المهندس المستلم (إن وُجد)."""
+    if session.get("role") != "manager":
+        return redirect(url_for("login"))
+
+    now = datetime.utcnow()
+    five_hours_ago = now - timedelta(hours=5)
+
+    # 1) لم تُستلم بعد
+    delayed_not_received = Transaction.query.filter(
+        Transaction.transaction_type == "real_estate",
+        Transaction.status == "بانتظار المهندس",
+        or_(Transaction.assigned_to == None, Transaction.assigned_to.is_(None)),
+        Transaction.date <= five_hours_ago,
+    ).order_by(Transaction.date.asc()).all()
+
+    # 2) استلمها مهندس ولكن بدون تقرير حتى الآن
+    delayed_received_no_report = Transaction.query.filter(
+        Transaction.transaction_type == "real_estate",
+        Transaction.status.in_(["قيد المعاينة", "قيد التنفيذ"]),
+        Transaction.date <= five_hours_ago,
+        and_(
+            or_(Transaction.report_file == None, func.length(func.trim(Transaction.report_file)) == 0),
+            or_(Transaction.engineer_report == None, func.length(func.trim(Transaction.engineer_report)) == 0),
+            or_(Transaction.report_b2_file_name == None, func.length(func.trim(Transaction.report_b2_file_name)) == 0),
+        ),
+    ).order_by(Transaction.date.asc()).all()
+
+    # خريطة للمهندسين بالمعرّف لسهولة العرض في القالب
+    engineers = {u.id: u for u in User.query.filter_by(role="engineer").all()}
+
+    return render_template(
+        "delayed_transactions.html",
+        delayed_not_received=delayed_not_received,
+        delayed_received_no_report=delayed_received_no_report,
+        engineers=engineers,
+        now=now,
+    )
+
 # ✅ تحديث حالة المعاملة
 @app.route("/update_status/<int:tid>/<status>")
 def update_status(tid, status):

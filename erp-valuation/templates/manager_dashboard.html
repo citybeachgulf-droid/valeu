@@ -85,9 +85,11 @@
   {% endif %}
 
   {% if (delayed_not_received and delayed_not_received|length) or (delayed_received_no_report and delayed_received_no_report|length) %}
-  <div class="card fade-in" style="background:#f8d7da; color:#721c24;">
-    ⏱️ معاملات متأخرة (أكثر من 5 ساعات)
-  </div>
+  <a href="{{ url_for('manager_delayed') }}" style="text-decoration:none;">
+    <div class="card fade-in" style="background:#f8d7da; color:#721c24;">
+      ⏱️ معاملات متأخرة (أكثر من 5 ساعات) — اضغط للعرض التفصيلي
+    </div>
+  </a>
   {% endif %}
 
   <h3 class="fade-in" style="margin:2rem 0; text-align:center;">📋 جميع المعاملات</h3>
