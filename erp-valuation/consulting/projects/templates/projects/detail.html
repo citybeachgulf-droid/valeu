@@ -49,23 +49,136 @@
   <div class="row g-3">
     <div class="col-md-6">
       <div class="card h-100">
-        <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
           <strong>العقود</strong>
-          <span class="text-muted small">(غير متوفر حالياً)</span>
+          <div class="d-flex align-items-center gap-2">
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('consulting_contracts.list_contracts', project_id=project.id) }}">📑 جميع العقود</a>
+            {% if can_manage_project %}
+            <a class="btn btn-sm btn-primary" href="{{ url_for('consulting_contracts.create_contract') }}?project_id={{ project.id }}&client_id={{ project.client_id }}">➕ عقد جديد</a>
+            {% endif %}
+          </div>
         </div>
         <div class="card-body">
-          <div class="text-muted">لا توجد بيانات</div>
+          {% if related_contracts %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>رقم العقد</th>
+                  <th>القيمة</th>
+                  <th>المدة</th>
+                  <th>الحالة</th>
+                  <th class="text-end">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for c in related_contracts %}
+                <tr>
+                  <td class="fw-semibold">{{ c.contract_number }}</td>
+                  <td>{{ '%.2f'|format(c.value) if c.value is not none else '-' }}</td>
+                  <td>
+                    {% if c.start_date %}{{ c.start_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}
+                    —
+                    {% if c.end_date %}{{ c.end_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}
+                  </td>
+                  <td>
+                    {% if c.status == 'ساري' %}
+                      <span class="badge bg-success">{{ c.status }}</span>
+                    {% elif c.status == 'منتهي' %}
+                      <span class="badge bg-secondary">{{ c.status }}</span>
+                    {% else %}
+                      <span class="badge bg-warning text-dark">{{ c.status }}</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end text-nowrap">
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_contracts.contract_detail', contract_id=c.id) }}">عرض</a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-muted">لا توجد عقود مرتبطة بهذا المشروع.</div>
+          {% endif %}
         </div>
       </div>
     </div>
     <div class="col-md-6">
       <div class="card h-100">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <strong>المهندسون</strong>
-          <span class="text-muted small">(غير متوفر حالياً)</span>
+        <div class="card-header">
+          <strong>المهندسون المسؤولون</strong>
         </div>
         <div class="card-body">
-          <div class="text-muted">لا توجد بيانات</div>
+          {% if can_manage_project %}
+          <form class="row g-2 align-items-end" method="post" action="{{ url_for('consulting_projects.assign_project_engineer', project_id=project.id) }}">
+            <div class="col-12">
+              <label class="form-label">اختيار المهندس</label>
+              <select class="form-select" name="engineer_id" required>
+                <option value="">-- اختر مهندساً --</option>
+                {% for eng in engineers %}
+                <option value="{{ eng.id }}">{{ eng.name }}{% if eng.specialty %} — {{ eng.specialty }}{% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">الدور</label>
+              <input type="text" class="form-control" name="role" placeholder="مثل: مسؤول المشروع">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">ملاحظات</label>
+              <input type="text" class="form-control" name="notes" placeholder="ملاحظات إضافية">
+            </div>
+            <div class="col-12">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" value="1" id="assignLead" name="is_lead">
+                <label class="form-check-label" for="assignLead">
+                  تعيين كمهندس مسؤول عن المشروع
+                </label>
+              </div>
+            </div>
+            <div class="col-12 d-grid">
+              <button class="btn btn-primary" type="submit">💾 حفظ التعيين</button>
+            </div>
+          </form>
+          <hr class="my-3">
+          {% endif %}
+
+          {% if assigned_engineers %}
+          <div class="list-group list-group-flush">
+            {% for assign in assigned_engineers %}
+            <div class="list-group-item px-0">
+              <div class="d-flex justify-content-between gap-3 flex-wrap">
+                <div>
+                  <div class="fw-semibold">
+                    {{ assign.engineer.name if assign.engineer else '—' }}
+                    {% if assign.is_lead %}
+                      <span class="badge bg-info text-dark ms-2">مسؤول المشروع</span>
+                    {% endif %}
+                  </div>
+                  <div class="text-muted small">
+                    {% if assign.engineer and assign.engineer.specialty %}{{ assign.engineer.specialty }} · {% endif %}
+                    {% if assign.role %}{{ assign.role }}{% else %}بدون دور محدد{% endif %}
+                  </div>
+                  <div class="text-muted small">
+                    {% if assign.assigned_at %}تاريخ التعيين: {{ assign.assigned_at.strftime('%Y-%m-%d %H:%M') }}{% else %}-{% endif %}
+                  </div>
+                  {% if assign.notes %}
+                  <div class="small mt-1">📝 {{ assign.notes }}</div>
+                  {% endif %}
+                </div>
+                {% if can_manage_project %}
+                <form method="post" action="{{ url_for('consulting_projects.remove_project_engineer', project_id=project.id, assignment_id=assign.id) }}">
+                  <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('تأكيد إزالة هذا المهندس من المشروع؟');">حذف</button>
+                </form>
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="text-muted">لم يتم تعيين مهندسين لهذا المشروع بعد.</div>
+          {% endif %}
         </div>
       </div>
     </div>

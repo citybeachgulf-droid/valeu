@@ -81,3 +81,48 @@ class ProjectFile(db.Model):
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<ProjectFile {self.id} project={self.project_id} name={self.original_filename!r}>"
+
+
+class ProjectEngineerAssignment(db.Model):
+    __tablename__ = "consulting_project_engineer"
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(
+        db.Integer,
+        db.ForeignKey("consulting_project.id"),
+        nullable=False,
+        index=True,
+    )
+    engineer_id = db.Column(
+        db.Integer,
+        db.ForeignKey("consulting_engineer.id"),
+        nullable=False,
+        index=True,
+    )
+
+    role = db.Column(db.String(100), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    is_lead = db.Column(db.Boolean, nullable=False, default=False)
+    assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    project = db.relationship(
+        "ConsultingProject",
+        backref=db.backref(
+            "engineer_assignments",
+            lazy=True,
+            cascade="all, delete-orphan",
+        ),
+        foreign_keys=[project_id],
+    )
+    engineer = db.relationship(
+        "Engineer",
+        backref=db.backref("project_assignments", lazy=True),
+        foreign_keys=[engineer_id],
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return (
+            f"<ProjectEngineerAssignment project={self.project_id} "
+            f"engineer={self.engineer_id} lead={self.is_lead}>"
+        )
+
