@@ -16,8 +16,9 @@
 </head>
 <body class="{% block body_class %}{% endblock %}"
   data-back-button="{{ 'off' if show_back_button is defined and not show_back_button else 'on' }}"
-  data-back-button-label="{{ back_button_label|default('رجوع', true)|e }}"
-  data-back-button-fallback="{{ back_button_url|default(url_for('login'), true)|e }}">
+  data-back-button-label="{{ back_button_label|default(role_home_label, true)|e }}"
+  data-back-button-icon="{{ back_button_icon|default('🏠', true)|e }}"
+  data-back-button-fallback="{{ back_button_url|default(role_home_url, true)|e }}">
 
   {% block navbar %}{% endblock %}
 

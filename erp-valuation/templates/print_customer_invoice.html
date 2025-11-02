@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/print-invoice.css') }}">
 </head>
-<body data-back-button-fallback="{{ url_for('login') }}">
+<body data-back-button-label="{{ role_home_label }}" data-back-button-fallback="{{ role_home_url }}">
   <div class="invoice-container">
     <div class="card">
       <div class="header">

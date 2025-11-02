@@ -139,10 +139,43 @@ def build_b2_public_url(file_name: str) -> str | None:
         return None
 
 # اجعل الدالة متاحة داخل قوالب Jinja مباشرةً
+ROLE_HOME_ENDPOINTS: dict[str, tuple[str, str]] = {
+    "manager": ("manager_dashboard", "العودة للوحة المدير"),
+    "employee": ("employee_dashboard", "العودة للوحة الموظف"),
+    "engineer": ("engineer_dashboard", "العودة للوحة المهندس"),
+    "finance": ("finance_dashboard", "العودة للوحة المالية"),
+    "consultant": ("consulting_dashboard.dashboard_home", "العودة للوحة الاستشارات"),
+    "admin": ("manager_dashboard", "العودة للوحة المدير"),
+    "visit": ("index", "العودة للصفحة الرئيسية"),
+}
+
+
+def _resolve_role_home() -> tuple[str, str]:
+    """Return (url, label) pointing to the home page for the active role."""
+
+    role = session.get("role")
+    endpoint, label = ROLE_HOME_ENDPOINTS.get(role, ("index", "العودة للصفحة الرئيسية"))
+
+    try:
+        home_url = url_for(endpoint)
+    except Exception:
+        # Fallback to login if endpoint cannot be reversed (e.g. outside request context)
+        try:
+            home_url = url_for("login")
+        except Exception:
+            home_url = "/"
+
+    return home_url, label
+
+
 @app.context_processor
 def inject_template_helpers():
+    role_home_url, role_home_label = _resolve_role_home()
+
     return {
         "build_b2_public_url": build_b2_public_url,
+        "role_home_url": role_home_url,
+        "role_home_label": role_home_label,
     }
 
 # ---------------- إعداد مفاتيح Web Push (VAPID) ----------------
