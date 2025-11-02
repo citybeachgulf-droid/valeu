@@ -11,6 +11,11 @@ ENGINEER_SPECIALTIES = [
     "ميكانيكي",
 ]
 
+ENGINEER_STATUSES = [
+    "نشط",
+    "غير نشط",
+]
+
 # ثابت حالات المهام
 TASK_STATUSES = [
     "جديدة",
@@ -82,4 +87,53 @@ def validate_update_task_form(form: Dict[str, str]) -> Tuple[Dict, Dict[str, str
         "status": status,
         "progress": progress,
     }
+    return data, errors
+
+
+def validate_engineer_form(form: Dict[str, str], *, for_update: bool = False) -> Tuple[Dict, Dict[str, str]]:
+    """Validate creation or update of an engineer entry."""
+
+    errors: Dict[str, str] = {}
+
+    name = _normalize_str(form.get("name"))
+    specialty = _normalize_str(form.get("specialty"))
+    phone = _normalize_str(form.get("phone"))
+    email = _normalize_str(form.get("email"))
+    join_date_raw = _normalize_str(form.get("join_date"))
+    status_input = _normalize_str(form.get("status"))
+
+    if not name:
+        errors["name"] = "الاسم مطلوب"
+
+    if specialty not in ENGINEER_SPECIALTIES:
+        errors["specialty"] = "التخصص غير صالح"
+
+    join_date = None
+    if join_date_raw:
+        try:
+            year, month, day = map(int, join_date_raw.split("-"))
+            join_date = date(year, month, day)
+        except Exception:
+            errors["join_date"] = "صيغة تاريخ الانضمام غير صحيحة"
+
+    if email and "@" not in email:
+        errors["email"] = "البريد الإلكتروني غير صالح"
+
+    status: str | None
+    if status_input:
+        if status_input not in ENGINEER_STATUSES:
+            errors["status"] = "الحالة غير صالحة"
+        status = status_input
+    else:
+        status = None if for_update else "نشط"
+
+    data = {
+        "name": name,
+        "specialty": specialty,
+        "phone": phone or None,
+        "email": email or None,
+        "join_date": join_date,
+        "status": status,
+    }
+
     return data, errors

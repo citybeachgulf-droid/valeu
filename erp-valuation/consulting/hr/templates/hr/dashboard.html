@@ -1,0 +1,230 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+      <h3 class="mb-1">???? ??????? ??????? ??????????</h3>
+      <p class="text-muted mb-0 small">?????? ???? ????????? ??????? ?????? ??????? ???????</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.list_engineers') }}">????? ?????????</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_projects.list_projects') }}">?????? ??????????</a>
+      <a class="btn btn-primary" href="{{ url_for('consulting_hr.create_engineer') }}">? ????? ????? ????????</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small mb-1">?????? ?????????</div>
+          <div class="fs-3 fw-bold">{{ stats.total_engineers }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small mb-1">????????? ???????</div>
+          <div class="fs-3 fw-bold text-success">{{ stats.active_engineers }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small mb-1">??? ???????</div>
+          <div class="fs-3 fw-bold text-secondary">{{ stats.inactive_engineers }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small mb-1">???? ??? ????????</div>
+          <div class="fs-3 fw-bold">{{ stats.total_open_tasks }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small mb-1">?????? ????????</div>
+          <div class="fs-3 fw-bold text-danger">{{ stats.overdue_tasks_count }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mt-1">
+    <div class="col-lg-5">
+      <div class="card h-100 shadow-sm border-0">
+        <div class="card-header bg-white fw-semibold">????? ????? ??????</div>
+        <div class="card-body">
+          <form method="post" novalidate>
+            <div class="mb-3">
+              <label class="form-label">????? ??????</label>
+              <input type="text" class="form-control {% if form_errors.get('name') %}is-invalid{% endif %}" name="name" value="{{ form_values.name }}" required>
+              {% if form_errors.get('name') %}<div class="invalid-feedback d-block">{{ form_errors.get('name') }}</div>{% endif %}
+            </div>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label">??????</label>
+                <select class="form-select {% if form_errors.get('specialty') %}is-invalid{% endif %}" name="specialty" required>
+                  <option value="">-- ???? ?????? --</option>
+                  {% for sp in ENGINEER_SPECIALTIES %}
+                  <option value="{{ sp }}" {% if form_values.specialty==sp %}selected{% endif %}>{{ sp }}</option>
+                  {% endfor %}
+                </select>
+                {% if form_errors.get('specialty') %}<div class="invalid-feedback d-block">{{ form_errors.get('specialty') }}</div>{% endif %}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">??????</label>
+                <select class="form-select {% if form_errors.get('status') %}is-invalid{% endif %}" name="status">
+                  {% for st in ENGINEER_STATUSES %}
+                  <option value="{{ st }}" {% if form_values.status==st %}selected{% endif %}>{{ st }}</option>
+                  {% endfor %}
+                </select>
+                {% if form_errors.get('status') %}<div class="invalid-feedback d-block">{{ form_errors.get('status') }}</div>{% endif %}
+              </div>
+            </div>
+            <div class="row g-2 mt-2">
+              <div class="col-md-6">
+                <label class="form-label">??????</label>
+                <input type="text" class="form-control" name="phone" value="{{ form_values.phone }}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">?????? ??????????</label>
+                <input type="email" class="form-control {% if form_errors.get('email') %}is-invalid{% endif %}" name="email" value="{{ form_values.email }}">
+                {% if form_errors.get('email') %}<div class="invalid-feedback d-block">{{ form_errors.get('email') }}</div>{% endif %}
+              </div>
+            </div>
+            <div class="mt-3">
+              <label class="form-label">????? ????????</label>
+              <input type="date" class="form-control {% if form_errors.get('join_date') %}is-invalid{% endif %}" name="join_date" value="{{ form_values.join_date }}">
+              {% if form_errors.get('join_date') %}<div class="invalid-feedback d-block">{{ form_errors.get('join_date') }}</div>{% endif %}
+            </div>
+            <div class="d-grid mt-4">
+              <button class="btn btn-primary" type="submit">?? ??? ???????</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <h5 class="card-title mb-3">????? ????????</h5>
+          {% if specialty_distribution %}
+          <div class="d-flex flex-wrap gap-2">
+            {% for name, count in specialty_distribution.items() %}
+            <span class="badge bg-light text-dark border">{{ name }}<span class="ms-1 fw-semibold">{{ count }}</span></span>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="text-muted">?? ???? ?????? ?????? ???.</div>
+          {% endif %}
+        </div>
+        <div class="card-footer bg-white">
+          <h6 class="mb-2">????????? ???????? ??????</h6>
+          {% if recent_engineers %}
+          <ul class="list-unstyled mb-0 small">
+            {% for eng in recent_engineers %}
+            <li class="mb-1">
+              <span class="fw-semibold">{{ eng.name }}</span>
+              <span class="text-muted">? {{ eng.specialty }}</span>
+              {% if eng.created_at %}<span class="text-muted">? {{ eng.created_at.strftime('%Y-%m-%d') }}</span>{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <div class="text-muted small">?? ??? ????? ??????? ???.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mt-1">
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-white fw-semibold">?????? ???????</div>
+        <div class="card-body">
+          {% if upcoming_tasks %}
+          <ul class="list-group list-group-flush">
+            {% for task in upcoming_tasks %}
+            <li class="list-group-item">
+              <div class="fw-semibold">{{ task.title }}</div>
+              <div class="text-muted small">
+                {{ task.engineer.name if task.engineer else '??? ?????' }}
+                {% if task.deadline %} ? ??????: {{ task.deadline.strftime('%Y-%m-%d') }}{% endif %}
+              </div>
+              {% if task.project %}<div class="text-muted small">???????: {{ task.project.name }}</div>{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <div class="text-muted">?? ???? ???? ????? ?????.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-white fw-semibold">?????? ????????</div>
+        <div class="card-body">
+          {% if overdue_tasks %}
+          <ul class="list-group list-group-flush">
+            {% for task in overdue_tasks %}
+            <li class="list-group-item list-group-item-action list-group-item-danger">
+              <div class="fw-semibold">{{ task.title }}</div>
+              <div class="text-muted small">
+                {{ task.engineer.name if task.engineer else '??? ?????' }}
+                {% if task.deadline %} ? ???? ??? {{ task.deadline.strftime('%Y-%m-%d') }}{% endif %}
+              </div>
+              {% if task.project %}<div class="text-muted small">???????: {{ task.project.name }}</div>{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <div class="text-muted">?? ???? ???? ?????? ?????? ??</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0 mt-4">
+    <div class="card-header bg-white fw-semibold">??? ????????? ??? ??????</div>
+    <div class="card-body">
+      {% if recent_tasks %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>??????</th>
+              <th>???????</th>
+              <th>??????</th>
+              <th>??? ?????</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for task in recent_tasks %}
+            <tr>
+              <td>{{ task.title }}</td>
+              <td>{{ task.engineer.name if task.engineer else '-' }}</td>
+              <td><span class="badge {% if task.status=='??????' %}bg-success{% elif task.status=='??? ???????' %}bg-info text-dark{% else %}bg-secondary{% endif %}">{{ task.status }}</span></td>
+              <td>{{ task.created_at.strftime('%Y-%m-%d %H:%M') if task.created_at else '-' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-muted">?? ???? ??????? ????? ??? ??????.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -13,8 +13,9 @@ with app.app_context():
         visit    = User(username="visit", password=generate_password_hash("456"), role="visit")
         engineer = User(username="engineer", password=generate_password_hash("789"), role="engineer")
         finance  = User(username="finance", password=generate_password_hash("000"), role="finance")
+        hr_user  = User(username="hr", password=generate_password_hash("hr123"), role="hr")
 
-        db.session.add_all([manager, employee, visit, engineer, finance])
+        db.session.add_all([manager, employee, visit, engineer, finance, hr_user])
         db.session.commit()
         print("✅ Database initialized with default users")
     else:

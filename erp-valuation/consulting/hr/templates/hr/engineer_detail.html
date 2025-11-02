@@ -2,9 +2,18 @@
 
 {% block content %}
 <div class="container py-4" data-overdue="{{ overdue_count }}">
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <h3 class="mb-0">{{ engineer.name }} <small class="text-muted">({{ engineer.specialty }})</small></h3>
-    <a href="{{ url_for('consulting_hr.list_engineers') }}" class="btn btn-outline-secondary">عودة للقائمة</a>
+  <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+    <div>
+      <h3 class="mb-1">{{ engineer.name }} <small class="text-muted">({{ engineer.specialty }})</small></h3>
+      <p class="text-muted small mb-0">إدارة بيانات المهندس ومتابعة التكليفات والمهام المرتبطة به</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      {% if can_manage %}
+      <a class="btn btn-primary" href="{{ url_for('consulting_hr.edit_engineer', engineer_id=engineer.id) }}">✏️ تعديل البيانات</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.dashboard') }}">لوحة HR</a>
+      {% endif %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.list_engineers') }}">عودة للقائمة</a>
+    </div>
   </div>
 
   <div class="row g-3">
@@ -19,6 +28,7 @@
         </div>
       </div>
 
+      {% if can_manage %}
       <div class="card mt-3">
         <div class="card-body">
           <h5 class="card-title">إضافة مهمة</h5>
@@ -50,6 +60,11 @@
           </form>
         </div>
       </div>
+      {% else %}
+      <div class="alert alert-info mt-3 mb-0 small">
+        لا يمكن إضافة مهام جديدة إلا من خلال موظفي الموارد البشرية أو الإدارة.
+      </div>
+      {% endif %}
     </div>
 
     <div class="col-md-8">

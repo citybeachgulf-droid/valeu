@@ -144,6 +144,7 @@ ROLE_HOME_ENDPOINTS: dict[str, tuple[str, str]] = {
     "employee": ("employee_dashboard", "العودة للوحة الموظف"),
     "engineer": ("engineer_dashboard", "العودة للوحة المهندس"),
     "finance": ("finance_dashboard", "العودة للوحة المالية"),
+    "hr": ("consulting_hr.dashboard", "العودة للوحة الموارد البشرية"),
     "consultant": ("consulting_dashboard.dashboard_home", "العودة للوحة الاستشارات"),
     "admin": ("manager_dashboard", "العودة للوحة المدير"),
     "visit": ("index", "العودة للصفحة الرئيسية"),
@@ -1184,6 +1185,8 @@ def index():
         return redirect(url_for("engineer_dashboard"))
     elif role == "finance":
         return redirect(url_for("finance_dashboard"))
+    elif role == "hr":
+        return redirect(url_for("consulting_hr.dashboard"))
     return redirect(url_for("login"))
 
 # ================= Consulting Department Routes =================

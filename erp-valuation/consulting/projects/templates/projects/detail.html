@@ -128,6 +128,7 @@
           {% elif can_manage_project %}
           <div class="alert alert-warning small">
             لا يوجد مهندسون مسجلون في قسم الاستشارات حتى الآن.
+            <a class="alert-link" href="{{ url_for('consulting_hr.dashboard') }}">أضف مهندساً من لوحة الموارد البشرية</a>.
           </div>
           {% endif %}
           {% if can_manage_project %}

@@ -125,7 +125,7 @@ def _resolve_client_from_form(form_data: Dict[str, str]) -> Tuple[Optional[Clien
 
 @projects_bp.route("/projects")
 def list_projects():
-    maybe_redirect = _require_roles(["manager", "employee", "engineer"])  # allow engineers to view
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "hr"])  # allow engineers to view
     if maybe_redirect:
         return maybe_redirect
 
@@ -174,7 +174,7 @@ def list_projects():
 
 @projects_bp.route("/projects/<int:project_id>")
 def project_detail(project_id: int):
-    maybe_redirect = _require_roles(["manager", "employee", "engineer"])  # allow engineers to view
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "hr"])  # allow engineers to view
     if maybe_redirect:
         return maybe_redirect
 
@@ -234,7 +234,7 @@ def project_detail(project_id: int):
             if eng and eng.name
         ]
         consulting_engineer_source = "registry"
-    can_manage_project = session.get("role") in {"manager", "employee"}
+    can_manage_project = session.get("role") in {"manager", "employee", "hr"}
 
     # Files
     files = ProjectFile.query.filter_by(project_id=project.id).order_by(ProjectFile.uploaded_at.desc()).all()
@@ -257,7 +257,7 @@ def project_detail(project_id: int):
 
 @projects_bp.route("/projects/<int:project_id>/assign-engineer", methods=["POST"])
 def assign_project_engineer(project_id: int):
-    maybe_redirect = _require_roles(["manager", "employee"])
+    maybe_redirect = _require_roles(["manager", "employee", "hr"])
     if maybe_redirect:
         return maybe_redirect
 
@@ -318,7 +318,7 @@ def assign_project_engineer(project_id: int):
 
 @projects_bp.route("/projects/<int:project_id>/assignments/<int:assignment_id>/delete", methods=["POST"])
 def remove_project_engineer(project_id: int, assignment_id: int):
-    maybe_redirect = _require_roles(["manager", "employee"])
+    maybe_redirect = _require_roles(["manager", "employee", "hr"])
     if maybe_redirect:
         return maybe_redirect
 
