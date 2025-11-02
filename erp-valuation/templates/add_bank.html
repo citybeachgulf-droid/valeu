@@ -23,7 +23,7 @@
     }
   </style>
 </head>
-<body>
+<body data-back-button-fallback="{{ url_for('login') }}">
 
   <div class="container">
     <div class="card">
@@ -38,5 +38,6 @@
     </div>
   </div>
 
+  <script defer src="{{ url_for('static', filename='js/back-button.js') }}"></script>
 </body>
 </html>

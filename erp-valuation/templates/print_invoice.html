@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/print-invoice.css') }}">
 </head>
-<body>
+<body data-back-button-fallback="{{ url_for('login') }}">
   <div class="invoice-container">
     <div class="card">
       <div class="header">
@@ -115,6 +115,7 @@
       } catch (e) {}
     })();
   </script>
+  <script defer src="{{ url_for('static', filename='js/back-button.js') }}"></script>
 </body>
 </html>
 

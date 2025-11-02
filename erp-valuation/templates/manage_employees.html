@@ -38,7 +38,7 @@
   @keyframes fadeIn { to { opacity:1; } }
 </style>
 </head>
-<body>
+<body data-back-button-fallback="{{ url_for('login') }}">
 
 <div class="container">
   <h2 class="fade-in">👥 إدارة الموظفين</h2>
@@ -155,5 +155,6 @@
 
 </div>
 
+  <script defer src="{{ url_for('static', filename='js/back-button.js') }}"></script>
 </body>
 </html>
