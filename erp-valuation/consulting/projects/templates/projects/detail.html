@@ -112,7 +112,13 @@
         <div class="card-body">
           {% if consulting_branch_engineers %}
           <div class="alert alert-light border text-muted small">
-            <div class="fw-semibold text-dark mb-1">مهندسو قسم الاستشارات في هذا الفرع</div>
+            <div class="fw-semibold text-dark mb-1">
+              {% if consulting_engineer_source == 'branch' %}
+              مهندسو قسم الاستشارات في هذا الفرع
+              {% else %}
+              المهندسون المسجلون في قسم الاستشارات
+              {% endif %}
+            </div>
             <div class="d-flex flex-wrap gap-2">
               {% for eng in consulting_branch_engineers %}
               <span class="badge bg-light text-dark border">{{ eng.name }}</span>
@@ -121,7 +127,7 @@
           </div>
           {% elif can_manage_project %}
           <div class="alert alert-warning small">
-            لا يوجد مهندسون مسجلون في قسم الاستشارات لهذا الفرع.
+            لا يوجد مهندسون مسجلون في قسم الاستشارات حتى الآن.
           </div>
           {% endif %}
           {% if can_manage_project %}
