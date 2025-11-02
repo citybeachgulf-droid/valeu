@@ -46,8 +46,6 @@ def validate_contract_form(form: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[s
         errors["project_id"] = "المشروع مطلوب"
     if not data["client_id"]:
         errors["client_id"] = "العميل مطلوب"
-    if not data["contract_number"]:
-        errors["contract_number"] = "رقم العقد مطلوب"
 
     # Value -> float
     if data["value"]:

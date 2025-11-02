@@ -21,7 +21,7 @@ from sqlalchemy import or_
 from extensions import db
 from consulting.clients.models import Client
 from consulting.projects.models import ConsultingProject
-from .models import Contract
+from .models import Contract, generate_unique_contract_number, preview_next_contract_number
 from .forms import (
     CONTRACT_STATUSES,
     ALLOWED_FILE_EXTENSIONS,
@@ -155,9 +155,11 @@ def create_contract():
                 clients=clients,
                 projects=projects,
                 CONTRACT_STATUSES=CONTRACT_STATUSES,
+                next_contract_number=preview_next_contract_number(),
                 title="إضافة عقد",
             )
 
+        data["contract_number"] = generate_unique_contract_number()
         contract = Contract(**data)
         db.session.add(contract)
         db.session.commit()
@@ -190,6 +192,7 @@ def create_contract():
         clients=clients,
         projects=projects,
         CONTRACT_STATUSES=CONTRACT_STATUSES,
+        next_contract_number=preview_next_contract_number(),
         title="إضافة عقد",
     )
 

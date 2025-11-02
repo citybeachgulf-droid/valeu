@@ -64,3 +64,36 @@ class Contract(db.Model):
             "days_to_expiry": self.days_to_expiry(),
             "near_expiry": self.is_near_expiry(),
         }
+
+
+class ContractSequence(db.Model):
+    __tablename__ = "consulting_contract_sequence"
+
+    id = db.Column(db.Integer, primary_key=True)
+    year = db.Column(db.Integer, unique=True, nullable=False)
+    last_number = db.Column(db.Integer, nullable=False, default=0)
+
+
+def preview_next_contract_number(prefix: str = "CON") -> str:
+    """Return the next contract number without consuming the sequence."""
+
+    current_year = datetime.utcnow().year
+    seq = ContractSequence.query.filter_by(year=current_year).first()
+    next_serial = (int(seq.last_number or 0) + 1) if seq else 1
+    return f"{prefix}-{current_year}-{next_serial:04d}"
+
+
+def generate_unique_contract_number(prefix: str = "CON") -> str:
+    """Increment and return a unique contract number for the current year."""
+
+    current_year = datetime.utcnow().year
+    seq = ContractSequence.query.filter_by(year=current_year).first()
+    if not seq:
+        seq = ContractSequence(year=current_year, last_number=0)
+        db.session.add(seq)
+        db.session.flush()
+
+    seq.last_number = int(seq.last_number or 0) + 1
+    db.session.flush()
+
+    return f"{prefix}-{current_year}-{seq.last_number:04d}"
