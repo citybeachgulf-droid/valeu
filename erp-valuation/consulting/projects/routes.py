@@ -16,7 +16,7 @@ from flask import (
     current_app,
 )
 from werkzeug.utils import secure_filename
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, text
 
 from extensions import db
 from consulting.clients.models import Client
@@ -195,6 +195,37 @@ def project_detail(project_id: int):
     engineers = (
         Engineer.query.filter(Engineer.status == "نشط").order_by(Engineer.name.asc()).all()
     )
+    consulting_branch_engineers = []
+    current_user_id = session.get("user_id")
+    if current_user_id:
+        branch_row = db.session.execute(
+            text("SELECT branch_id FROM user WHERE id = :uid"),
+            {"uid": current_user_id},
+        ).fetchone()
+        branch_id = branch_row[0] if branch_row else None
+
+        if branch_id:
+            rows = db.session.execute(
+                text(
+                    """
+                    SELECT u.id, u.username
+                    FROM user AS u
+                    LEFT JOIN branch_section AS s ON s.id = u.section_id
+                    WHERE u.role = 'engineer'
+                      AND u.branch_id = :branch_id
+                      AND LOWER(COALESCE(s.name, '')) IN (
+                        'consultations', 'consultation', 'consulting', 'الاستشارات'
+                      )
+                    ORDER BY LOWER(u.username) ASC
+                    """
+                ),
+                {"branch_id": branch_id},
+            ).fetchall()
+            consulting_branch_engineers = [
+                {"id": row[0], "name": row[1]}
+                for row in rows
+                if row and row[1]
+            ]
     can_manage_project = session.get("role") in {"manager", "employee"}
 
     # Files
@@ -207,6 +238,7 @@ def project_detail(project_id: int):
         related_contracts=related_contracts,
         assigned_engineers=assigned_engineers,
         engineers=engineers,
+        consulting_branch_engineers=consulting_branch_engineers,
         can_manage_project=can_manage_project,
         PROJECT_STATUSES=PROJECT_STATUSES,
         PROJECT_TYPES=PROJECT_TYPES,
