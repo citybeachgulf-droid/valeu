@@ -26,7 +26,16 @@
 
     <div class="col-md-4">
       <label class="form-label">رقم العقد</label>
-      <input type="text" name="contract_number" class="form-control" value="{{ data.get('contract_number','') }}" required>
+      {% if mode == 'create' %}
+        <input type="hidden" name="contract_number" value="">
+        <input type="text" class="form-control" value="{{ next_contract_number }}" readonly>
+        <div class="form-text">يتم توليد رقم العقد تلقائيًا عند الحفظ.</div>
+      {% else %}
+        {% set current_number = data.get('contract_number', contract.contract_number if contract else '') %}
+        <input type="hidden" name="contract_number" value="{{ current_number }}">
+        <input type="text" class="form-control" value="{{ current_number }}" readonly>
+        <div class="form-text">لا يمكن تعديل رقم العقد.</div>
+      {% endif %}
     </div>
 
     <div class="col-md-4">
