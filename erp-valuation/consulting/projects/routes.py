@@ -195,7 +195,8 @@ def project_detail(project_id: int):
     engineers = (
         Engineer.query.filter(Engineer.status == "نشط").order_by(Engineer.name.asc()).all()
     )
-    consulting_branch_engineers = []
+    consulting_branch_engineers: list[dict[str, str]] = []
+    consulting_engineer_source = "branch"
     current_user_id = session.get("user_id")
     if current_user_id:
         branch_row = db.session.execute(
@@ -226,6 +227,13 @@ def project_detail(project_id: int):
                 for row in rows
                 if row and row[1]
             ]
+    if not consulting_branch_engineers:
+        consulting_branch_engineers = [
+            {"id": eng.id, "name": eng.name}
+            for eng in engineers
+            if eng and eng.name
+        ]
+        consulting_engineer_source = "registry"
     can_manage_project = session.get("role") in {"manager", "employee"}
 
     # Files
@@ -239,6 +247,7 @@ def project_detail(project_id: int):
         assigned_engineers=assigned_engineers,
         engineers=engineers,
         consulting_branch_engineers=consulting_branch_engineers,
+        consulting_engineer_source=consulting_engineer_source,
         can_manage_project=can_manage_project,
         PROJECT_STATUSES=PROJECT_STATUSES,
         PROJECT_TYPES=PROJECT_TYPES,
