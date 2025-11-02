@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from flask import (
     Blueprint,
@@ -15,7 +15,7 @@ from flask import (
     current_app,
 )
 from werkzeug.utils import secure_filename
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 from extensions import db
 from consulting.clients.models import Client
@@ -50,6 +50,71 @@ def _ext_of(filename: str) -> str:
     base = filename.rsplit("/", 1)[-1]
     parts = base.rsplit(".", 1)
     return parts[-1].lower() if len(parts) == 2 else ""
+
+
+def _resolve_client_from_form(form_data: Dict[str, str]) -> Tuple[Optional[Client], bool, Dict[str, str]]:
+    """Resolve client_id based on manual client name input.
+
+    Mutates form_data in-place to set `client_id` (as string) when possible.
+    Returns (client, created_flag, client_errors).
+    """
+
+    client_errors: Dict[str, str] = {}
+
+    client_name_input = (form_data.get("client_name") or "").strip()
+    form_data["client_name"] = client_name_input
+
+    if client_name_input:
+        existing_client = (
+            Client.query.filter(func.lower(Client.name) == client_name_input.lower())
+            .order_by(Client.id.asc())
+            .first()
+        )
+    else:
+        existing_client = None
+
+    if existing_client:
+        form_data["client_id"] = str(existing_client.id)
+        form_data["new_client_name"] = ""
+        return existing_client, False, client_errors
+
+    # No existing client matched; prepare for inline creation if data provided
+    form_data["client_id"] = ""
+
+    new_client_name = (form_data.get("new_client_name") or "").strip()
+    if client_name_input and not new_client_name:
+        new_client_name = client_name_input
+    form_data["new_client_name"] = new_client_name
+
+    if not new_client_name:
+        # No inline client creation requested
+        return None, False, client_errors
+
+    client_form_payload = {
+        "name": new_client_name,
+        "type": (form_data.get("new_client_type") or "").strip(),
+        "phone": (form_data.get("new_client_phone") or "").strip(),
+        "email": (form_data.get("new_client_email") or "").strip(),
+        "address": (form_data.get("new_client_address") or "").strip(),
+        "tax_number": (form_data.get("new_client_tax_number") or "").strip(),
+        "notes": (form_data.get("new_client_notes") or "").strip(),
+    }
+
+    if not client_form_payload["type"] and CLIENT_TYPES:
+        client_form_payload["type"] = CLIENT_TYPES[0]
+
+    client_clean, client_errors = validate_client_form(client_form_payload)
+    if client_errors:
+        return None, False, client_errors
+
+    client = Client(**client_clean)
+    db.session.add(client)
+    db.session.commit()
+
+    form_data["client_id"] = str(client.id)
+    form_data["client_name"] = client.name
+
+    return client, True, {}
 
 
 # ---------- Pages ----------
@@ -139,49 +204,25 @@ def create_project():
         return maybe_redirect
 
     if request.method == "POST":
-        # Allow inline creation of a new client when adding a project
         form_data = request.form.to_dict(flat=True)
 
-        new_client_name = (form_data.get("new_client_name") or "").strip()
-        if new_client_name:
-            # Build client form payload from prefixed fields
-            client_form_payload = {
-                "name": new_client_name,
-                "type": (form_data.get("new_client_type") or "").strip(),
-                "phone": (form_data.get("new_client_phone") or "").strip(),
-                "email": (form_data.get("new_client_email") or "").strip(),
-                "address": (form_data.get("new_client_address") or "").strip(),
-                "tax_number": (form_data.get("new_client_tax_number") or "").strip(),
-                "notes": (form_data.get("new_client_notes") or "").strip(),
-            }
+        _client, client_created, client_errors = _resolve_client_from_form(form_data)
+        if client_errors:
+            for _, msg in client_errors.items():
+                flash(f"❌ {msg}", "error")
+            clients = Client.query.order_by(Client.name.asc()).all()
+            return render_template(
+                "projects/form.html",
+                mode="create",
+                data=form_data,
+                clients=clients,
+                PROJECT_TYPES=PROJECT_TYPES,
+                PROJECT_STATUSES=PROJECT_STATUSES,
+                CLIENT_TYPES=CLIENT_TYPES,
+                title="إضافة مشروع",
+            )
 
-            # If user only typed the client name, default the type to the first option
-            if not client_form_payload["type"] and CLIENT_TYPES:
-                client_form_payload["type"] = CLIENT_TYPES[0]
-
-            client_clean, client_errors = validate_client_form(client_form_payload)
-            if client_errors:
-                for _, msg in client_errors.items():
-                    flash(f"❌ {msg}", "error")
-                clients = Client.query.order_by(Client.name.asc()).all()
-                # Preserve entered values
-                data = form_data
-                return render_template(
-                    "projects/form.html",
-                    mode="create",
-                    data=data,
-                    clients=clients,
-                    PROJECT_TYPES=PROJECT_TYPES,
-                    PROJECT_STATUSES=PROJECT_STATUSES,
-                    CLIENT_TYPES=CLIENT_TYPES,
-                    title="إضافة مشروع",
-                )
-
-            # Create and persist the client, then inject its id into project form
-            client = Client(**client_clean)
-            db.session.add(client)
-            db.session.commit()
-            form_data["client_id"] = str(client.id)
+        if client_created:
             flash("✅ تم إنشاء العميل وربطه بالمشروع", "success")
 
         data, errors = validate_project_form(form_data)
@@ -211,7 +252,7 @@ def create_project():
     return render_template(
         "projects/form.html",
         mode="create",
-        data={},
+        data={"client_name": ""},
         clients=clients,
         PROJECT_TYPES=PROJECT_TYPES,
         PROJECT_STATUSES=PROJECT_STATUSES,
@@ -229,15 +270,35 @@ def edit_project(project_id: int):
     project = ConsultingProject.query.get_or_404(project_id)
 
     if request.method == "POST":
-        data, errors = validate_project_form(request.form)
-        if errors:
-            for _, msg in errors.items():
+        form_data = request.form.to_dict(flat=True)
+
+        _client, client_created, client_errors = _resolve_client_from_form(form_data)
+        if client_errors:
+            for _, msg in client_errors.items():
                 flash(f"❌ {msg}", "error")
             clients = Client.query.order_by(Client.name.asc()).all()
             return render_template(
                 "projects/form.html",
                 mode="edit",
-                data=data,
+                data=form_data,
+                clients=clients,
+                project=project,
+                PROJECT_TYPES=PROJECT_TYPES,
+                PROJECT_STATUSES=PROJECT_STATUSES,
+                CLIENT_TYPES=CLIENT_TYPES,
+                title=f"تعديل مشروع - {project.name}",
+            )
+
+        data, errors = validate_project_form(form_data)
+        if errors:
+            for _, msg in errors.items():
+                flash(f"❌ {msg}", "error")
+            clients = Client.query.order_by(Client.name.asc()).all()
+            data_with_client = {**form_data, **{k: v for k, v in data.items()}}
+            return render_template(
+                "projects/form.html",
+                mode="edit",
+                data=data_with_client,
                 clients=clients,
                 project=project,
                 PROJECT_TYPES=PROJECT_TYPES,
@@ -256,6 +317,8 @@ def edit_project(project_id: int):
         project.progress = data["progress"]
         project.description = data["description"]
         db.session.commit()
+        if client_created:
+            flash("✅ تم إنشاء العميل وربطه بالمشروع", "success")
         flash("✅ تم تحديث بيانات المشروع", "success")
         return redirect(url_for("consulting_projects.project_detail", project_id=project.id))
 
@@ -266,6 +329,7 @@ def edit_project(project_id: int):
         mode="edit",
         data={
             "client_id": project.client_id,
+            "client_name": project.client.name if project.client else "",
             "name": project.name,
             "type": project.type,
             "location": project.location or "",
