@@ -28,7 +28,7 @@
 </head>
 
 <!-- نمرّر المساحة من Jinja عبر data-transaction-area لتجنّب أخطاء محرّر JavaScript -->
-<body class="container mt-4" data-transaction-area="{{ t.area or 0 }}" data-back-button-fallback="{{ url_for('login') }}">
+<body class="container mt-4" data-transaction-area="{{ t.area or 0 }}" data-back-button-label="{{ role_home_label }}" data-back-button-fallback="{{ role_home_url }}">
 
   <h3>💰 تثمين المعاملة رقم {{ t.id }}</h3>
 
