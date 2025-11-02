@@ -9,13 +9,22 @@
   <form method="post" action="">
     <div class="row g-3">
       <div class="col-md-6">
-        <label class="form-label">العميل</label>
-        <select name="client_id" class="form-select" required>
-          <option value="">اختر العميل</option>
+        <label class="form-label">اسم العميل</label>
+        <input
+          type="text"
+          name="client_name"
+          class="form-control"
+          list="client-name-options"
+          value="{{ data.client_name or '' }}"
+          placeholder="اكتب اسم العميل"
+          required
+        >
+        <datalist id="client-name-options">
           {% for c in clients %}
-            <option value="{{ c.id }}" {% if data.client_id|int == c.id %}selected{% endif %}>{{ c.name }}</option>
+            <option value="{{ c.name }}"></option>
           {% endfor %}
-        </select>
+        </datalist>
+        <div class="form-text">يمكنك كتابة اسم العميل يدويًا أو اختيار أحد الأسماء المقترحة.</div>
       </div>
       <div class="col-md-6">
         <label class="form-label">اسم المشروع</label>
@@ -62,7 +71,7 @@
 
     <hr class="my-4">
     <div class="alert alert-info">
-      إذا لم يكن العميل موجودًا، يمكنك إضافته هنا وسيتم حفظه وربطه بالمشروع تلقائيًا.
+      إذا لم يكن العميل موجودًا، اكتب اسمه وسيتم إضافته وربطه بالمشروع تلقائيًا مع إمكانية استكمال بياناته أدناه.
     </div>
     <div class="row g-3">
       <div class="col-md-6">
