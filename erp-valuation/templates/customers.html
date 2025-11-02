@@ -50,7 +50,7 @@
   @keyframes fadeIn { to { opacity:1; } }
 </style>
 </head>
-<body>
+<body data-back-button-fallback="{{ url_for('login') }}">
 
 <nav>
   <a class="navbar-brand" href="#">🛠️ نظام التثمين</a>
@@ -116,5 +116,6 @@
   </div>
 </div>
 
+  <script defer src="{{ url_for('static', filename='js/back-button.js') }}"></script>
 </body>
 </html>

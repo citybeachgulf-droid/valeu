@@ -26,7 +26,7 @@
   <title>🏢 إدارة الفروع</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body class="bg-light">
+<body class="bg-light" data-back-button-fallback="{{ url_for('login') }}">
 
 <div class="container py-4">
   <h2 class="mb-4">🏢 إدارة الفروع</h2>
@@ -134,5 +134,6 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
+  <script defer src="{{ url_for('static', filename='js/back-button.js') }}"></script>
 </body>
 </html>
