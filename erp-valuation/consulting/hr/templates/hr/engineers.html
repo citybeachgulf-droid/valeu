@@ -2,8 +2,17 @@
 
 {% block content %}
 <div class="container py-4">
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <h3 class="mb-0">المهندسون</h3>
+  <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+    <div>
+      <h3 class="mb-1">المهندسون</h3>
+      <p class="text-muted small mb-0">إدارة مهندسي قسم الاستشارات ومتابعة حالاتهم</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.dashboard') }}">لوحة HR</a>
+      {% if can_manage %}
+      <a class="btn btn-primary" href="{{ url_for('consulting_hr.create_engineer') }}">➕ إضافة مهندس</a>
+      {% endif %}
+    </div>
   </div>
 
   <form class="row g-2 mb-3" method="get">
@@ -21,8 +30,9 @@
     <div class="col-md-3">
       <select class="form-select" name="status">
         <option value="">كل الحالات</option>
-        <option value="نشط" {% if current_status=='نشط' %}selected{% endif %}>نشط</option>
-        <option value="غير نشط" {% if current_status=='غير نشط' %}selected{% endif %}>غير نشط</option>
+        {% for st in ENGINEER_STATUSES %}
+        <option value="{{ st }}" {% if current_status==st %}selected{% endif %}>{{ st }}</option>
+        {% endfor %}
       </select>
     </div>
     <div class="col-md-2 d-grid">
@@ -62,8 +72,17 @@
             <span class="badge {{ 'bg-danger' if oc>0 else 'bg-success' }}">{{ oc }}</span>
           </td>
           <td>
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_hr.engineer_detail', engineer_id=eng.id) }}">عرض</a>
+            <div class="d-flex gap-2">
+              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_hr.engineer_detail', engineer_id=eng.id) }}">عرض</a>
+              {% if can_manage %}
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('consulting_hr.edit_engineer', engineer_id=eng.id) }}">تعديل</a>
+              {% endif %}
+            </div>
           </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center text-muted py-4">لا يوجد مهندسون مسجلون حتى الآن.</td>
         </tr>
         {% endfor %}
       </tbody>
