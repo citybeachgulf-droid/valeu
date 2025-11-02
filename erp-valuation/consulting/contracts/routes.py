@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import time
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from flask import (
     Blueprint,
@@ -185,10 +185,17 @@ def create_contract():
 
     clients = Client.query.order_by(Client.name.asc()).all()
     projects = ConsultingProject.query.order_by(ConsultingProject.name.asc()).all()
+    default_project_id = request.args.get("project_id", type=int)
+    default_client_id = request.args.get("client_id", type=int)
+    prefilled: Dict[str, Any] = {}
+    if default_project_id and any(p.id == default_project_id for p in projects):
+        prefilled["project_id"] = default_project_id
+    if default_client_id and any(c.id == default_client_id for c in clients):
+        prefilled["client_id"] = default_client_id
     return render_template(
         "contracts/form.html",
         mode="create",
-        data={},
+        data=prefilled,
         clients=clients,
         projects=projects,
         CONTRACT_STATUSES=CONTRACT_STATUSES,

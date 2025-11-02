@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import os
 import time
-from typing import Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Dict, Optional, Tuple
 
 from flask import (
     Blueprint,
@@ -19,12 +20,15 @@ from sqlalchemy import or_, func
 
 from extensions import db
 from consulting.clients.models import Client
-from .models import ConsultingProject, ProjectFile
+from consulting.contracts.models import Contract
+from consulting.hr.models import Engineer
+from .models import ConsultingProject, ProjectFile, ProjectEngineerAssignment
 from .forms import (
     PROJECT_TYPES,
     PROJECT_STATUSES,
     ALLOWED_FILE_EXTENSIONS,
     validate_project_form,
+    validate_engineer_assignment_form,
 )
 from consulting.clients.forms import validate_client_form, CLIENT_TYPES
 
@@ -176,9 +180,22 @@ def project_detail(project_id: int):
 
     project = ConsultingProject.query.get_or_404(project_id)
 
-    # Placeholder data for contracts and engineers (no schema defined yet)
-    related_contracts: List[Dict] = []
-    assigned_engineers: List[Dict] = []
+    related_contracts = (
+        Contract.query.filter_by(project_id=project.id)
+        .order_by(Contract.id.desc())
+        .all()
+    )
+
+    assigned_engineers = (
+        ProjectEngineerAssignment.query.filter_by(project_id=project.id)
+        .order_by(ProjectEngineerAssignment.is_lead.desc(), ProjectEngineerAssignment.assigned_at.desc())
+        .all()
+    )
+
+    engineers = (
+        Engineer.query.filter(Engineer.status == "نشط").order_by(Engineer.name.asc()).all()
+    )
+    can_manage_project = session.get("role") in {"manager", "employee"}
 
     # Files
     files = ProjectFile.query.filter_by(project_id=project.id).order_by(ProjectFile.uploaded_at.desc()).all()
@@ -189,10 +206,93 @@ def project_detail(project_id: int):
         files=files,
         related_contracts=related_contracts,
         assigned_engineers=assigned_engineers,
+        engineers=engineers,
+        can_manage_project=can_manage_project,
         PROJECT_STATUSES=PROJECT_STATUSES,
         PROJECT_TYPES=PROJECT_TYPES,
         title=f"تفاصيل المشروع - {project.name}",
     )
+
+
+@projects_bp.route("/projects/<int:project_id>/assign-engineer", methods=["POST"])
+def assign_project_engineer(project_id: int):
+    maybe_redirect = _require_roles(["manager", "employee"])
+    if maybe_redirect:
+        return maybe_redirect
+
+    project = ConsultingProject.query.get_or_404(project_id)
+    data, errors = validate_engineer_assignment_form(request.form)
+
+    if errors:
+        for _, msg in errors.items():
+            flash(f"❌ {msg}", "error")
+        return redirect(url_for("consulting_projects.project_detail", project_id=project.id))
+
+    engineer = Engineer.query.get(data["engineer_id"])
+    if not engineer:
+        flash("❌ المهندس المحدد غير موجود", "error")
+        return redirect(url_for("consulting_projects.project_detail", project_id=project.id))
+
+    if data["is_lead"]:
+        others = ProjectEngineerAssignment.query.filter(
+            ProjectEngineerAssignment.project_id == project.id,
+            ProjectEngineerAssignment.engineer_id != engineer.id,
+        ).all()
+        for other in others:
+            other.is_lead = False
+
+    assignment = ProjectEngineerAssignment.query.filter_by(
+        project_id=project.id,
+        engineer_id=engineer.id,
+    ).first()
+
+    notes_val = data["notes"] or None
+    role_input = data["role"] or None
+
+    if assignment:
+        if role_input is not None:
+            assignment.role = role_input or None
+        elif assignment.role is None and (assignment.is_lead or data["is_lead"]):
+            assignment.role = "مسؤول المشروع"
+        assignment.notes = notes_val
+        if data["is_lead"]:
+            assignment.is_lead = True
+        assignment.assigned_at = datetime.utcnow()
+        flash("✅ تم تحديث بيانات المهندس للمشروع", "success")
+    else:
+        role_for_new = role_input or ("مسؤول المشروع" if data["is_lead"] else "عضو الفريق")
+        assignment = ProjectEngineerAssignment(
+            project_id=project.id,
+            engineer_id=engineer.id,
+            role=role_for_new,
+            notes=notes_val,
+            is_lead=data["is_lead"],
+        )
+        db.session.add(assignment)
+        flash("✅ تم تعيين المهندس للمشروع", "success")
+
+    db.session.commit()
+    return redirect(url_for("consulting_projects.project_detail", project_id=project.id))
+
+
+@projects_bp.route("/projects/<int:project_id>/assignments/<int:assignment_id>/delete", methods=["POST"])
+def remove_project_engineer(project_id: int, assignment_id: int):
+    maybe_redirect = _require_roles(["manager", "employee"])
+    if maybe_redirect:
+        return maybe_redirect
+
+    project = ConsultingProject.query.get_or_404(project_id)
+    assignment = (
+        ProjectEngineerAssignment.query.filter_by(id=assignment_id, project_id=project.id).first()
+    )
+    if not assignment:
+        flash("❌ تعذر العثور على هذا التعيين", "error")
+        return redirect(url_for("consulting_projects.project_detail", project_id=project.id))
+
+    db.session.delete(assignment)
+    db.session.commit()
+    flash("✅ تم إزالة المهندس من المشروع", "success")
+    return redirect(url_for("consulting_projects.project_detail", project_id=project.id))
 
 
 # ---------- Create / Edit (optional for operability) ----------

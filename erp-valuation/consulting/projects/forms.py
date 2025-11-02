@@ -93,3 +93,29 @@ def validate_project_form(form: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[st
             errors["client_id"] = "معرّف العميل غير صالح"
 
     return data, errors
+
+
+def validate_engineer_assignment_form(form: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, str]]:
+    data: Dict[str, Any] = {
+        "engineer_id": _clean(form.get("engineer_id")),
+        "role": _clean(form.get("role")),
+        "notes": _clean(form.get("notes")),
+        "is_lead": (form.get("is_lead") in {"1", "true", "True", "on", "yes"}),
+    }
+
+    errors: Dict[str, str] = {}
+
+    if not data["engineer_id"]:
+        errors["engineer_id"] = "يجب اختيار مهندس"
+    else:
+        try:
+            data["engineer_id"] = int(data["engineer_id"])  # type: ignore[assignment]
+        except Exception:
+            errors["engineer_id"] = "معرّف المهندس غير صالح"
+
+    if not data["role"]:
+        data["role"] = ""
+    if not data["notes"]:
+        data["notes"] = ""
+
+    return data, errors
