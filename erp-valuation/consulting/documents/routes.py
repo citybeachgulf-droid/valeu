@@ -63,7 +63,7 @@ def _documents_upload_dir() -> str:
 
 @documents_bp.route("/documents")
 def list_documents():
-    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance"])  # allow finance too
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance", "hr"])  # allow finance and hr too
     if maybe_redirect:
         return maybe_redirect
 
@@ -110,7 +110,7 @@ def list_documents():
 
 @documents_bp.route("/documents/new", methods=["GET", "POST"])
 def create_document():
-    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance"])  # create allowed
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance", "hr"])  # create allowed
     if maybe_redirect:
         return maybe_redirect
 
@@ -174,7 +174,7 @@ def create_document():
 
 @documents_bp.route("/documents/<int:doc_id>/download")
 def download_document(doc_id: int):
-    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance"])  # allow download
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance", "hr"])  # allow download
     if maybe_redirect:
         return maybe_redirect
 

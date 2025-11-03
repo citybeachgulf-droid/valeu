@@ -43,7 +43,7 @@ def _require_roles(allowed: List[str]) -> Optional[None]:
 
 @invoices_bp.route("/invoices")
 def list_invoices():
-    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance"])  # read wide
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance", "hr"])  # read wide
     if maybe_redirect:
         return maybe_redirect
 
@@ -113,7 +113,7 @@ def list_invoices():
 
 @invoices_bp.route("/invoices/new", methods=["GET", "POST"])
 def create_invoice():
-    maybe_redirect = _require_roles(["manager", "employee", "finance"])  # create restricted
+    maybe_redirect = _require_roles(["manager", "employee", "finance", "hr"])  # create restricted
     if maybe_redirect:
         return maybe_redirect
 
@@ -169,7 +169,7 @@ def create_invoice():
 
 @invoices_bp.route("/invoices/<int:invoice_id>")
 def invoice_detail(invoice_id: int):
-    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance"])  # read wide
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance", "hr"])  # read wide
     if maybe_redirect:
         return maybe_redirect
 
@@ -215,7 +215,7 @@ def invoice_detail(invoice_id: int):
 
 @invoices_bp.route("/invoices/<int:invoice_id>/status", methods=["POST"])
 def update_invoice_status(invoice_id: int):
-    maybe_redirect = _require_roles(["manager", "employee", "finance"])  # update restricted
+    maybe_redirect = _require_roles(["manager", "employee", "finance", "hr"])  # update restricted
     if maybe_redirect:
         return maybe_redirect
 
@@ -243,7 +243,7 @@ def update_invoice_status(invoice_id: int):
 
 @invoices_bp.route("/invoices/reports")
 def invoices_reports():
-    maybe_redirect = _require_roles(["manager", "finance"])  # reports restricted
+    maybe_redirect = _require_roles(["manager", "finance", "hr"])  # reports restricted
     if maybe_redirect:
         return maybe_redirect
 

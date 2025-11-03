@@ -42,7 +42,7 @@ def _require_roles(allowed: List[str]) -> Optional[None]:
 
 @dashboard_bp.route("/dashboard")
 def dashboard_home():
-    maybe_redirect = _require_roles(["manager", "employee", "engineer"])  # السماح للمهندسين بالاطلاع
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "hr"])  # السماح للمهندسين وHR بالاطلاع
     if maybe_redirect:
         return maybe_redirect
 

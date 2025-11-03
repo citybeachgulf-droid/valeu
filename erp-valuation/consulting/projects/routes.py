@@ -340,7 +340,7 @@ def remove_project_engineer(project_id: int, assignment_id: int):
 
 @projects_bp.route("/projects/new", methods=["GET", "POST"])
 def create_project():
-    maybe_redirect = _require_roles(["manager", "employee"])  # create restricted
+    maybe_redirect = _require_roles(["manager", "employee", "hr"])  # create restricted
     if maybe_redirect:
         return maybe_redirect
 
@@ -404,7 +404,7 @@ def create_project():
 
 @projects_bp.route("/projects/<int:project_id>/edit", methods=["GET", "POST"])
 def edit_project(project_id: int):
-    maybe_redirect = _require_roles(["manager", "employee"])  # edit restricted
+    maybe_redirect = _require_roles(["manager", "employee", "hr"])  # edit restricted
     if maybe_redirect:
         return maybe_redirect
 
@@ -493,7 +493,7 @@ def edit_project(project_id: int):
 
 @projects_bp.route("/projects/<int:project_id>/upload", methods=["POST"])
 def upload_project_file(project_id: int):
-    maybe_redirect = _require_roles(["manager", "employee", "engineer"])  # allow engineers to upload
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "hr"])  # allow engineers and hr to upload
     if maybe_redirect:
         return maybe_redirect
 
