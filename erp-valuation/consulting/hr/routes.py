@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
+import secrets
 from typing import Dict, List, Optional
-from datetime import date
+from datetime import date, datetime, timedelta
 
 from flask import (
     Blueprint,
@@ -18,7 +20,7 @@ from werkzeug.security import generate_password_hash
 
 from extensions import db
 from consulting.projects.models import ConsultingProject
-from .models import Engineer, Task, Department
+from .models import Engineer, Task, Department, Employee
 from .forms import (
     ENGINEER_SPECIALTIES,
     ENGINEER_STATUSES,
@@ -81,6 +83,48 @@ def _create_limited_user(username_hint: str | None, role: str) -> tuple[str, str
     db.session.flush()  # للحصول على id إن لزم قبل commit
 
     return username, raw_password
+
+
+def _initialize_employee_invitation(
+    employee: Employee,
+    *,
+    expires_in_days: int = 7,
+    reset_credentials: bool = False,
+) -> str:
+    """Generates a unique invitation token for the employee.
+
+    Optionally resets existing credentials when `reset_credentials=True`.
+    Returns the generated token.
+    """
+
+    if employee is None:
+        raise ValueError("employee must not be None")
+
+    # Try a few times to avoid token collisions (extremely unlikely)
+    token = None
+    for _ in range(5):
+        candidate = secrets.token_urlsafe(32)
+        if not Employee.query.filter_by(invitation_token=candidate).first():
+            token = candidate
+            break
+    if token is None:
+        raise RuntimeError("unable to generate unique invitation token")
+
+    now = datetime.utcnow()
+    employee.invitation_token = token
+    employee.invitation_token_created_at = now
+    employee.invitation_expires_at = now + timedelta(days=expires_in_days)
+    employee.invitation_used_at = None
+
+    if reset_credentials:
+        employee.credential_username = None
+        employee.credential_password_hash = None
+        employee.credential_password_plain = None
+        employee.credential_created_at = None
+        employee.credential_updated_at = None
+
+    db.session.flush()
+    return token
 
 
 # Ensure there are some baseline departments so forms can render choices
@@ -416,7 +460,6 @@ from .forms import (
     PERFORMANCE_PERIODS, JOB_POSTING_STATUSES, CANDIDATE_STATUSES,
     INTERVIEW_STATUSES, INTERVIEW_RESULTS, GOAL_PRIORITIES, GOAL_STATUSES
 )
-from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 
@@ -577,11 +620,12 @@ def create_employee():
             db.session.add(employee)
             db.session.flush()
 
-            # إنشاء حساب مستخدم محدود الدور للموظف
-            username, raw_password = _create_limited_user(employee.email or employee.phone, role="employee")
+            token = _initialize_employee_invitation(employee)
+            invitation_link = url_for("consulting_hr.accept_employee_invitation", token=token, _external=True)
 
             db.session.commit()
-            flash(f"✅ تم إضافة الموظف بنجاح. تم إنشاء مستخدم: {username} بكلمة مرور مؤقتة.", "success")
+            flash("✅ تم إضافة الموظف بنجاح. تم إنشاء رابط دعوة لإعداد الحساب.", "success")
+            flash(f"🔗 رابط الدعوة: {invitation_link}", "info")
             return redirect(url_for("consulting_hr.employee_detail", employee_id=employee.id))
     else:
         # تعيين القيم الافتراضية
@@ -622,6 +666,10 @@ def employee_detail(employee_id: int):
         # يجب التحقق من أن الموظف المسجل هو نفسه (يتطلب نظام مصادقة)
         pass
     
+    invitation_link = None
+    if employee.active_invitation_token():
+        invitation_link = url_for("consulting_hr.accept_employee_invitation", token=employee.invitation_token, _external=True)
+
     # جلب البيانات المرتبطة
     recent_attendance = Attendance.query.filter_by(employee_id=employee.id)\
         .order_by(Attendance.attendance_date.desc()).limit(10).all()
@@ -648,8 +696,126 @@ def employee_detail(employee_id: int):
         recent_reviews=recent_reviews,
         documents=documents,
         expiring_docs=expiring_docs,
+        invitation_link=invitation_link,
         can_manage=can_manage,
         title=f"تفاصيل الموظف - {employee.full_name}",
+    )
+
+
+@hr_bp.route("/employees/<int:employee_id>/invitation/regenerate", methods=["POST"])
+def regenerate_employee_invitation(employee_id: int):
+    maybe_redirect = _require_roles(["manager", "hr", "hr_manager"])
+    if maybe_redirect:
+        return maybe_redirect
+
+    employee = Employee.query.get_or_404(employee_id)
+
+    if employee.has_credentials():
+        flash("⚠️ لا يمكن إعادة توليد رابط الدعوة بعد تعيين بيانات الدخول. يرجى إعادة تعيين الحساب يدويًا.", "warning")
+        return redirect(url_for("consulting_hr.employee_detail", employee_id=employee.id))
+
+    token = _initialize_employee_invitation(employee, reset_credentials=True)
+    invitation_link = url_for("consulting_hr.accept_employee_invitation", token=token, _external=True)
+
+    db.session.commit()
+    flash("✅ تم توليد رابط دعوة جديد بنجاح.", "success")
+    flash(f"🔗 رابط الدعوة: {invitation_link}", "info")
+    return redirect(url_for("consulting_hr.employee_detail", employee_id=employee.id))
+
+
+@hr_bp.route("/invite/<token>", methods=["GET", "POST"])
+def accept_employee_invitation(token: str):
+    clean_token = (token or "").strip()
+    if not clean_token:
+        return render_template("hr/employee_invite_accept.html", status="invalid"), 404
+
+    employee = Employee.query.filter_by(invitation_token=clean_token).first()
+    if employee is None:
+        return render_template("hr/employee_invite_accept.html", status="invalid"), 404
+
+    if employee.has_credentials() or employee.invitation_used_at:
+        return render_template(
+            "hr/employee_invite_accept.html",
+            status="used",
+            employee=employee,
+        ), 410
+
+    if employee.invitation_expires_at and employee.invitation_expires_at < datetime.utcnow():
+        return render_template(
+            "hr/employee_invite_accept.html",
+            status="expired",
+            employee=employee,
+        ), 410
+
+    from app import User
+
+    form_errors: Dict[str, str] = {}
+    form_values: Dict[str, str] = {"username": ""}
+
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip().lower()
+        password = request.form.get("password") or ""
+        confirm_password = request.form.get("confirm_password") or ""
+
+        form_values["username"] = username
+
+        if len(username) < 4:
+            form_errors["username"] = "اسم المستخدم يجب أن يتكون من 4 أحرف على الأقل"
+        elif not re.match(r"^[a-z0-9_.-]+$", username):
+            form_errors["username"] = "يمكن أن يحتوي اسم المستخدم على حروف صغيرة وأرقام ونقاط وشرطات فقط"
+        else:
+            if User.query.filter_by(username=username).first():
+                form_errors["username"] = "اسم المستخدم مستخدم بالفعل، يرجى اختيار اسم آخر"
+
+        if len(password) < 8:
+            form_errors["password"] = "كلمة المرور يجب أن تتكون من 8 أحرف على الأقل"
+        if password != confirm_password:
+            form_errors["confirm_password"] = "تأكيد كلمة المرور غير مطابق"
+
+        if not form_errors:
+            password_hash = generate_password_hash(password)
+            user = User(username=username, password=password_hash, role="employee")
+            db.session.add(user)
+            db.session.flush()
+
+            now = datetime.utcnow()
+            employee.credential_username = username
+            employee.credential_password_hash = password_hash
+            employee.credential_password_plain = password
+            if not employee.credential_created_at:
+                employee.credential_created_at = now
+            employee.credential_updated_at = now
+            employee.invitation_used_at = now
+            employee.invitation_token = None
+            employee.invitation_expires_at = None
+
+            db.session.commit()
+
+            login_url = url_for("login")
+            return render_template(
+                "hr/employee_invite_accept.html",
+                status="success",
+                employee=employee,
+                username=username,
+                login_url=login_url,
+            )
+
+    else:
+        # Prefill username hint from email if available
+        hint = ""
+        if employee.email:
+            hint = employee.email.split("@")[0]
+        elif employee.phone:
+            digits = re.sub(r"\D", "", employee.phone)
+            hint = digits[-8:] if digits else ""
+        form_values["username"] = hint
+
+    return render_template(
+        "hr/employee_invite_accept.html",
+        status="form",
+        employee=employee,
+        form_values=form_values,
+        form_errors=form_errors,
     )
 
 
@@ -1009,12 +1175,15 @@ def create_staff():
                 db.session.add(employee)
                 db.session.flush()
 
-                username, raw_password = _create_limited_user(employee.email or employee.phone, role="employee")
+                token = _initialize_employee_invitation(employee)
+                invitation_link = url_for("consulting_hr.accept_employee_invitation", token=token, _external=True)
+
                 db.session.commit()
                 flash(
-                    f"✅ تم إضافة الموظف بنجاح. تم إنشاء مستخدم: {username} بكلمة مرور مؤقتة.",
+                    "✅ تم إضافة الموظف بنجاح. تم إنشاء رابط دعوة لإعداد الحساب.",
                     "success",
                 )
+                flash(f"🔗 رابط الدعوة: {invitation_link}", "info")
                 return redirect(url_for("consulting_hr.employee_detail", employee_id=employee.id))
 
     _ensure_default_departments()
