@@ -2,7 +2,17 @@
 
 {% block head_extra %}
   <style>
-    body { font-family: 'Cairo', system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; }
+    @font-face {
+      font-family: 'AmiriLocal';
+      src: url('{{ url_for('static', filename='fonts/Amiri-Regular.ttf') }}') format('truetype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    body {
+      font-family: 'Cairo', 'AmiriLocal', 'Tajawal', 'Noto Sans Arabic', system-ui, -apple-system, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+    }
     .card-title { font-weight: 700; }
     .metric { font-size: 1.6rem; font-weight: 700; }
     .subtext { color: #6c757d; font-size: .9rem; }
@@ -111,7 +121,7 @@
               <div class="d-flex justify-content-between align-items-center">
                 <div>
                   <div class="fw-semibold">{{ p.name }}</div>
-                  <div class="text-muted small">الحالة: {{ p.status }}{% if p.location %} • {{ p.location }}{% endif %}</div>
+                  <div class="text-muted small">الحالة: {{ p.status }}{% if p.location %}، {{ p.location }}{% endif %}</div>
                 </div>
                 <a class="btn btn-sm btn-link" href="{{ url_for('consulting_projects.project_detail', project_id=p.id) }}">عرض</a>
               </div>
@@ -169,6 +179,10 @@
 {% block scripts %}
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
+    Chart.defaults.font.family = "'Cairo', 'AmiriLocal', 'Tajawal', 'Noto Sans Arabic', 'Segoe UI', 'Arial', sans-serif";
+    Chart.defaults.locale = 'ar';
+    Chart.defaults.color = '#212529';
+
     const projectsCtx = document.getElementById('projectsChart').getContext('2d');
     const contractsCtx = document.getElementById('contractsChart').getContext('2d');
     const invoicesCtx = document.getElementById('invoicesChart').getContext('2d');

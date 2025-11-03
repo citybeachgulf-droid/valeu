@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from __future__ import annotations
 
 from datetime import date
@@ -27,7 +29,7 @@ dashboard_bp = Blueprint(
 )
 
 
-# ---------- Helpers ----------
+# ---------- الدوال المساعدة ----------
 
 def _require_roles(allowed: List[str]) -> Optional[None]:
     role = session.get("role")
@@ -36,15 +38,15 @@ def _require_roles(allowed: List[str]) -> Optional[None]:
     return None
 
 
-# ---------- Pages ----------
+# ---------- الصفحات ----------
 
 @dashboard_bp.route("/dashboard")
 def dashboard_home():
-    maybe_redirect = _require_roles(["manager", "employee", "engineer"])  # allow engineers to view
+    maybe_redirect = _require_roles(["manager", "employee", "engineer"])  # السماح للمهندسين بالاطلاع
     if maybe_redirect:
         return maybe_redirect
 
-    # Projects
+    # المشاريع
     total_projects = db.session.query(func.count(ConsultingProject.id)).scalar() or 0
     ongoing_projects = (
         db.session.query(func.count(ConsultingProject.id))
@@ -59,7 +61,7 @@ def dashboard_home():
         or 0
     )
 
-    # Contracts
+    # العقود
     active_contracts = (
         db.session.query(func.count(Contract.id)).filter(Contract.status == "ساري").scalar() or 0
     )
@@ -67,18 +69,18 @@ def dashboard_home():
         db.session.query(func.count(Contract.id)).filter(Contract.status == "منتهي").scalar() or 0
     )
 
-    # Invoices
+    # الفواتير
     total_invoices = db.session.query(func.count(Invoice.id)).scalar() or 0
     paid_invoices = (
         db.session.query(func.count(Invoice.id)).filter(Invoice.status == "مدفوعة").scalar() or 0
     )
 
-    # Latest 5 Projects
+    # أحدث خمسة مشاريع
     latest_projects = (
         ConsultingProject.query.order_by(ConsultingProject.created_at.desc()).limit(5).all()
     )
 
-    # Overdue tasks (limit 10 for display)
+    # المهام المتأخرة (عرض 10 عناصر كحد أقصى)
     overdue_tasks = (
         Task.query.filter(
             Task.status != "مكتملة",
