@@ -674,6 +674,8 @@ class CustomerInvoice(db.Model):
     amount = db.Column(db.Float, default=0)
     issued_at = db.Column(db.DateTime, default=datetime.utcnow)
     transaction_id = db.Column(db.Integer, db.ForeignKey("transaction.id"), nullable=True)
+    # رابط بفواتير الاستشارات
+    consulting_invoice_id = db.Column(db.Integer, db.ForeignKey("consulting_invoice.id"), nullable=True, index=True)
     note = db.Column(db.String(255))
     created_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     # رقم فاتورة موحّد عبر النظام
@@ -3273,6 +3275,12 @@ def finance_dashboard():
         .filter(or_(CustomerQuote.valid_until == None, CustomerQuote.valid_until >= now_utc)) \
         .order_by(CustomerQuote.id.desc()).limit(20).all()
     recent_customer_invoices = CustomerInvoice.query.order_by(CustomerInvoice.id.desc()).limit(20).all()
+    
+    # ✅ فواتير الاستشارات غير المربوطة بفواتير مالية
+    from consulting.invoices.models import Invoice as ConsultingInvoice
+    recent_consulting_invoices = ConsultingInvoice.query \
+        .filter(ConsultingInvoice.status != "مدفوعة") \
+        .order_by(ConsultingInvoice.id.desc()).limit(20).all()
 
     return render_template(
         "finance.html",
@@ -3286,6 +3294,7 @@ def finance_dashboard():
         recent_bank_invoices=recent_bank_invoices,
         recent_customer_quotes=recent_customer_quotes,
         recent_customer_invoices=recent_customer_invoices,
+        recent_consulting_invoices=recent_consulting_invoices,
         vat_default_percent=int(_get_vat_rate() * 100)
     )
 
@@ -4284,6 +4293,7 @@ def finance_create_customer_invoice():
     amount = float(request.form.get("amount") or 0)
     note = request.form.get("note")
     transaction_id = request.form.get("transaction_id")
+    consulting_invoice_id = request.form.get("consulting_invoice_id")
     user = User.query.get(session["user_id"]) if session.get("user_id") else None
 
     if not customer_name:
@@ -4308,11 +4318,20 @@ def finance_create_customer_invoice():
         except Exception:
             resolved_transaction_id = None
 
+    # ✅ ربط بفاتورة الاستشارات إن وُجدت
+    resolved_consulting_invoice_id = None
+    if consulting_invoice_id:
+        try:
+            resolved_consulting_invoice_id = int(consulting_invoice_id)
+        except Exception:
+            resolved_consulting_invoice_id = None
+
     inv = CustomerInvoice(
         customer_name=customer_name,
         amount=amount,
         note=note,
         transaction_id=resolved_transaction_id,
+        consulting_invoice_id=resolved_consulting_invoice_id,
         created_by=session.get("user_id"),
     )
     db.session.add(inv)
@@ -4340,6 +4359,58 @@ def finance_create_customer_invoice():
         qp["vat"] = str(vat_percent)
     from urllib.parse import urlencode
     flash("✅ تم إنشاء فاتورة العميل", "success")
+    return redirect(url_for("print_customer_invoice_html", invoice_id=inv.id) + "?" + urlencode(qp))
+
+# ✅ إنشاء فاتورة مالية من فاتورة استشارات
+@app.route("/finance/create_from_consulting/<int:consulting_invoice_id>", methods=["POST"])
+def finance_create_from_consulting_invoice(consulting_invoice_id):
+    if session.get("role") != "finance":
+        return redirect(url_for("login"))
+    
+    from consulting.invoices.models import Invoice as ConsultingInvoice
+    consulting_inv = ConsultingInvoice.query.get_or_404(consulting_invoice_id)
+    
+    # التحقق من عدم وجود فاتورة مالية مربوطة بالفعل
+    existing = CustomerInvoice.query.filter_by(consulting_invoice_id=consulting_invoice_id).first()
+    if existing:
+        flash("⚠️ هذه الفاتورة مربوطة بفاتورة مالية موجودة بالفعل", "warning")
+        return redirect(url_for("finance_dashboard"))
+    
+    # إنشاء فاتورة مالية
+    apply_vat = (request.form.get("apply_vat") or "1")
+    vat_percent = request.form.get("vat")
+    
+    inv = CustomerInvoice(
+        customer_name=consulting_inv.client.name if consulting_inv.client else "عميل",
+        amount=consulting_inv.amount,
+        note=f"فاتورة مرتبطة بفاتورة استشارات #{consulting_invoice_id}",
+        consulting_invoice_id=consulting_invoice_id,
+        created_by=session.get("user_id"),
+    )
+    db.session.add(inv)
+    db.session.commit()
+    
+    # توليد رقم فاتورة فريد
+    try:
+        inv.invoice_number = generate_unique_invoice_number(prefix="INV", kind="CUST")
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        try:
+            inv.invoice_number = generate_unique_invoice_number(prefix="INV")
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+    
+    # تمرير مدخلات الضريبة للطباعة إن وُجدت
+    qp = {
+        "auto": "1",
+        "apply_vat": apply_vat,
+    }
+    if vat_percent:
+        qp["vat"] = str(vat_percent)
+    from urllib.parse import urlencode
+    flash("✅ تم إنشاء فاتورة مالية من فاتورة الاستشارات", "success")
     return redirect(url_for("print_customer_invoice_html", invoice_id=inv.id) + "?" + urlencode(qp))
 
 # ---------------- صفحة البنوك: نظرة عامة ----------------
