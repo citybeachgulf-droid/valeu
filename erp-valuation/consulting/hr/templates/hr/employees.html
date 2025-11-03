@@ -1,27 +1,85 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<style>
+/* ===== اتجاه وخط الصفحة ===== */
+body {
+  direction: rtl;
+  text-align: right;
+  font-family: 'Tajawal', sans-serif;
+}
+
+/* ===== حاوية ===== */
+.container {
+  max-width: 1200px;
+  padding: 2rem 1rem;
+}
+
+/* ===== العنوان والأزرار ===== */
+h3 {
+  font-weight: 600;
+  color: #4a148c;
+}
+.btn-primary, .btn-outline-secondary {
+  border-radius: 8px;
+  transition: 0.3s;
+}
+.btn-primary:hover {
+  background-color: #5a32a3;
+}
+.btn-outline-secondary:hover {
+  background-color: #f8f9fa;
+  color: #000;
+}
+
+/* ===== البحث والفلاتر ===== */
+.form-control, .form-select {
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+}
+
+/* ===== جدول الموظفين ===== */
+.table thead {
+  background-color: #f5f5f5;
+}
+.table tbody tr:hover {
+  background-color: #fdfcff;
+}
+.badge {
+  padding: 0.4em 0.6em;
+  font-size: 0.85rem;
+  border-radius: 0.5rem;
+}
+
+/* ===== تنسيقات إضافية ===== */
+.pagination .page-link {
+  border-radius: 6px;
+}
+</style>
+
 <div class="container py-4">
+  <!-- ===== رأس الصفحة ===== -->
   <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
     <div>
-      <h3 class="mb-1">????? ????????</h3>
-      <p class="text-muted small mb-0">????? ????? ?????? ??????? ???????</p>
+      <h3>قائمة الموظفين</h3>
+      <p class="text-muted small mb-0">عرض وإدارة بيانات جميع الموظفين</p>
     </div>
     <div class="d-flex gap-2">
-      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.dashboard') }}">???? HR</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.dashboard') }}">لوحة HR</a>
       {% if can_manage %}
-      <a class="btn btn-primary" href="{{ url_for('consulting_hr.create_employee') }}">? ????? ????</a>
+      <a class="btn btn-primary" href="{{ url_for('consulting_hr.create_employee') }}">إضافة موظف</a>
       {% endif %}
     </div>
   </div>
 
+  <!-- ===== نموذج البحث ===== -->
   <form class="row g-2 mb-3" method="get">
     <div class="col-md-4">
-      <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="??? ?????? ?? ????? ??????? ?? ??????">
+      <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="ابحث باسم الموظف أو الرقم الوظيفي">
     </div>
     <div class="col-md-3">
       <select class="form-select" name="department_id">
-        <option value="">?? ???????</option>
+        <option value="">كل الأقسام</option>
         {% for dept in departments %}
         <option value="{{ dept.id }}" {% if current_department_id == dept.id %}selected{% endif %}>{{ dept.name }}</option>
         {% endfor %}
@@ -29,30 +87,31 @@
     </div>
     <div class="col-md-3">
       <select class="form-select" name="status">
-        <option value="">?? ???????</option>
+        <option value="">كل الحالات</option>
         {% for st in EMPLOYEE_STATUSES %}
         <option value="{{ st }}" {% if current_status == st %}selected{% endif %}>{{ st }}</option>
         {% endfor %}
       </select>
     </div>
     <div class="col-md-2 d-grid">
-      <button class="btn btn-primary" type="submit">???</button>
+      <button class="btn btn-primary" type="submit">بحث</button>
     </div>
   </form>
 
+  <!-- ===== جدول الموظفين ===== -->
   <div class="table-responsive">
     <table class="table table-striped align-middle">
       <thead>
         <tr>
-          <th>????? ???????</th>
-          <th>?????</th>
-          <th>?????</th>
-          <th>?????? ???????</th>
-          <th>??????</th>
-          <th>??????</th>
-          <th>????? ????????</th>
-          <th>??????</th>
-          <th>???????</th>
+          <th>الرقم الوظيفي</th>
+          <th>الاسم الكامل</th>
+          <th>القسم</th>
+          <th>المسمى الوظيفي</th>
+          <th>البريد الإلكتروني</th>
+          <th>الهاتف</th>
+          <th>تاريخ الانضمام</th>
+          <th>الحالة</th>
+          <th>عمليات</th>
         </tr>
       </thead>
       <tbody>
@@ -66,45 +125,39 @@
           <td>{{ emp.phone or emp.mobile or '-' }}</td>
           <td>{% if emp.join_date %}{{ emp.join_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</td>
           <td>
-            <span class="badge {% if emp.status == '???' %}bg-success{% elif emp.status == '?????' %}bg-warning{% else %}bg-secondary{% endif %}">
+            <span class="badge {% if emp.status == 'نشط' %}bg-success{% elif emp.status == 'إجازة' %}bg-warning{% else %}bg-secondary{% endif %}">
               {{ emp.status }}
             </span>
           </td>
           <td>
             <div class="d-flex gap-2">
-              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_hr.employee_detail', employee_id=emp.id) }}">???</a>
+              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_hr.employee_detail', employee_id=emp.id) }}">عرض</a>
               {% if can_manage %}
-              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('consulting_hr.edit_employee', employee_id=emp.id) }}">?????</a>
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('consulting_hr.edit_employee', employee_id=emp.id) }}">تعديل</a>
               {% endif %}
             </div>
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="9" class="text-center text-muted py-4">?? ???? ?????? ?????? ??? ????.</td>
+          <td colspan="9" class="text-center text-muted py-4">لا توجد موظفين للعرض.</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 
+  <!-- ===== الترقيم ===== -->
   <nav aria-label="Pagination" class="mt-3">
     <ul class="pagination justify-content-center">
       <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-        <a class="page-link" href="?page={{ pagination.prev_num }}&q={{ q }}&department_id={{ current_department_id }}&status={{ current_status }}">??????</a>
+        <a class="page-link" href="?page={{ pagination.prev_num }}&q={{ q }}&department_id={{ current_department_id }}&status={{ current_status }}">السابق</a>
       </li>
-      <li class="page-item disabled"><span class="page-link">???? {{ pagination.page }} ?? {{ pagination.pages }}</span></li>
+      <li class="page-item disabled"><span class="page-link">صفحة {{ pagination.page }} من {{ pagination.pages }}</span></li>
       <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-        <a class="page-link" href="?page={{ pagination.next_num }}&q={{ q }}&department_id={{ current_department_id }}&status={{ current_status }}">??????</a>
+        <a class="page-link" href="?page={{ pagination.next_num }}&q={{ q }}&department_id={{ current_department_id }}&status={{ current_status }}">التالي</a>
       </li>
     </ul>
   </nav>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-  // Example: here you can add alerts based on query params or state if needed
-</script>
 {% endblock %}
