@@ -14,8 +14,10 @@ from flask import (
     session,
 )
 from sqlalchemy import or_, func
+from werkzeug.security import generate_password_hash
 
 from extensions import db
+from app import User  # استخدام نموذج المستخدم لإنشاء حسابات للموظفين والمهندسين
 from consulting.projects.models import ConsultingProject
 from .models import Engineer, Task, Department
 from .forms import (
@@ -43,6 +45,40 @@ def _require_roles(allowed: List[str]) -> Optional[None]:
     if role not in allowed:
         return redirect(url_for("login"))
     return None
+
+
+def _create_limited_user(username_hint: str | None, role: str) -> tuple[str, str]:
+    """ينشئ مستخدمًا محدود الصلاحيات بالدور المحدد.
+
+    - username: يُشتق من البريد/الهاتف إن وُجد وإلا يُولّد اسمًا فريدًا.
+    - password: كلمة مرور افتراضية آمنة يمكن تغييرها لاحقًا.
+    تعاد (username, raw_password) لاستخدامها في التنبيه للـ HR.
+    """
+    base_username = (username_hint or "").strip().lower()
+    if base_username:
+        # نظّف المسافة وأنواع الحروف الشائعة في الهواتف/الايميل
+        base_username = base_username.replace(" ", "").replace("+", "").replace("(", "").replace(")", "").replace("-", "")
+    # اختر بادئة حسب الدور
+    prefix = "emp" if role == "employee" else ("eng" if role == "engineer" else "user")
+
+    # ابنِ اسم مستخدم فريد
+    candidate = base_username or f"{prefix}"
+    suffix = 0
+    while True:
+        username = candidate if suffix == 0 else f"{candidate}{suffix}"
+        if not User.query.filter_by(username=username).first():
+            break
+        suffix += 1
+
+    # كلمة مرور افتراضية قوية يسهل تسليمها: 8 خانات مع حروف وأرقام
+    raw_password = f"{prefix}123456" if suffix == 0 else f"{prefix}{suffix:02d}123"
+    password_hash = generate_password_hash(raw_password)
+
+    user = User(username=username, password=password_hash, role=role)
+    db.session.add(user)
+    db.session.flush()  # للحصول على id إن لزم قبل commit
+
+    return username, raw_password
 
 
 # ---------- Pages ----------
@@ -135,9 +171,14 @@ def create_engineer():
                 department_id=data.get("department_id"),
             )
             db.session.add(engineer)
+            db.session.flush()
+
+            # إنشاء حساب مستخدم محدود الدور للمهندس
+            username, raw_password = _create_limited_user(engineer.email or engineer.phone, role="engineer")
+
             db.session.commit()
 
-            flash("✅ تم إضافة المهندس بنجاح", "success")
+            flash(f"✅ تم إضافة المهندس بنجاح. تم إنشاء مستخدم: {username} بكلمة مرور مؤقتة.", "success")
             return redirect(url_for("consulting_hr.engineer_detail", engineer_id=engineer.id))
 
     departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
@@ -495,8 +536,13 @@ def create_employee():
         else:
             employee = Employee(**data)
             db.session.add(employee)
+            db.session.flush()
+
+            # إنشاء حساب مستخدم محدود الدور للموظف
+            username, raw_password = _create_limited_user(employee.email or employee.phone, role="employee")
+
             db.session.commit()
-            flash("✅ تم إضافة الموظف بنجاح", "success")
+            flash(f"✅ تم إضافة الموظف بنجاح. تم إنشاء مستخدم: {username} بكلمة مرور مؤقتة.", "success")
             return redirect(url_for("consulting_hr.employee_detail", employee_id=employee.id))
     else:
         # تعيين القيم الافتراضية
