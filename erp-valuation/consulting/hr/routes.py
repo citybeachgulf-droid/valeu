@@ -47,109 +47,7 @@ def _require_roles(allowed: List[str]) -> Optional[None]:
 
 # ---------- Pages ----------
 
-@hr_bp.route("/dashboard", methods=["GET", "POST"])
-def dashboard():
-    maybe_redirect = _require_roles(["manager", "employee", "hr"])
-    if maybe_redirect:
-        return maybe_redirect
-
-    form_values: Dict[str, str] = {
-        "name": "",
-        "specialty": ENGINEER_SPECIALTIES[0] if ENGINEER_SPECIALTIES else "",
-        "phone": "",
-        "email": "",
-        "join_date": "",
-        "status": "نشط",
-    }
-    form_errors: Dict[str, str] = {}
-
-    if request.method == "POST":
-        for key in form_values:
-            form_values[key] = (request.form.get(key) or "").strip()
-
-        data, form_errors = validate_engineer_form(request.form)
-        if form_errors:
-            for _, msg in form_errors.items():
-                flash(f"❌ {msg}", "error")
-        else:
-            engineer = Engineer(
-                name=data["name"],
-                specialty=data["specialty"],
-                phone=data["phone"],
-                email=data["email"],
-                join_date=data["join_date"],
-                status=data["status"] or "نشط",
-            )
-            db.session.add(engineer)
-            db.session.commit()
-
-            flash("✅ تم إضافة المهندس بنجاح", "success")
-            return redirect(url_for("consulting_hr.dashboard"))
-
-    total_engineers = Engineer.query.count()
-    active_engineers = Engineer.query.filter(Engineer.status == "نشط").count()
-    inactive_engineers = Engineer.query.filter(Engineer.status != "نشط").count()
-
-    specialty_rows = (
-        db.session.query(Engineer.specialty, func.count(Engineer.id))
-        .group_by(Engineer.specialty)
-        .all()
-    )
-    specialty_distribution = {row[0]: row[1] for row in specialty_rows}
-
-    today = date.today()
-
-    open_tasks_query = Task.query.filter(Task.status != "مكتملة")
-    total_open_tasks = open_tasks_query.count()
-
-    overdue_tasks_query = open_tasks_query.filter(
-        Task.deadline.isnot(None),
-        Task.deadline < today,
-    )
-    overdue_tasks_count = overdue_tasks_query.count()
-    overdue_tasks = (
-        overdue_tasks_query.order_by(Task.deadline.asc())
-        .limit(5)
-        .all()
-    )
-
-    upcoming_tasks = (
-        open_tasks_query.filter(
-            Task.deadline.isnot(None),
-            Task.deadline >= today,
-        )
-        .order_by(Task.deadline.asc())
-        .limit(5)
-        .all()
-    )
-
-    recent_engineers = (
-        Engineer.query.order_by(Engineer.created_at.desc()).limit(5).all()
-    )
-    recent_tasks = Task.query.order_by(Task.created_at.desc()).limit(5).all()
-
-    stats = {
-        "total_engineers": total_engineers,
-        "active_engineers": active_engineers,
-        "inactive_engineers": inactive_engineers,
-        "total_open_tasks": total_open_tasks,
-        "overdue_tasks_count": overdue_tasks_count,
-    }
-
-    return render_template(
-        "hr/dashboard.html",
-        stats=stats,
-        specialty_distribution=specialty_distribution,
-        recent_engineers=recent_engineers,
-        upcoming_tasks=upcoming_tasks,
-        overdue_tasks=overdue_tasks,
-        recent_tasks=recent_tasks,
-        ENGINEER_SPECIALTIES=ENGINEER_SPECIALTIES,
-        ENGINEER_STATUSES=ENGINEER_STATUSES,
-        form_values=form_values,
-        form_errors=form_errors,
-        title="لوحة الموارد البشرية",
-    )
+# تم نقل وظيفة dashboard القديمة إلى hr_dashboard الموحدة أدناه
 
 
 @hr_bp.route("/engineers")
@@ -651,20 +549,21 @@ def edit_employee(employee_id: int):
     )
 
 
-@hr_bp.route("/dashboard")
-def hr_dashboard():
-    """لوحة تحكم HR الشاملة"""
+@hr_bp.route("/dashboard", methods=["GET", "POST"])
+def dashboard():
+    """لوحة تحكم HR الشاملة لجميع الأقسام"""
     maybe_redirect = _require_roles(["manager", "employee", "hr", "hr_manager"])
     if maybe_redirect:
         return maybe_redirect
     
-    # إحصائيات الموظفين
+    today = date.today()
+    
+    # ===== إحصائيات عامة للموظفين =====
     total_employees = Employee.query.count()
     active_employees = Employee.query.filter(Employee.status == "نشط").count()
     on_leave_employees = Employee.query.filter(Employee.status == "إجازة").count()
     
-    # إحصائيات الحضور (هذا الشهر)
-    today = date.today()
+    # ===== إحصائيات الحضور (هذا الشهر) =====
     current_month_attendance = Attendance.query.filter(
         func.extract('year', Attendance.attendance_date) == today.year,
         func.extract('month', Attendance.attendance_date) == today.month
@@ -672,7 +571,7 @@ def hr_dashboard():
     present_count = sum(1 for a in current_month_attendance if a.status == "حاضر")
     absent_count = sum(1 for a in current_month_attendance if a.status == "غائب")
     
-    # إحصائيات الإجازات
+    # ===== إحصائيات الإجازات =====
     pending_leaves = LeaveRequest.query.filter(LeaveRequest.status == "معلق").count()
     approved_leaves_today = LeaveRequest.query.filter(
         LeaveRequest.status == "معتمد",
@@ -680,7 +579,7 @@ def hr_dashboard():
         LeaveRequest.end_date >= today
     ).count()
     
-    # إحصائيات الرواتب
+    # ===== إحصائيات الرواتب =====
     current_month_payroll = Payroll.query.filter(
         Payroll.payroll_year == today.year,
         Payroll.payroll_month == today.month
@@ -690,33 +589,117 @@ def hr_dashboard():
         Payroll.payroll_month == today.month
     ).scalar() or Decimal(0)
     
-    # المستندات المنتهية الصلاحية
+    # ===== المستندات المنتهية الصلاحية =====
     expiring_documents = EmployeeDocument.query.filter(
         EmployeeDocument.expiry_date.isnot(None),
         EmployeeDocument.expiry_date <= today + timedelta(days=30),
         EmployeeDocument.expiry_date >= today
     ).count()
     
-    # طلبات التوظيف المعلقة
+    # ===== طلبات التوظيف المعلقة =====
     pending_applications = JobApplication.query.filter(
         JobApplication.status == "قيد المراجعة"
     ).count()
     
-    # أحدث الموظفين
+    # ===== إحصائيات المهندسين (للتوافق مع النظام القديم) =====
+    total_engineers = Engineer.query.count()
+    active_engineers = Engineer.query.filter(Engineer.status == "نشط").count()
+    open_tasks_query = Task.query.filter(Task.status != "مكتملة")
+    total_open_tasks = open_tasks_query.count()
+    overdue_tasks_count = open_tasks_query.filter(
+        Task.deadline.isnot(None),
+        Task.deadline < today,
+    ).count()
+    
+    # ===== إحصائيات لكل قسم =====
+    departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
+    department_stats = []
+    
+    for dept in departments:
+        dept_employees = Employee.query.filter(Employee.department_id == dept.id).all()
+        dept_total = len(dept_employees)
+        dept_active = sum(1 for e in dept_employees if e.status == "نشط")
+        dept_on_leave = sum(1 for e in dept_employees if e.status == "إجازة")
+        
+        # الحضور لهذا الشهر
+        dept_employee_ids = [e.id for e in dept_employees]
+        dept_attendance = [
+            a for a in current_month_attendance 
+            if a.employee_id in dept_employee_ids
+        ]
+        dept_present = sum(1 for a in dept_attendance if a.status == "حاضر")
+        dept_absent = sum(1 for a in dept_attendance if a.status == "غائب")
+        
+        # الإجازات المعلقة
+        dept_pending_leaves = LeaveRequest.query.filter(
+            LeaveRequest.employee_id.in_(dept_employee_ids),
+            LeaveRequest.status == "معلق"
+        ).count()
+        
+        department_stats.append({
+            "department": dept,
+            "total_employees": dept_total,
+            "active_employees": dept_active,
+            "on_leave_employees": dept_on_leave,
+            "present_count": dept_present,
+            "absent_count": dept_absent,
+            "pending_leaves": dept_pending_leaves,
+        })
+    
+    # ===== توزيع الموظفين حسب الأقسام =====
+    department_distribution = {}
+    for dept in departments:
+        count = Employee.query.filter(Employee.department_id == dept.id).count()
+        if count > 0:
+            department_distribution[dept.name] = count
+    
+    # ===== أحدث الموظفين من جميع الأقسام =====
     recent_employees = Employee.query.order_by(Employee.created_at.desc()).limit(5).all()
     
-    # الإجازات القادمة
+    # ===== الإجازات القادمة =====
     upcoming_leaves = LeaveRequest.query.filter(
         LeaveRequest.status == "معتمد",
         LeaveRequest.start_date > today
     ).order_by(LeaveRequest.start_date.asc()).limit(5).all()
     
-    # المستندات المنتهية قريباً
+    # ===== المستندات المنتهية قريباً =====
     docs_expiring_soon = EmployeeDocument.query.filter(
         EmployeeDocument.expiry_date.isnot(None),
         EmployeeDocument.expiry_date <= today + timedelta(days=30),
         EmployeeDocument.expiry_date >= today
     ).order_by(EmployeeDocument.expiry_date.asc()).limit(5).all()
+    
+    # ===== المهام القادمة والمتأخرة (للمهندسين) =====
+    upcoming_tasks = (
+        open_tasks_query.filter(
+            Task.deadline.isnot(None),
+            Task.deadline >= today,
+        )
+        .order_by(Task.deadline.asc())
+        .limit(5)
+        .all()
+    )
+    
+    overdue_tasks = (
+        open_tasks_query.filter(
+            Task.deadline.isnot(None),
+            Task.deadline < today,
+        )
+        .order_by(Task.deadline.asc())
+        .limit(5)
+        .all()
+    )
+    
+    recent_tasks = Task.query.order_by(Task.created_at.desc()).limit(5).all()
+    recent_engineers = Engineer.query.order_by(Engineer.created_at.desc()).limit(5).all()
+    
+    # توزيع المهندسين حسب التخصص
+    specialty_rows = (
+        db.session.query(Engineer.specialty, func.count(Engineer.id))
+        .group_by(Engineer.specialty)
+        .all()
+    )
+    specialty_distribution = {row[0]: row[1] for row in specialty_rows}
     
     stats = {
         "total_employees": total_employees,
@@ -730,13 +713,27 @@ def hr_dashboard():
         "total_payroll_amount": total_payroll_amount,
         "expiring_documents": expiring_documents,
         "pending_applications": pending_applications,
+        "total_engineers": total_engineers,
+        "active_engineers": active_engineers,
+        "total_open_tasks": total_open_tasks,
+        "overdue_tasks_count": overdue_tasks_count,
     }
     
     return render_template(
         "hr/dashboard.html",
         stats=stats,
+        department_stats=department_stats,
+        department_distribution=department_distribution,
+        departments=departments,
         recent_employees=recent_employees,
         upcoming_leaves=upcoming_leaves,
         docs_expiring_soon=docs_expiring_soon,
-        title="لوحة تحكم الموارد البشرية",
+        upcoming_tasks=upcoming_tasks,
+        overdue_tasks=overdue_tasks,
+        recent_tasks=recent_tasks,
+        recent_engineers=recent_engineers,
+        specialty_distribution=specialty_distribution,
+        ENGINEER_SPECIALTIES=ENGINEER_SPECIALTIES,
+        ENGINEER_STATUSES=ENGINEER_STATUSES,
+        title="لوحة تحكم الموارد البشرية الشاملة",
     )
