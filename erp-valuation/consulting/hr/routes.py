@@ -17,7 +17,6 @@ from sqlalchemy import or_, func
 from werkzeug.security import generate_password_hash
 
 from extensions import db
-from app import User  # استخدام نموذج المستخدم لإنشاء حسابات للموظفين والمهندسين
 from consulting.projects.models import ConsultingProject
 from .models import Engineer, Task, Department
 from .forms import (
@@ -54,6 +53,9 @@ def _create_limited_user(username_hint: str | None, role: str) -> tuple[str, str
     - password: كلمة مرور افتراضية آمنة يمكن تغييرها لاحقًا.
     تعاد (username, raw_password) لاستخدامها في التنبيه للـ HR.
     """
+    # تجنّب الاستيراد الدائري: نستورد User داخل الدالة
+    from app import User
+
     base_username = (username_hint or "").strip().lower()
     if base_username:
         # نظّف المسافة وأنواع الحروف الشائعة في الهواتف/الايميل
