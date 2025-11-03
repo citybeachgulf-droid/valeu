@@ -72,7 +72,7 @@ label.form-label {
       {% if engineer %}
       <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.engineer_detail', engineer_id=engineer.id) }}">عرض ملف المهندس</a>
       {% endif %}
-      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.list_engineers') }}">قائمة المهندسين</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.list_staff') }}">الموظفين والمهندسين</a>
       <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.dashboard') }}">لوحة HR</a>
     </div>
   </div>
@@ -128,6 +128,18 @@ label.form-label {
       {% if form_errors.get('join_date') %}<div class="invalid-feedback d-block">{{ form_errors.get('join_date') }}</div>{% endif %}
     </div>
 
+    <!-- الفرع -->
+    <div class="col-md-6">
+      <label class="form-label">الفرع</label>
+      <select class="form-select {% if form_errors.get('department_id') %}is-invalid{% endif %}" name="department_id">
+        <option value="">-- اختر الفرع --</option>
+        {% for dept in departments %}
+        <option value="{{ dept.id }}" {% if form_values.department_id|string == dept.id|string %}selected{% endif %}>{{ dept.name }}</option>
+        {% endfor %}
+      </select>
+      {% if form_errors.get('department_id') %}<div class="invalid-feedback d-block">{{ form_errors.get('department_id') }}</div>{% endif %}
+    </div>
+
     <!-- ملاحظة -->
     <div class="col-12">
       <div class="alert alert-light border small mb-0">
@@ -137,7 +149,7 @@ label.form-label {
 
     <!-- الأزرار -->
     <div class="col-12 d-flex justify-content-between align-items-center mt-3">
-      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.list_engineers') }}">رجوع</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.list_staff') }}">رجوع</a>
       <button class="btn btn-primary" type="submit">
         {% if mode == 'create' %}حفظ المهندس{% else %}تحديث البيانات{% endif %}
       </button>

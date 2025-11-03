@@ -21,8 +21,11 @@ class Engineer(db.Model):
     email = db.Column(db.String(120), nullable=True)
     join_date = db.Column(db.Date, nullable=True, index=True)
     status = db.Column(db.String(20), nullable=False, default="نشط", index=True)
+    department_id = db.Column(db.Integer, db.ForeignKey("hr_department.id"), nullable=True, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    department = db.relationship("Department", backref=db.backref("engineers", lazy=True), foreign_keys=[department_id])
 
     def __repr__(self) -> str:
         return f"<Engineer {self.id} {self.name!r} {self.specialty!r} status={self.status}>"
