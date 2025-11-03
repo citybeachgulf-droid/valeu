@@ -2,20 +2,22 @@
 
 {% block content %}
 <style>
-/* ===== ????? ??????? ????? ===== */
+/* ===== خطوط واتجاه الصفحة ===== */
 body {
   direction: rtl;
   text-align: right;
   font-family: 'Tajawal', sans-serif;
 }
 
-/* ===== ????? ????? ?????? ===== */
+/* ===== حاوية المحتوى ===== */
 .container {
   max-width: 1200px;
+  padding: 2rem 1rem;
 }
 
-.card, .btn, .form-control, .form-select {
-  border-radius: 10px !important;
+/* ===== بطاقات ونماذج ===== */
+.card, .btn, .form-control, .form-select, .alert {
+  border-radius: 12px !important;
 }
 
 h3 {
@@ -31,11 +33,17 @@ label.form-label {
 .btn-primary {
   background-color: #6f42c1;
   border: none;
+  transition: background-color 0.3s;
 }
 .btn-primary:hover {
   background-color: #5a32a3;
 }
 
+.btn-outline-secondary {
+  border-color: #6f42c1;
+  color: #6f42c1;
+  transition: all 0.3s;
+}
 .btn-outline-secondary:hover {
   background-color: #f8f9fa;
   color: #000;
@@ -49,321 +57,184 @@ label.form-label {
   font-size: 1.2rem;
   font-weight: 600;
   color: #6f42c1;
-  margin-top: 1.5rem;
+  margin-top: 2rem;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
   border-bottom: 2px solid #e9ecef;
 }
 
+.form-control, .form-select {
+  padding: 0.5rem 0.75rem;
+}
 </style>
 
-<!-- ??????? ?? ?????? -->
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600&display=swap" rel="stylesheet">
 
-<div class="container py-4">
+<div class="container">
+  <!-- ===== رأس الصفحة ===== -->
   <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
     <div>
       <h3 class="mb-1">
-        {% if mode == 'create' %}
-          ????? ???? ????
-        {% else %}
-          ????? ?????? ??????
-        {% endif %}
+        {% if mode == 'create' %}إضافة موظف جديد{% else %}تعديل بيانات الموظف{% endif %}
       </h3>
       <p class="text-muted small mb-0">
         {% if mode == 'create' %}
-          ?? ?????? ?????? ?????? ?????? ??????? ??? ????? ?????? ??????.
+          الرجاء ملء جميع البيانات الأساسية لإنشاء سجل الموظف.
         {% else %}
-          ????? ????? ?????? ?????? ???? ????????? ?????.
+          تعديل بيانات الموظف الحالي، مع إمكانية تحديث كافة الحقول.
         {% endif %}
       </p>
     </div>
     <div class="d-flex flex-wrap gap-2">
       {% if employee %}
-      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.employee_detail', employee_id=employee.id) }}">??? ??? ??????</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.employee_detail', employee_id=employee.id) }}">عرض الموظف</a>
       {% endif %}
-      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.list_employees') }}">????? ????????</a>
-      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.dashboard') }}">???? HR</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.list_employees') }}">قائمة الموظفين</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.dashboard') }}">لوحة HR</a>
     </div>
   </div>
 
   <form method="post" class="row g-3" novalidate>
-    
-    <!-- ===== ???????? ???????? ===== -->
+    <!-- ===== بيانات أساسية ===== -->
     <div class="col-12">
-      <h5 class="section-title">?? ???????? ????????</h5>
+      <h5 class="section-title">البيانات الأساسية</h5>
     </div>
 
-    <!-- ??? ?????? -->
     <div class="col-md-3">
-      <label class="form-label">??? ??????</label>
+      <label class="form-label">رقم الموظف</label>
       <input type="text" class="form-control" name="employee_number" value="{{ form_values.employee_number or '' }}">
     </div>
-
-    <!-- ????? ????? -->
     <div class="col-md-3">
-      <label class="form-label">????? ????? <span class="text-danger">*</span></label>
+      <label class="form-label">الاسم <span class="text-danger">*</span></label>
       <input type="text" class="form-control {% if form_errors.get('first_name') %}is-invalid{% endif %}" name="first_name" value="{{ form_values.first_name or '' }}" required>
       {% if form_errors.get('first_name') %}<div class="invalid-feedback d-block">{{ form_errors.get('first_name') }}</div>{% endif %}
     </div>
+    
 
-    <!-- ????? ?????? -->
+    
     <div class="col-md-3">
-      <label class="form-label">????? ??????</label>
-      <input type="text" class="form-control" name="middle_name" value="{{ form_values.middle_name or '' }}">
-    </div>
-
-    <!-- ??? ??????? -->
-    <div class="col-md-3">
-      <label class="form-label">??? ??????? <span class="text-danger">*</span></label>
-      <input type="text" class="form-control {% if form_errors.get('last_name') %}is-invalid{% endif %}" name="last_name" value="{{ form_values.last_name or '' }}" required>
-      {% if form_errors.get('last_name') %}<div class="invalid-feedback d-block">{{ form_errors.get('last_name') }}</div>{% endif %}
-    </div>
-
-    <!-- ????? ???????? -->
-    <div class="col-md-6">
-      <label class="form-label">????? ????????</label>
-      <input type="text" class="form-control" name="arabic_name" value="{{ form_values.arabic_name or '' }}">
-    </div>
-
-    <!-- ????? ??????? -->
-    <div class="col-md-3">
-      <label class="form-label">????? ???????</label>
+      <label class="form-label">تاريخ الميلاد</label>
       <input type="date" class="form-control" name="date_of_birth" value="{{ form_values.date_of_birth or '' }}">
     </div>
-
-    <!-- ????? -->
     <div class="col-md-3">
-      <label class="form-label">?????</label>
+      <label class="form-label">الجنس</label>
       <select class="form-select" name="gender">
-        <option value="">-- ???? --</option>
-        <option value="???" {% if form_values.gender == '???' %}selected{% endif %}>???</option>
-        <option value="????" {% if form_values.gender == '????' %}selected{% endif %}>????</option>
+        <option value="">-- اختر --</option>
+        <option value="ذكر" {% if form_values.gender == 'ذكر' %}selected{% endif %}>ذكر</option>
+        <option value="أنثى" {% if form_values.gender == 'أنثى' %}selected{% endif %}>أنثى</option>
       </select>
     </div>
 
-    <!-- ===== ?????? ???????? ===== -->
+    <!-- ===== بيانات الاتصال ===== -->
     <div class="col-12">
-      <h5 class="section-title">?? ?????? ????????</h5>
+      <h5 class="section-title">بيانات الاتصال</h5>
     </div>
-
-    <!-- ??????? -->
-    <div class="col-md-3">
-      <label class="form-label">???????</label>
-      <input type="text" class="form-control" name="nationality" value="{{ form_values.nationality or '' }}">
-    </div>
-
-    <!-- ??? ?????? -->
-    <div class="col-md-3">
-      <label class="form-label">??? ??????</label>
-      <input type="text" class="form-control" name="national_id" value="{{ form_values.national_id or '' }}">
-    </div>
-
-    <!-- ??? ?????? -->
-    <div class="col-md-3">
-      <label class="form-label">??? ??????</label>
-      <input type="text" class="form-control" name="passport_number" value="{{ form_values.passport_number or '' }}">
-    </div>
-
-    <!-- ===== ??????? ??????? ===== -->
-    <div class="col-12">
-      <h5 class="section-title">?? ??????? ???????</h5>
-    </div>
-
-    <!-- ?????? ?????????? -->
     <div class="col-md-4">
-      <label class="form-label">?????? ??????????</label>
+      <label class="form-label">البريد الإلكتروني</label>
       <input type="email" class="form-control {% if form_errors.get('email') %}is-invalid{% endif %}" name="email" value="{{ form_values.email or '' }}">
       {% if form_errors.get('email') %}<div class="invalid-feedback d-block">{{ form_errors.get('email') }}</div>{% endif %}
     </div>
-
-    <!-- ?????? -->
     <div class="col-md-4">
-      <label class="form-label">??????</label>
+      <label class="form-label">الهاتف</label>
       <input type="text" class="form-control" name="phone" value="{{ form_values.phone or '' }}">
     </div>
-
-    <!-- ?????? -->
     <div class="col-md-4">
-      <label class="form-label">??????</label>
+      <label class="form-label">الجوال</label>
       <input type="text" class="form-control" name="mobile" value="{{ form_values.mobile or '' }}">
     </div>
-
-    <!-- ??????? -->
     <div class="col-md-6">
-      <label class="form-label">???????</label>
+      <label class="form-label">العنوان</label>
       <textarea class="form-control" name="address" rows="2">{{ form_values.address or '' }}</textarea>
     </div>
-
-    <!-- ??????? -->
     <div class="col-md-3">
-      <label class="form-label">???????</label>
+      <label class="form-label">المدينة</label>
       <input type="text" class="form-control" name="city" value="{{ form_values.city or '' }}">
     </div>
-
-    <!-- ?????? -->
     <div class="col-md-3">
-      <label class="form-label">??????</label>
+      <label class="form-label">الدولة</label>
       <input type="text" class="form-control" name="country" value="{{ form_values.country or '' }}">
     </div>
 
-    <!-- ===== ??? ??????? ??????? ===== -->
+    <!-- ===== بيانات الوظيفة ===== -->
     <div class="col-12">
-      <h5 class="section-title">?? ??? ??????? ???????</h5>
+      <h5 class="section-title">بيانات الوظيفة</h5>
     </div>
-
-    <!-- ??? ??? ??????? -->
-    <div class="col-md-4">
-      <label class="form-label">??? ??? ???????</label>
-      <input type="text" class="form-control" name="emergency_contact_name" value="{{ form_values.emergency_contact_name or '' }}">
-    </div>
-
-    <!-- ???? ??? ??????? -->
     <div class="col-md-3">
-      <label class="form-label">???? ??? ???????</label>
-      <input type="text" class="form-control" name="emergency_contact_phone" value="{{ form_values.emergency_contact_phone or '' }}">
-    </div>
-
-    <!-- ??? ??????? -->
-    <div class="col-md-3">
-      <label class="form-label">??? ???????</label>
-      <input type="text" class="form-control" name="emergency_contact_relation" value="{{ form_values.emergency_contact_relation or '' }}" placeholder="??? ??? ???? ???">
-    </div>
-
-    <!-- ===== ?????? ??????? ===== -->
-    <div class="col-12">
-      <h5 class="section-title">?? ?????? ???????</h5>
-    </div>
-
-    <!-- ????? -->
-    <div class="col-md-3">
-      <label class="form-label">?????</label>
+      <label class="form-label">القسم</label>
       <select class="form-select" name="department_id">
-        <option value="">-- ???? ????? --</option>
+        <option value="">-- اختر القسم --</option>
         {% for dept in departments %}
         <option value="{{ dept.id }}" {% if form_values.department_id == dept.id|string or form_values.department_id == dept.id %}selected{% endif %}>{{ dept.name }}</option>
         {% endfor %}
       </select>
     </div>
-
-    <!-- ?????? -->
     <div class="col-md-3">
-      <label class="form-label">??????</label>
+      <label class="form-label">الوظيفة</label>
       <input type="text" class="form-control" name="position" value="{{ form_values.position or '' }}">
     </div>
-
-    <!-- ?????? ??????? -->
     <div class="col-md-3">
-      <label class="form-label">?????? ???????</label>
+      <label class="form-label">المسمى الوظيفي</label>
       <input type="text" class="form-control" name="job_title" value="{{ form_values.job_title or '' }}">
     </div>
-
-    <!-- ??? ??????? -->
     <div class="col-md-3">
-      <label class="form-label">??? ???????</label>
+      <label class="form-label">نوع التوظيف</label>
       <select class="form-select" name="employment_type">
-        <option value="">-- ???? --</option>
+        <option value="">-- اختر --</option>
         {% for emp_type in EMPLOYMENT_TYPES %}
         <option value="{{ emp_type }}" {% if form_values.employment_type == emp_type %}selected{% endif %}>{{ emp_type }}</option>
         {% endfor %}
       </select>
     </div>
-
-    <!-- ????? ???????? -->
     <div class="col-md-3">
-      <label class="form-label">????? ????????</label>
+      <label class="form-label">تاريخ الانضمام</label>
       <input type="date" class="form-control" name="join_date" value="{{ form_values.join_date or '' }}">
     </div>
-
-    <!-- ????? ????? ????? -->
     <div class="col-md-3">
-      <label class="form-label">????? ????? ?????</label>
-      <input type="date" class="form-control {% if form_errors.get('contract_start_date') %}is-invalid{% endif %}" name="contract_start_date" value="{{ form_values.contract_start_date or '' }}">
-      {% if form_errors.get('contract_start_date') %}<div class="invalid-feedback d-block">{{ form_errors.get('contract_start_date') }}</div>{% endif %}
+      <label class="form-label">تاريخ بداية العقد</label>
+      <input type="date" class="form-control" name="contract_start_date" value="{{ form_values.contract_start_date or '' }}">
     </div>
-
-    <!-- ????? ????? ????? -->
     <div class="col-md-3">
-      <label class="form-label">????? ????? ?????</label>
-      <input type="date" class="form-control {% if form_errors.get('contract_end_date') %}is-invalid{% endif %}" name="contract_end_date" value="{{ form_values.contract_end_date or '' }}">
-      {% if form_errors.get('contract_end_date') %}<div class="invalid-feedback d-block">{{ form_errors.get('contract_end_date') }}</div>{% endif %}
+      <label class="form-label">تاريخ نهاية العقد</label>
+      <input type="date" class="form-control" name="contract_end_date" value="{{ form_values.contract_end_date or '' }}">
     </div>
-
-    <!-- ?????? -->
     <div class="col-md-3">
-      <label class="form-label">??????</label>
-      <select class="form-select {% if form_errors.get('status') %}is-invalid{% endif %}" name="status">
+      <label class="form-label">الحالة</label>
+      <select class="form-select" name="status">
         {% for status in EMPLOYEE_STATUSES %}
         <option value="{{ status }}" {% if form_values.status == status %}selected{% endif %}>{{ status }}</option>
         {% endfor %}
       </select>
-      {% if form_errors.get('status') %}<div class="invalid-feedback d-block">{{ form_errors.get('status') }}</div>{% endif %}
     </div>
 
-    <!-- ===== ????? ?????? ===== -->
+    <!-- ===== الراتب والملاحظات ===== -->
     <div class="col-12">
-      <h5 class="section-title">?? ????? ??????</h5>
+      <h5 class="section-title">الراتب والملاحظات</h5>
     </div>
-
-    <!-- ????? ????????? -->
-    <div class="col-md-3">
-      <label class="form-label">????? ?????????</label>
-      <input type="date" class="form-control" name="resignation_date" value="{{ form_values.resignation_date or '' }}">
-    </div>
-
-    <!-- ????? ????? ?????? -->
-    <div class="col-md-3">
-      <label class="form-label">????? ????? ??????</label>
-      <input type="date" class="form-control" name="termination_date" value="{{ form_values.termination_date or '' }}">
-    </div>
-
-    <!-- ===== ??????? ===== -->
-    <div class="col-12">
-      <h5 class="section-title">?? ???????</h5>
-    </div>
-
-    <!-- ?????? ??????? -->
     <div class="col-md-4">
-      <label class="form-label">?????? ???????</label>
-      <input type="number" step="0.01" class="form-control {% if form_errors.get('base_salary') %}is-invalid{% endif %}" name="base_salary" value="{{ form_values.base_salary or '' }}">
-      {% if form_errors.get('base_salary') %}<div class="invalid-feedback d-block">{{ form_errors.get('base_salary') }}</div>{% endif %}
+      <label class="form-label">الراتب الأساسي</label>
+      <input type="number" step="0.01" class="form-control" name="base_salary" value="{{ form_values.base_salary or '' }}">
     </div>
-
-    <!-- ?????? -->
-    <div class="col-md-2">
-      <label class="form-label">??????</label>
-      <select class="form-select" name="currency">
-        <option value="SAR" {% if form_values.currency == 'SAR' or not form_values.currency %}selected{% endif %}>SAR</option>
-        <option value="USD" {% if form_values.currency == 'USD' %}selected{% endif %}>USD</option>
-        <option value="EUR" {% if form_values.currency == 'EUR' %}selected{% endif %}>EUR</option>
-      </select>
-    </div>
-
-    <!-- ===== ??????? ===== -->
+   
     <div class="col-12">
-      <h5 class="section-title">?? ???????</h5>
-    </div>
-
-    <!-- ????????? -->
-    <div class="col-12">
-      <label class="form-label">??????? ??????</label>
+      <label class="form-label">ملاحظات</label>
       <textarea class="form-control" name="notes" rows="3">{{ form_values.notes or '' }}</textarea>
     </div>
 
-    <!-- ?????? -->
+    <!-- ===== التنبيهات ===== -->
     <div class="col-12">
       <div class="alert alert-light border small mb-0">
-        <strong>??????:</strong> ????? ????? ?????? ?????? ?????? ?? ???? ???? ?????? ?????? ???? ??????? ???????.
+        <strong>تنبيه:</strong> جميع الحقول باللون الأحمر مطلوبة لإكمال عملية الحفظ.
       </div>
     </div>
 
-    <!-- ??????? -->
+    <!-- ===== أزرار الحفظ والرجوع ===== -->
     <div class="col-12 d-flex justify-content-between align-items-center mt-3">
-      <a class="btn btn-outline-secondary" href="{% if employee %}{{ url_for('consulting_hr.employee_detail', employee_id=employee.id) }}{% else %}{{ url_for('consulting_hr.list_employees') }}{% endif %}">????</a>
+      <a class="btn btn-outline-secondary" href="{% if employee %}{{ url_for('consulting_hr.employee_detail', employee_id=employee.id) }}{% else %}{{ url_for('consulting_hr.list_employees') }}{% endif %}">رجوع</a>
       <button class="btn btn-primary" type="submit">
-        {% if mode == 'create' %}??? ??????{% else %}????? ????????{% endif %}
+        {% if mode == 'create' %}حفظ الموظف{% else %}تحديث البيانات{% endif %}
       </button>
     </div>
+
   </form>
 </div>
 {% endblock %}
