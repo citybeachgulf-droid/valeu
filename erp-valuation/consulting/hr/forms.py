@@ -308,10 +308,9 @@ def validate_employee_form(form: Dict[str, str], *, for_update: bool = False) ->
     email = _normalize_str(form.get("email"))
     employee_number = _normalize_str(form.get("employee_number"))
     
+    # اجعل الحقول الإجبارية عند الإضافة هي الاسم والقسم فقط
     if not first_name:
-        errors["first_name"] = "الاسم الأول مطلوب"
-    if not last_name:
-        errors["last_name"] = "اسم العائلة مطلوب"
+        errors["first_name"] = "الاسم مطلوب"
     
     if email and "@" not in email:
         errors["email"] = "البريد الإلكتروني غير صالح"
@@ -332,6 +331,11 @@ def validate_employee_form(form: Dict[str, str], *, for_update: bool = False) ->
     if base_salary and base_salary < 0:
         errors["base_salary"] = "الراتب يجب أن يكون رقمًا موجبًا"
     
+    # تحقق من القسم (department_id) على أنه مطلوب عند الإضافة
+    department_id_value = _normalize_int(form.get("department_id"))
+    if not for_update and not department_id_value:
+        errors["department_id"] = "يجب اختيار القسم"
+
     data = {
         "employee_number": employee_number or None,
         "first_name": first_name,
@@ -352,7 +356,7 @@ def validate_employee_form(form: Dict[str, str], *, for_update: bool = False) ->
         "emergency_contact_name": _normalize_str(form.get("emergency_contact_name")) or None,
         "emergency_contact_phone": _normalize_str(form.get("emergency_contact_phone")) or None,
         "emergency_contact_relation": _normalize_str(form.get("emergency_contact_relation")) or None,
-        "department_id": _normalize_int(form.get("department_id")),
+        "department_id": department_id_value,
         "position": _normalize_str(form.get("position")) or None,
         "job_title": _normalize_str(form.get("job_title")) or None,
         "employment_type": _normalize_str(form.get("employment_type")) or None,
