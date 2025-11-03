@@ -83,6 +83,39 @@ def _create_limited_user(username_hint: str | None, role: str) -> tuple[str, str
     return username, raw_password
 
 
+# Ensure there are some baseline departments so forms can render choices
+def _ensure_default_departments() -> None:
+    """Create a few default departments if none exist.
+
+    This prevents empty department dropdowns on employee/engineer creation forms
+    in fresh databases where HR departments haven't been set up yet.
+    """
+    existing_count = Department.query.count()
+    if existing_count and existing_count > 0:
+        return
+
+    defaults: List[dict] = [
+        {"name": "التثمين", "code": "valuation", "description": "قسم التثمين"},
+        {"name": "الاستشارات", "code": "consultations", "description": "قسم الاستشارات"},
+        {"name": "إدارة الممتلكات", "code": "property", "description": "قسم إدارة الممتلكات"},
+        {"name": "الموارد البشرية", "code": "hr", "description": "قسم الموارد البشرية"},
+        {"name": "المالية", "code": "finance", "description": "قسم المالية"},
+    ]
+
+    # Avoid unique constraint conflicts if codes/names already partially exist
+    existing_names = {d.name for d in Department.query.all()}
+    existing_codes = {d.code for d in Department.query.all() if d.code}
+
+    created = False
+    for d in defaults:
+        if d["name"] in existing_names or d["code"] in existing_codes:
+            continue
+        db.session.add(Department(**d))
+        created = True
+
+    if created:
+        db.session.commit()
+
 # ---------- Pages ----------
 
 # تم نقل وظيفة dashboard القديمة إلى hr_dashboard الموحدة أدناه
@@ -183,6 +216,7 @@ def create_engineer():
             flash(f"✅ تم إضافة المهندس بنجاح. تم إنشاء مستخدم: {username} بكلمة مرور مؤقتة.", "success")
             return redirect(url_for("consulting_hr.engineer_detail", engineer_id=engineer.id))
 
+    _ensure_default_departments()
     departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
     
     return render_template(
@@ -240,6 +274,7 @@ def edit_engineer(engineer_id: int):
             flash("✅ تم تحديث بيانات المهندس", "success")
             return redirect(url_for("consulting_hr.engineer_detail", engineer_id=engineer.id))
 
+    _ensure_default_departments()
     departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
     
     return render_template(
@@ -450,6 +485,7 @@ def list_staff():
         overdue_counts[eng.id] = sum(1 for t in eng.tasks if t.is_overdue())
         open_counts[eng.id] = sum(1 for t in eng.tasks if t.status != "مكتملة")
     
+    _ensure_default_departments()
     departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
     can_manage = session.get("role") in {"manager", "hr", "hr_manager"}
     
@@ -502,6 +538,7 @@ def list_employees():
     query = query.order_by(Employee.id.desc())
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     
+    _ensure_default_departments()
     departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
     can_manage = session.get("role") in {"manager", "hr", "hr_manager"}
     
@@ -554,6 +591,7 @@ def create_employee():
             "employment_type": EMPLOYMENT_TYPES[0] if EMPLOYMENT_TYPES else None,
         }
     
+    _ensure_default_departments()
     departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
     
     return render_template(
@@ -678,6 +716,7 @@ def edit_employee(employee_id: int):
             "notes": employee.notes or "",
         }
     
+    _ensure_default_departments()
     departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
     
     return render_template(
@@ -756,6 +795,7 @@ def dashboard():
     ).count()
     
     # ===== إحصائيات لكل قسم =====
+    _ensure_default_departments()
     departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
     department_stats = []
     
@@ -977,6 +1017,7 @@ def create_staff():
                 )
                 return redirect(url_for("consulting_hr.employee_detail", employee_id=employee.id))
 
+    _ensure_default_departments()
     departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
     return render_template(
         "hr/staff_form.html",
