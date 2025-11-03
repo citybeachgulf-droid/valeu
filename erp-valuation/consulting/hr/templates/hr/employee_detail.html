@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+    <div>
+      <h3 class="mb-1">{{ employee.full_name }}
+        {% if employee.employee_number %}<small class="text-muted">({{ employee.employee_number }})</small>{% endif %}
+      </h3>
+      <p class="text-muted small mb-0">{{ employee.job_title or employee.position or '????' }} - {{ employee.department.name if employee.department else '???? ???' }}</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      {% if can_manage %}
+      <a class="btn btn-primary" href="{{ url_for('consulting_hr.edit_employee', employee_id=employee.id) }}">?? ????? ????????</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.dashboard') }}">???? HR</a>
+      {% endif %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.list_employees') }}">???? ???????</a>
+    </div>
+  </div>
+
+  {% if expiring_docs %}
+  <div class="alert alert-warning mb-3">
+    <strong>?? ?????:</strong> ???? {{ expiring_docs|length }} ????? ????? ???????? ?? ?????? ??????.
+  </div>
+  {% endif %}
+
+  <div class="row g-3">
+    <!-- ????????? ???????? -->
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title mb-3">????????? ????????</h5>
+          <p class="mb-1"><strong>????? ???????:</strong> {{ employee.employee_number or '-' }}</p>
+          <p class="mb-1"><strong>????? ??????:</strong> {{ employee.full_name }}</p>
+          {% if employee.arabic_name %}<p class="mb-1"><strong>????? ????????:</strong> {{ employee.arabic_name }}</p>{% endif %}
+          <p class="mb-1"><strong>??????:</strong> {{ employee.email or '-' }}</p>
+          <p class="mb-1"><strong>??????:</strong> {{ employee.phone or employee.mobile or '-' }}</p>
+          <p class="mb-1"><strong>?????:</strong> {{ employee.gender or '-' }}</p>
+          {% if employee.date_of_birth %}<p class="mb-1"><strong>????? ???????:</strong> {{ employee.date_of_birth.strftime('%Y-%m-%d') }}</p>{% endif %}
+          <p class="mb-1"><strong>???????:</strong> {{ employee.nationality or '-' }}</p>
+          <p class="mb-0"><strong>??????:</strong> 
+            <span class="badge {% if employee.status=='???' %}bg-success{% elif employee.status=='?????' %}bg-warning{% else %}bg-secondary{% endif %}">
+              {{ employee.status }}
+            </span>
+          </p>
+        </div>
+      </div>
+
+      <div class="card mt-3">
+        <div class="card-body">
+          <h5 class="card-title mb-3">?????? ???????</h5>
+          <p class="mb-1"><strong>?????:</strong> {{ employee.department.name if employee.department else '-' }}</p>
+          <p class="mb-1"><strong>?????? ???????:</strong> {{ employee.job_title or '-' }}</p>
+          <p class="mb-1"><strong>??????:</strong> {{ employee.position or '-' }}</p>
+          <p class="mb-1"><strong>??? ???????:</strong> {{ employee.employment_type or '-' }}</p>
+          {% if employee.join_date %}<p class="mb-1"><strong>????? ????????:</strong> {{ employee.join_date.strftime('%Y-%m-%d') }}</p>{% endif %}
+          {% if employee.contract_start_date %}<p class="mb-1"><strong>????? ?????:</strong> {{ employee.contract_start_date.strftime('%Y-%m-%d') }}</p>{% endif %}
+          {% if employee.contract_end_date %}<p class="mb-1"><strong>????? ?????:</strong> {{ employee.contract_end_date.strftime('%Y-%m-%d') }}</p>{% endif %}
+          {% if employee.base_salary %}<p class="mb-0"><strong>?????? ???????:</strong> {{ employee.base_salary }} {{ employee.currency or 'SAR' }}</p>{% endif %}
+        </div>
+      </div>
+
+      {% if employee.address or employee.city or employee.country %}
+      <div class="card mt-3">
+        <div class="card-body">
+          <h5 class="card-title mb-3">???????</h5>
+          {% if employee.address %}<p class="mb-1">{{ employee.address }}</p>{% endif %}
+          {% if employee.city or employee.country %}<p class="mb-0">{{ employee.city or '' }}{% if employee.city and employee.country %}? {% endif %}{{ employee.country or '' }}</p>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if employee.emergency_contact_name %}
+      <div class="card mt-3">
+        <div class="card-body">
+          <h5 class="card-title mb-3">??? ??????? ?? ????? ???????</h5>
+          <p class="mb-1"><strong>?????:</strong> {{ employee.emergency_contact_name }}</p>
+          <p class="mb-1"><strong>??????:</strong> {{ employee.emergency_contact_phone or '-' }}</p>
+          {% if employee.emergency_contact_relation %}<p class="mb-0"><strong>???????:</strong> {{ employee.emergency_contact_relation }}</p>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ????????? ????????? -->
+    <div class="col-md-8">
+      <!-- ?????? ?????? -->
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title mb-3">????? ?????? ???????</h5>
+          {% if recent_attendance %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+              <thead>
+                <tr>
+                  <th>???????</th>
+                  <th>???? ??????</th>
+                  <th>??? ??????</th>
+                  <th>??? ??????</th>
+                  <th>????? ?????</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for att in recent_attendance %}
+                <tr>
+                  <td>{{ att.attendance_date.strftime('%Y-%m-%d') }}</td>
+                  <td><span class="badge {% if att.status=='????' %}bg-success{% elif att.status=='????' %}bg-danger{% else %}bg-secondary{% endif %}">{{ att.status }}</span></td>
+                  <td>{% if att.check_in %}{{ att.check_in.strftime('%H:%M') }}{% else %}-{% endif %}</td>
+                  <td>{% if att.check_out %}{{ att.check_out.strftime('%H:%M') }}{% else %}-{% endif %}</td>
+                  <td>{% if att.hours_worked %}{{ att.hours_worked }}{% else %}-{% endif %}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="text-muted mb-0">?? ???? ????? ???? ?????.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- ???????? ??????? -->
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title mb-3">???????? ???????</h5>
+          {% if recent_leaves %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+              <thead>
+                <tr>
+                  <th>??? ???????</th>
+                  <th>??</th>
+                  <th>???</th>
+                  <th>??????</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for leave in recent_leaves %}
+                <tr>
+                  <td>{{ leave.leave_type.name if leave.leave_type else '-' }}</td>
+                  <td>{{ leave.start_date.strftime('%Y-%m-%d') }}</td>
+                  <td>{{ leave.end_date.strftime('%Y-%m-%d') }}</td>
+                  <td><span class="badge {% if leave.status=='?????' %}bg-success{% elif leave.status=='?????' %}bg-danger{% else %}bg-warning{% endif %}">{{ leave.status }}</span></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="text-muted mb-0">?? ???? ?????? ?????.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- ????????? ??????? -->
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title mb-3">????????? ???????? ???????</h5>
+          {% if recent_reviews %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+              <thead>
+                <tr>
+                  <th>??????</th>
+                  <th>?????</th>
+                  <th>??????? ?????</th>
+                  <th>??????</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for review in recent_reviews %}
+                <tr>
+                  <td>{{ review.review_period }}</td>
+                  <td>{{ review.review_year }}</td>
+                  <td>{{ review.overall_rating or '-' }}</td>
+                  <td><span class="badge {% if review.status=='?????' %}bg-success{% else %}bg-secondary{% endif %}">{{ review.status or '-' }}</span></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="text-muted mb-0">?? ???? ??????? ?????.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- ????????? -->
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title mb-3">?????????</h5>
+          {% if documents %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+              <thead>
+                <tr>
+                  <th>??? ???????</th>
+                  <th>?????</th>
+                  <th>????? ?????</th>
+                  <th>????? ????????</th>
+                  <th>??????</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for doc in documents %}
+                <tr class="{% if doc.is_expired() %}table-danger{% endif %}">
+                  <td>{{ doc.document_name }}</td>
+                  <td>{{ doc.document_type or '-' }}</td>
+                  <td>{{ doc.uploaded_at.strftime('%Y-%m-%d') if doc.uploaded_at else '-' }}</td>
+                  <td>{% if doc.expiry_date %}{{ doc.expiry_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</td>
+                  <td>
+                    {% if doc.is_expired() %}
+                    <span class="badge bg-danger">?????</span>
+                    {% elif doc.expiry_date %}
+                    <span class="badge bg-success">????</span>
+                    {% else %}
+                    <span class="badge bg-secondary">???? ????? ??????</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="text-muted mb-0">?? ???? ??????? ??????.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if employee.notes %}
+      <div class="card mt-3">
+        <div class="card-body">
+          <h5 class="card-title mb-3">???????</h5>
+          <p class="mb-0">{{ employee.notes }}</p>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+{% endblock %}
