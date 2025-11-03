@@ -160,13 +160,14 @@ label.form-label {
       <h5 class="section-title">بيانات الوظيفة</h5>
     </div>
     <div class="col-md-3">
-      <label class="form-label">القسم</label>
-      <select class="form-select" name="department_id">
+      <label class="form-label">القسم <span class="text-danger">*</span></label>
+      <select class="form-select {% if form_errors.get('department_id') %}is-invalid{% endif %}" name="department_id" required>
         <option value="">-- اختر القسم --</option>
         {% for dept in departments %}
         <option value="{{ dept.id }}" {% if form_values.department_id == dept.id|string or form_values.department_id == dept.id %}selected{% endif %}>{{ dept.name }}</option>
         {% endfor %}
       </select>
+      {% if form_errors.get('department_id') %}<div class="invalid-feedback d-block">{{ form_errors.get('department_id') }}</div>{% endif %}
     </div>
     <div class="col-md-3">
       <label class="form-label">الوظيفة</label>
