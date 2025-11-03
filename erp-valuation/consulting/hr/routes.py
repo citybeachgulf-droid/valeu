@@ -991,12 +991,6 @@ def create_staff():
     )
 
 
-# Redirect legacy create routes to the unified form
-@hr_bp.route("/employees/new", methods=["GET", "POST"])
-def create_employee():
-    return redirect(url_for("consulting_hr.create_staff", role_type="employee"))
-
-
-@hr_bp.route("/engineers/new", methods=["GET", "POST"])
-def create_engineer():
-    return redirect(url_for("consulting_hr.create_staff", role_type="engineer"))
+# NOTE: Legacy redirect routes removed to avoid endpoint conflicts with existing
+# create_employee/create_engineer handlers above. If external callers need
+# redirection, place them in a separate module with unique endpoint names.
