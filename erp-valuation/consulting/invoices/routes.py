@@ -174,10 +174,40 @@ def invoice_detail(invoice_id: int):
         return maybe_redirect
 
     invoice = Invoice.query.get_or_404(invoice_id)
+    
+    # ✅ البحث عن الفواتير المالية المرتبطة
+    # استخدام استيراد ديناميكي لتجنب الاعتماد الدائري
+    linked_finance_invoices = []
+    try:
+        # محاولة الاستيراد من app (يتم تسجيله بعد تحميل app)
+        import sys
+        if 'app' in sys.modules:
+            CustomerInvoice = sys.modules['app'].CustomerInvoice
+            linked_finance_invoices = CustomerInvoice.query.filter_by(consulting_invoice_id=invoice_id).all()
+    except (ImportError, AttributeError, KeyError):
+        # إذا فشل، نستخدم query مباشرة عبر SQL
+        from sqlalchemy import text
+        try:
+            result = db.session.execute(
+                text("SELECT id, invoice_number, customer_name, amount, issued_at FROM customer_invoice WHERE consulting_invoice_id = :inv_id"),
+                {"inv_id": invoice_id}
+            )
+            for row in result:
+                # إنشاء كائن بسيط للعرض
+                linked_finance_invoices.append(type('obj', (object,), {
+                    'id': row[0],
+                    'invoice_number': row[1],
+                    'customer_name': row[2],
+                    'amount': row[3],
+                    'issued_at': row[4]
+                })())
+        except Exception:
+            linked_finance_invoices = []
 
     return render_template(
         "invoices/detail.html",
         invoice=invoice,
+        linked_finance_invoices=linked_finance_invoices,
         INVOICE_STATUSES=INVOICE_STATUSES,
         title=f"تفاصيل الفاتورة - #{invoice.id}",
     )

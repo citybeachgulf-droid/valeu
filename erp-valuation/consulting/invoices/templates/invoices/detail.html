@@ -52,6 +52,40 @@
           </form>
         </div>
       </div>
+      
+      {% if linked_finance_invoices %}
+      <div class="card mt-3">
+        <div class="card-body">
+          <h5 class="card-title mb-3">🔗 الفواتير المالية المرتبطة</h5>
+          <div class="table-responsive">
+            <table class="table table-bordered table-sm">
+              <thead>
+                <tr>
+                  <th>رقم الفاتورة</th>
+                  <th>العميل</th>
+                  <th>المبلغ</th>
+                  <th>تاريخ الإصدار</th>
+                  <th>إجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for fin_inv in linked_finance_invoices %}
+                <tr>
+                  <td>{{ fin_inv.invoice_number or ('INV-CUST-' ~ fin_inv.id) }}</td>
+                  <td>{{ fin_inv.customer_name }}</td>
+                  <td>{{ '%.2f'|format(fin_inv.amount) }}</td>
+                  <td>{{ fin_inv.issued_at.strftime('%Y-%m-%d') if fin_inv.issued_at else '-' }}</td>
+                  <td>
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('print_customer_invoice_html', invoice_id=fin_inv.id) }}" target="_blank">عرض</a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>
