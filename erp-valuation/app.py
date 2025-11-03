@@ -3211,13 +3211,21 @@ def finance_dashboard():
 
     user = User.query.get(session["user_id"])
 
-    # ✅ المعاملات الخاصة بالفرع
-    transactions = Transaction.query.filter_by(branch_id=user.branch_id).all()
+    # ✅ المالية مسؤولة عن جميع الأقسام - عرض جميع المعاملات من جميع الفروع
+    transactions = Transaction.query.all()
 
-    # ✅ إضافة مصروف خاص بالفرع
+    # ✅ إضافة مصروف - المالية يمكنها إضافة مصروف لأي فرع
     if request.method == "POST" and "expense_name" in request.form:
         expense_name = request.form["expense_name"]
         amount = float(request.form.get("amount") or 0)
+        branch_id = request.form.get("branch_id")
+        if branch_id:
+            try:
+                branch_id = int(branch_id)
+            except:
+                branch_id = user.branch_id if user else None
+        else:
+            branch_id = user.branch_id if user else None
         file = request.files.get("file")
         filename = None
         if file and file.filename:
@@ -3227,35 +3235,28 @@ def finance_dashboard():
             description=expense_name,
             amount=amount,
             file=filename,
-            branch_id=user.branch_id
+            branch_id=branch_id
         )
         db.session.add(e)
         db.session.commit()
         flash("✅ تم تسجيل المصروف", "success")
         return redirect(url_for("finance_dashboard"))
 
-    # ✅ فقط المعاملات غير المدفوعة لهذا الفرع
+    # ✅ جميع المعاملات غير المدفوعة من جميع الفروع
     unpaid_transactions = Transaction.query.filter_by(
-        payment_status="غير مدفوعة",
-        branch_id=user.branch_id
+        payment_status="غير مدفوعة"
     ).all()
 
-    # ✅ المدفوعات الخاصة بهذا الفرع (سواء مرتبطة بمعاملة الفرع أو غير مرتبطة ولكن منسوبة للفرع)
-    paid_transactions = Payment.query.outerjoin(Transaction, Payment.transaction_id == Transaction.id) \
-        .filter(or_(Transaction.branch_id == user.branch_id, Payment.branch_id == user.branch_id)) \
-        .order_by(Payment.id.desc()).all()
+    # ✅ جميع المدفوعات من جميع الفروع
+    paid_transactions = Payment.query.order_by(Payment.id.desc()).all()
 
-    # ✅ مجموع الدخل للفرع فقط (يشمل المدفوعات غير المرتبطة بالمعاملات والمنسوبة للفرع)
-    total_income = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0)) \
-        .select_from(Payment) \
-        .outerjoin(Transaction, Payment.transaction_id == Transaction.id) \
-        .filter(or_(Transaction.branch_id == user.branch_id, Payment.branch_id == user.branch_id)).scalar() or 0.0
+    # ✅ مجموع الدخل الكلي من جميع الفروع
+    total_income = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0)).scalar() or 0.0
 
-    # ✅ مصاريف الفرع فقط
-    expenses = Expense.query.filter_by(branch_id=user.branch_id).order_by(Expense.id.desc()).all()
+    # ✅ جميع المصاريف من جميع الفروع
+    expenses = Expense.query.order_by(Expense.id.desc()).all()
 
-    total_expenses = db.session.query(func.coalesce(func.sum(Expense.amount), 0.0))\
-        .filter(Expense.branch_id == user.branch_id).scalar() or 0.0
+    total_expenses = db.session.query(func.coalesce(func.sum(Expense.amount), 0.0)).scalar() or 0.0
 
     net_profit = total_income - total_expenses
 
@@ -3274,6 +3275,9 @@ def finance_dashboard():
         .order_by(CustomerQuote.id.desc()).limit(20).all()
     recent_customer_invoices = CustomerInvoice.query.order_by(CustomerInvoice.id.desc()).limit(20).all()
 
+    # ✅ إحضار قائمة الفروع لعرضها في الواجهة (للفلترة أو الاختيار عند إضافة مصروف)
+    branches = Branch.query.order_by(Branch.name.asc()).all()
+
     return render_template(
         "finance.html",
         transactions=unpaid_transactions,
@@ -3286,7 +3290,8 @@ def finance_dashboard():
         recent_bank_invoices=recent_bank_invoices,
         recent_customer_quotes=recent_customer_quotes,
         recent_customer_invoices=recent_customer_invoices,
-        vat_default_percent=int(_get_vat_rate() * 100)
+        vat_default_percent=int(_get_vat_rate() * 100),
+        branches=branches
     )
 
 # ---------------- صفحة المعاملات المدفوعة (مالية) ----------------
@@ -3297,17 +3302,13 @@ def finance_paid():
 
     user = User.query.get(session["user_id"])
 
-    # معاملات هذا الفرع التي لديها مدفوعات + الدفعات المنسوبة للفرع بدون معاملة
-    payments = Payment.query.outerjoin(Transaction, Payment.transaction_id == Transaction.id) \
-        .filter(or_(Transaction.branch_id == user.branch_id, Payment.branch_id == user.branch_id)) \
-        .order_by(Payment.id.desc()).all()
+    # ✅ المالية مسؤولة عن جميع الأقسام - عرض جميع المدفوعات من جميع الفروع
+    payments = Payment.query.order_by(Payment.id.desc()).all()
 
-    total_income = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0)) \
-        .select_from(Payment) \
-        .outerjoin(Transaction, Payment.transaction_id == Transaction.id) \
-        .filter(or_(Transaction.branch_id == user.branch_id, Payment.branch_id == user.branch_id)).scalar() or 0.0
+    # ✅ مجموع الدخل الكلي من جميع الفروع
+    total_income = db.session.query(func.coalesce(func.sum(Payment.amount), 0.0)).scalar() or 0.0
 
-    # فواتير البنك التي تم استلام مبلغها
+    # ✅ جميع فواتير البنك التي تم استلام مبلغها
     received_bank_invoices = BankInvoice.query \
         .filter(BankInvoice.received_at != None) \
         .order_by(BankInvoice.received_at.desc()).all()
@@ -4298,10 +4299,9 @@ def finance_create_customer_invoice():
         resolved_transaction_id = None
     if not resolved_transaction_id and customer_name:
         try:
-            # أحدث معاملة غير مدفوعة بنفس اسم العميل وضمن نفس فرع المستخدم المالي
+            # ✅ المالية مسؤولة عن جميع الأقسام - البحث في جميع الفروع
+            # أحدث معاملة غير مدفوعة بنفس اسم العميل من جميع الفروع
             tx_query = Transaction.query.filter_by(client=customer_name, payment_status="غير مدفوعة")
-            if user and getattr(user, "branch_id", None) is not None:
-                tx_query = tx_query.filter(Transaction.branch_id == user.branch_id)
             candidate_tx = tx_query.order_by(Transaction.id.desc()).first()
             if candidate_tx:
                 resolved_transaction_id = candidate_tx.id
