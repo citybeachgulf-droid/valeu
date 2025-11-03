@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+body { direction: rtl; text-align: right; font-family: 'Tajawal', sans-serif; }
+.container { max-width: 1200px; padding: 2rem 1rem; }
+.card, .btn, .form-control, .form-select, .alert { border-radius: 12px !important; }
+h3 { font-weight: 600; color: #4a148c; }
+.section-title { font-size: 1.1rem; font-weight: 600; color: #6f42c1; margin-top: 1rem; margin-bottom: .75rem; padding-bottom: .25rem; border-bottom: 2px solid #e9ecef; }
+.btn-primary { background-color: #6f42c1; border: none; }
+.btn-primary:hover { background-color: #5a32a3; }
+.small-note { font-size: .9rem; }
+.hidden { display: none; }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600&display=swap" rel="stylesheet">
+
+<div class="container">
+  <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+    <div>
+      <h3 class="mb-1">????? ????/?????</h3>
+      <p class="text-muted small mb-0">???? ????? ?? ???? ?????? ????????. <strong>?????? ????? ??????</strong>.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.list_staff') }}">???????? ??????????</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.dashboard') }}">???? HR</a>
+    </div>
+  </div>
+
+  <form method="post" class="row g-3" novalidate>
+    <div class="col-12">
+      <label class="form-label">?????</label>
+      <div class="d-flex gap-3">
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="role_type" id="rt_employee" value="employee" {% if form_values.role_type != 'engineer' %}checked{% endif %}>
+          <label class="form-check-label" for="rt_employee">????</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="role_type" id="rt_engineer" value="engineer" {% if form_values.role_type == 'engineer' %}checked{% endif %}>
+          <label class="form-check-label" for="rt_engineer">?????</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label">????? <span class="text-danger">*</span></label>
+      <select class="form-select {% if form_errors.get('department_id') %}is-invalid{% endif %}" name="department_id" required>
+        <option value="">-- ???? ????? --</option>
+        {% for dept in departments %}
+        <option value="{{ dept.id }}" {% if form_values.department_id|string == dept.id|string %}selected{% endif %}>{{ dept.name }}</option>
+        {% endfor %}
+      </select>
+      {% if form_errors.get('department_id') %}<div class="invalid-feedback d-block">{{ form_errors.get('department_id') }}</div>{% endif %}
+    </div>
+
+    <!-- Employee fields -->
+    <div id="employee_fields" class="row g-3 {{ 'hidden' if form_values.role_type == 'engineer' }}">
+      <div class="col-12"><h6 class="section-title">?????? ??????</h6></div>
+      <div class="col-md-3">
+        <label class="form-label">????? ????? <span class="text-danger">*</span></label>
+        <input type="text" class="form-control {% if form_errors.get('first_name') %}is-invalid{% endif %}" name="first_name" value="{{ form_values.first_name }}">
+        {% if form_errors.get('first_name') %}<div class="invalid-feedback d-block">{{ form_errors.get('first_name') }}</div>{% endif %}
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">??? ??????? <span class="text-danger">*</span></label>
+        <input type="text" class="form-control {% if form_errors.get('last_name') %}is-invalid{% endif %}" name="last_name" value="{{ form_values.last_name }}">
+        {% if form_errors.get('last_name') %}<div class="invalid-feedback d-block">{{ form_errors.get('last_name') }}</div>{% endif %}
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">?????? ??????????</label>
+        <input type="email" class="form-control {% if form_errors.get('email') %}is-invalid{% endif %}" name="email" value="{{ form_values.email }}">
+        {% if form_errors.get('email') %}<div class="invalid-feedback d-block">{{ form_errors.get('email') }}</div>{% endif %}
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">??????</label>
+        <input type="text" class="form-control" name="phone" value="{{ form_values.phone }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">??? ???????</label>
+        <select class="form-select" name="employment_type">
+          <option value="">-- ???? --</option>
+          {% for t in EMPLOYMENT_TYPES %}
+          <option value="{{ t }}" {% if form_values.employment_type == t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">?????? ???????</label>
+        <input type="text" class="form-control" name="job_title" value="{{ form_values.job_title }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">????? ????????</label>
+        <input type="date" class="form-control" name="join_date" value="{{ form_values.join_date }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">??????</label>
+        <select class="form-select" name="status">
+          {% for st in EMPLOYEE_STATUSES %}
+          <option value="{{ st }}" {% if form_values.status == st %}selected{% endif %}>{{ st }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Engineer fields -->
+    <div id="engineer_fields" class="row g-3 {{ '' if form_values.role_type == 'engineer' else 'hidden' }}">
+      <div class="col-12"><h6 class="section-title">?????? ???????</h6></div>
+      <div class="col-md-5">
+        <label class="form-label">????? ?????? <span class="text-danger">*</span></label>
+        <input type="text" class="form-control {% if form_errors.get('name') %}is-invalid{% endif %}" name="name" value="{{ form_values.name }}">
+        {% if form_errors.get('name') %}<div class="invalid-feedback d-block">{{ form_errors.get('name') }}</div>{% endif %}
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">?????? <span class="text-danger">*</span></label>
+        <select class="form-select {% if form_errors.get('specialty') %}is-invalid{% endif %}" name="specialty">
+          <option value="">-- ???? ?????? --</option>
+          {% for sp in ENGINEER_SPECIALTIES %}
+          <option value="{{ sp }}" {% if form_values.specialty == sp %}selected{% endif %}>{{ sp }}</option>
+          {% endfor %}
+        </select>
+        {% if form_errors.get('specialty') %}<div class="invalid-feedback d-block">{{ form_errors.get('specialty') }}</div>{% endif %}
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">??????</label>
+        <select class="form-select" name="status">
+          {% for st in ENGINEER_STATUSES %}
+          <option value="{{ st }}" {% if form_values.status == st %}selected{% endif %}>{{ st }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">??????</label>
+        <input type="text" class="form-control" name="phone" value="{{ form_values.phone }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">?????? ??????????</label>
+        <input type="email" class="form-control {% if form_errors.get('email') %}is-invalid{% endif %}" name="email" value="{{ form_values.email }}">
+        {% if form_errors.get('email') %}<div class="invalid-feedback d-block">{{ form_errors.get('email') }}</div>{% endif %}
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">????? ????????</label>
+        <input type="date" class="form-control {% if form_errors.get('join_date') %}is-invalid{% endif %}" name="join_date" value="{{ form_values.join_date }}">
+        {% if form_errors.get('join_date') %}<div class="invalid-feedback d-block">{{ form_errors.get('join_date') }}</div>{% endif %}
+      </div>
+    </div>
+
+    <div class="col-12 small-note">
+      <div class="alert alert-light border small mb-0">
+        <strong>?????:</strong> ???? ????? ???? ?????? ????? ????? ???????? ??? ?????.
+      </div>
+    </div>
+
+    <div class="col-12 d-flex justify-content-between align-items-center mt-2">
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.list_staff') }}">????</a>
+      <button class="btn btn-primary" type="submit">???</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function(){
+  const rtEmployee = document.getElementById('rt_employee');
+  const rtEngineer = document.getElementById('rt_engineer');
+  const emp = document.getElementById('employee_fields');
+  const eng = document.getElementById('engineer_fields');
+  function sync(){
+    if (rtEngineer.checked){
+      eng.classList.remove('hidden');
+      emp.classList.add('hidden');
+    } else {
+      emp.classList.remove('hidden');
+      eng.classList.add('hidden');
+    }
+  }
+  if (rtEmployee && rtEngineer){
+    rtEmployee.addEventListener('change', sync);
+    rtEngineer.addEventListener('change', sync);
+    sync();
+  }
+})();
+</script>
+{% endblock %}

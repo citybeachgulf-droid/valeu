@@ -881,3 +881,122 @@ def dashboard():
         ENGINEER_STATUSES=ENGINEER_STATUSES,
         title="لوحة تحكم الموارد البشرية الشاملة",
     )
+
+
+# ========== Unified Staff Creation (Employee or Engineer) ==========
+
+@hr_bp.route("/staff/new", methods=["GET", "POST"])
+def create_staff():
+    """نموذج موحد لإضافة موظف أو مهندس مع إلزام اختيار القسم."""
+    maybe_redirect = _require_roles(["manager", "hr", "hr_manager", "employee"])
+    if maybe_redirect:
+        return maybe_redirect
+
+    form_errors: Dict[str, str] = {}
+    form_values: Dict[str, str] = {
+        "role_type": (request.args.get("role_type") or "employee").strip(),
+        # Employee fields
+        "first_name": "",
+        "last_name": "",
+        "email": "",
+        "phone": "",
+        "mobile": "",
+        "employment_type": "",
+        "position": "",
+        "job_title": "",
+        "join_date": "",
+        "status": "نشط",
+        # Engineer fields
+        "name": "",
+        "specialty": ENGINEER_SPECIALTIES[0] if ENGINEER_SPECIALTIES else "",
+        # Shared
+        "department_id": "",
+    }
+
+    if request.method == "POST":
+        # Preserve incoming values for re-render
+        for key in form_values.keys():
+            form_values[key] = (request.form.get(key) or "").strip()
+
+        role_type = (request.form.get("role_type") or "employee").strip()
+        dept_raw = (request.form.get("department_id") or "").strip()
+        if not dept_raw:
+            form_errors["department_id"] = "يجب اختيار القسم"
+
+        if role_type == "engineer":
+            data, eng_errors = validate_engineer_form(request.form)
+            form_errors.update(eng_errors)
+            # Ensure department required
+            if not data.get("department_id"):
+                form_errors["department_id"] = "يجب اختيار القسم"
+
+            if form_errors:
+                for _, msg in form_errors.items():
+                    flash(f"❌ {msg}", "error")
+            else:
+                engineer = Engineer(
+                    name=data["name"],
+                    specialty=data["specialty"],
+                    phone=data.get("phone"),
+                    email=data.get("email"),
+                    join_date=data.get("join_date"),
+                    status=data.get("status") or "نشط",
+                    department_id=data.get("department_id"),
+                )
+                db.session.add(engineer)
+                db.session.flush()
+
+                username, raw_password = _create_limited_user(engineer.email or engineer.phone, role="engineer")
+                db.session.commit()
+                flash(
+                    f"✅ تم إضافة المهندس بنجاح. تم إنشاء مستخدم: {username} بكلمة مرور مؤقتة.",
+                    "success",
+                )
+                return redirect(url_for("consulting_hr.engineer_detail", engineer_id=engineer.id))
+
+        else:  # employee
+            data, emp_errors = validate_employee_form(request.form)
+            form_errors.update(emp_errors)
+            # Ensure department required
+            if not data.get("department_id"):
+                form_errors["department_id"] = "يجب اختيار القسم"
+
+            if form_errors:
+                for _, msg in form_errors.items():
+                    flash(f"❌ {msg}", "error")
+            else:
+                employee = Employee(**data)
+                db.session.add(employee)
+                db.session.flush()
+
+                username, raw_password = _create_limited_user(employee.email or employee.phone, role="employee")
+                db.session.commit()
+                flash(
+                    f"✅ تم إضافة الموظف بنجاح. تم إنشاء مستخدم: {username} بكلمة مرور مؤقتة.",
+                    "success",
+                )
+                return redirect(url_for("consulting_hr.employee_detail", employee_id=employee.id))
+
+    departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
+    return render_template(
+        "hr/staff_form.html",
+        form_values=form_values,
+        form_errors=form_errors,
+        departments=departments,
+        ENGINEER_SPECIALTIES=ENGINEER_SPECIALTIES,
+        EMPLOYMENT_TYPES=EMPLOYMENT_TYPES,
+        EMPLOYEE_STATUSES=EMPLOYEE_STATUSES,
+        ENGINEER_STATUSES=ENGINEER_STATUSES,
+        title="إضافة موظف/مهندس",
+    )
+
+
+# Redirect legacy create routes to the unified form
+@hr_bp.route("/employees/new", methods=["GET", "POST"])
+def create_employee():
+    return redirect(url_for("consulting_hr.create_staff", role_type="employee"))
+
+
+@hr_bp.route("/engineers/new", methods=["GET", "POST"])
+def create_engineer():
+    return redirect(url_for("consulting_hr.create_staff", role_type="engineer"))
