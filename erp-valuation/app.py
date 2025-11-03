@@ -516,6 +516,7 @@ class Branch(db.Model):
 
 class BranchSection(db.Model):
     __tablename__ = "branch_section"
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=False, index=True)
     name = db.Column(db.String(50), nullable=False)  # valuation | consultations
@@ -524,6 +525,7 @@ class BranchSection(db.Model):
 
 class Bank(db.Model):
     __tablename__ = "bank"
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
 
@@ -532,6 +534,7 @@ class Bank(db.Model):
 
 class User(db.Model):
     __tablename__ = "user"
+    __table_args__ = {"extend_existing": True}
     id       = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
@@ -544,6 +547,7 @@ class User(db.Model):
 
 class Transaction(db.Model):
     __tablename__ = "transaction"
+    __table_args__ = {"extend_existing": True}
     id              = db.Column(db.Integer, primary_key=True)
     client          = db.Column(db.String(100))
     employee        = db.Column(db.String(50))
@@ -603,6 +607,7 @@ class Transaction(db.Model):
 
 
 class NotificationSubscription(db.Model):
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     subscription_json = db.Column(db.Text, nullable=False)
@@ -611,6 +616,7 @@ class NotificationSubscription(db.Model):
 
 
 class LandPrice(db.Model):
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     state = db.Column(db.String(120))      # الولاية
     region = db.Column(db.String(120))     # المنطقة
@@ -620,6 +626,7 @@ class LandPrice(db.Model):
 
 class Payment(db.Model):
     __tablename__ = "payment"
+    __table_args__ = {"extend_existing": True}
     id             = db.Column(db.Integer, primary_key=True)
     transaction_id = db.Column(db.Integer, db.ForeignKey('transaction.id'))
     amount         = db.Column(db.Float, default=0)
@@ -632,6 +639,7 @@ class Payment(db.Model):
 
 class ReportTemplate(db.Model):
     __tablename__ = "report_template"
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     template_type = db.Column(db.String(50), nullable=False)  # real_estate / vehicle
     content = db.Column(db.Text, nullable=True)
@@ -642,6 +650,7 @@ class ReportTemplate(db.Model):
 # تسلسل رقمي عام للفواتير بحسب السنة
 class InvoiceSequence(db.Model):
     __tablename__ = "invoice_sequence"
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     year = db.Column(db.Integer, unique=True, nullable=False)
     last_number = db.Column(db.Integer, nullable=False, default=0)
@@ -649,6 +658,7 @@ class InvoiceSequence(db.Model):
 # فواتير البنك بمراحلها
 class BankInvoice(db.Model):
     __tablename__ = "bank_invoice"
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     bank_id = db.Column(db.Integer, db.ForeignKey("bank.id"), nullable=False)
     transaction_id = db.Column(db.Integer, db.ForeignKey("transaction.id"), nullable=True)
@@ -662,6 +672,7 @@ class BankInvoice(db.Model):
 
 class Quote(db.Model):
     __tablename__ = "quote"
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     bank_id = db.Column(db.Integer, db.ForeignKey("bank.id"), nullable=False)
     transaction_id = db.Column(db.Integer, db.ForeignKey("transaction.id"), nullable=True)
@@ -673,6 +684,7 @@ class Quote(db.Model):
 
 class CustomerInvoice(db.Model):
     __tablename__ = "customer_invoice"
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     customer_name = db.Column(db.String(150), nullable=False)
     amount = db.Column(db.Float, default=0)
@@ -687,6 +699,7 @@ class CustomerInvoice(db.Model):
 
 class CustomerQuote(db.Model):
     __tablename__ = "customer_quote"
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     customer_name = db.Column(db.String(150), nullable=False)
     amount = db.Column(db.Float, default=0)
@@ -732,6 +745,7 @@ def auto_purge_expired_quotes():
         last_quotes_purge_at = now_utc
 
 class ValuationMemory(db.Model):
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     state = db.Column(db.String(100), nullable=False)   # الولاية
     region = db.Column(db.String(100), nullable=False)  # المنطقة
@@ -741,6 +755,7 @@ class ValuationMemory(db.Model):
 
 class Expense(db.Model):
     __tablename__ = "expense"
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     description = db.Column(db.String(200))
     amount = db.Column(db.Float, nullable=False)
@@ -751,6 +766,7 @@ class Expense(db.Model):
 
 class BranchDocument(db.Model):
     __tablename__ = "branch_document"
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=False)
     title = db.Column(db.String(200), nullable=False)
@@ -767,6 +783,7 @@ class BranchDocument(db.Model):
 # ✅ مستندات عامة مرسلة إلى البنوك (غير مرتبطة بمعاملة)
 class BankDocument(db.Model):
     __tablename__ = "bank_document"
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     bank_id = db.Column(db.Integer, db.ForeignKey("bank.id"), nullable=False)
     title = db.Column(db.String(200), nullable=False)
@@ -783,6 +800,7 @@ class BankDocument(db.Model):
 # ✅ جدول بسيط لحفظ العملاء (اسم ورقم)
 class Customer(db.Model):
     __tablename__ = "customer"
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), nullable=False)
     phone = db.Column(db.String(50), nullable=False)
@@ -790,6 +808,7 @@ class Customer(db.Model):
 # ✅ حفظ ملفات قوالب الوورد للفواتير وعروض الأسعار
 class TemplateDoc(db.Model):
     __tablename__ = "template_doc"
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     doc_type = db.Column(db.String(50), nullable=False)  # invoice | quote
     filename = db.Column(db.String(255), nullable=False)  # اسم الملف داخل uploads
@@ -816,6 +835,7 @@ CONSULTATION_TYPES = [
 
 class Project(db.Model):
     __tablename__ = "project"
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False, unique=True)
     description = db.Column(db.Text, nullable=True)
@@ -828,6 +848,7 @@ class Project(db.Model):
 
 class Consultation(db.Model):
     __tablename__ = "consultation"
+    __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(
         db.Integer,
