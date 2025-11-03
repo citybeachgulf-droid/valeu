@@ -17,7 +17,7 @@ from sqlalchemy import or_, func
 
 from extensions import db
 from consulting.projects.models import ConsultingProject
-from .models import Engineer, Task
+from .models import Engineer, Task, Department
 from .forms import (
     ENGINEER_SPECIALTIES,
     ENGINEER_STATUSES,
@@ -112,6 +112,7 @@ def create_engineer():
         "email": "",
         "join_date": "",
         "status": "نشط",
+        "department_id": "",
     }
     form_errors: Dict[str, str] = {}
 
@@ -131,6 +132,7 @@ def create_engineer():
                 email=data["email"],
                 join_date=data["join_date"],
                 status=data["status"] or "نشط",
+                department_id=data.get("department_id"),
             )
             db.session.add(engineer)
             db.session.commit()
@@ -138,6 +140,8 @@ def create_engineer():
             flash("✅ تم إضافة المهندس بنجاح", "success")
             return redirect(url_for("consulting_hr.engineer_detail", engineer_id=engineer.id))
 
+    departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
+    
     return render_template(
         "hr/engineer_form.html",
         mode="create",
@@ -146,6 +150,7 @@ def create_engineer():
         form_errors=form_errors,
         ENGINEER_SPECIALTIES=ENGINEER_SPECIALTIES,
         ENGINEER_STATUSES=ENGINEER_STATUSES,
+        departments=departments,
         title="إضافة مهندس جديد",
     )
 
@@ -165,6 +170,7 @@ def edit_engineer(engineer_id: int):
         "email": engineer.email or "",
         "join_date": engineer.join_date.strftime("%Y-%m-%d") if engineer.join_date else "",
         "status": engineer.status or "نشط",
+        "department_id": str(engineer.department_id) if engineer.department_id else "",
     }
     form_errors: Dict[str, str] = {}
 
@@ -184,12 +190,15 @@ def edit_engineer(engineer_id: int):
             engineer.join_date = data["join_date"]
             if data["status"]:
                 engineer.status = data["status"]
+            engineer.department_id = data.get("department_id")
 
             db.session.commit()
 
             flash("✅ تم تحديث بيانات المهندس", "success")
             return redirect(url_for("consulting_hr.engineer_detail", engineer_id=engineer.id))
 
+    departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
+    
     return render_template(
         "hr/engineer_form.html",
         mode="edit",
@@ -198,6 +207,7 @@ def edit_engineer(engineer_id: int):
         form_errors=form_errors,
         ENGINEER_SPECIALTIES=ENGINEER_SPECIALTIES,
         ENGINEER_STATUSES=ENGINEER_STATUSES,
+        departments=departments,
         title=f"تعديل بيانات المهندس - {engineer.name}",
     )
 
@@ -330,6 +340,92 @@ from .forms import (
 )
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+
+
+@hr_bp.route("/staff")
+def list_staff():
+    """قائمة موحدة للموظفين والمهندسين - كل فرع يظهر موظفيه لوحده"""
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "hr", "hr_manager"])
+    if maybe_redirect:
+        return maybe_redirect
+    
+    q = (request.args.get("q") or "").strip()
+    department_id = request.args.get("department_id", type=int)
+    employee_status = (request.args.get("employee_status") or "").strip()
+    engineer_status = (request.args.get("engineer_status") or "").strip()
+    page = max(int(request.args.get("page", 1) or 1), 1)
+    per_page = min(max(int(request.args.get("per_page", 30) or 30), 1), 100)
+    
+    # جلب الموظفين
+    employee_query = Employee.query
+    if q:
+        like = f"%{q}%"
+        employee_query = employee_query.filter(or_(
+            Employee.first_name.ilike(like),
+            Employee.last_name.ilike(like),
+            Employee.employee_number.ilike(like),
+            Employee.email.ilike(like),
+            Employee.phone.ilike(like)
+        ))
+    if department_id:
+        employee_query = employee_query.filter(Employee.department_id == department_id)
+    if employee_status:
+        employee_query = employee_query.filter(Employee.status == employee_status)
+    employees = employee_query.order_by(Employee.id.desc()).all()
+    
+    # جلب المهندسين
+    engineer_query = Engineer.query
+    if q:
+        like = f"%{q}%"
+        engineer_query = engineer_query.filter(or_(
+            Engineer.name.ilike(like),
+            Engineer.phone.ilike(like),
+            Engineer.email.ilike(like)
+        ))
+    if department_id:
+        engineer_query = engineer_query.filter(Engineer.department_id == department_id)
+    if engineer_status:
+        engineer_query = engineer_query.filter(Engineer.status == engineer_status)
+    engineers = engineer_query.order_by(Engineer.id.desc()).all()
+    
+    # تجميع حسب الفرع
+    from collections import defaultdict
+    staff_by_department = defaultdict(lambda: {"employees": [], "engineers": []})
+    
+    for emp in employees:
+        dept_key = emp.department.name if emp.department else "بدون فرع"
+        staff_by_department[dept_key]["employees"].append(emp)
+    
+    for eng in engineers:
+        dept_key = eng.department.name if eng.department else "بدون فرع"
+        staff_by_department[dept_key]["engineers"].append(eng)
+    
+    # بناء إحصائيات المهام للمهندسين
+    overdue_counts: Dict[int, int] = {}
+    open_counts: Dict[int, int] = {}
+    for eng in engineers:
+        overdue_counts[eng.id] = sum(1 for t in eng.tasks if t.is_overdue())
+        open_counts[eng.id] = sum(1 for t in eng.tasks if t.status != "مكتملة")
+    
+    departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
+    can_manage = session.get("role") in {"manager", "hr", "hr_manager"}
+    
+    return render_template(
+        "hr/staff.html",
+        staff_by_department=dict(staff_by_department),
+        q=q,
+        current_department_id=department_id,
+        current_employee_status=employee_status,
+        current_engineer_status=engineer_status,
+        departments=departments,
+        EMPLOYEE_STATUSES=EMPLOYEE_STATUSES,
+        ENGINEER_STATUSES=ENGINEER_STATUSES,
+        ENGINEER_SPECIALTIES=ENGINEER_SPECIALTIES,
+        overdue_counts=overdue_counts,
+        open_counts=open_counts,
+        can_manage=can_manage,
+        title="الموظفين والمهندسين",
+    )
 
 
 @hr_bp.route("/employees")

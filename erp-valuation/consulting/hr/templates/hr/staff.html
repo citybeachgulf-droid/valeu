@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+    <div>
+      <h3 class="mb-1">???????? ??????????</h3>
+      <p class="text-muted small mb-0">??? ???? ???????? ?????????? ??? ?????</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.dashboard') }}">???? HR</a>
+      {% if can_manage %}
+      <a class="btn btn-primary" href="{{ url_for('consulting_hr.create_employee') }}">? ????? ????</a>
+      <a class="btn btn-primary" href="{{ url_for('consulting_hr.create_engineer') }}">? ????? ?????</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ????? ????? ???????? -->
+  <form class="row g-2 mb-3" method="get">
+    <div class="col-md-3">
+      <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="??? ?????? ?? ??? ?????? ?? ??????">
+    </div>
+    <div class="col-md-2">
+      <select class="form-select" name="department_id">
+        <option value="">?? ??????</option>
+        {% for dept in departments %}
+        <option value="{{ dept.id }}" {% if current_department_id == dept.id %}selected{% endif %}>{{ dept.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select class="form-select" name="employee_status">
+        <option value="">?? ????? ????????</option>
+        {% for st in EMPLOYEE_STATUSES %}
+        <option value="{{ st }}" {% if current_employee_status == st %}selected{% endif %}>{{ st }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select class="form-select" name="engineer_status">
+        <option value="">?? ????? ?????????</option>
+        {% for st in ENGINEER_STATUSES %}
+        <option value="{{ st }}" {% if current_engineer_status == st %}selected{% endif %}>{{ st }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3 d-grid">
+      <button class="btn btn-primary" type="submit">???</button>
+      <a href="{{ url_for('consulting_hr.list_staff') }}" class="btn btn-outline-secondary btn-sm mt-1">????? ?????</a>
+    </div>
+  </form>
+
+  <!-- ??? ???????? ?????????? ??? ????? -->
+  {% if staff_by_department %}
+    {% for dept_name, staff_data in staff_by_department.items() %}
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">
+          <i class="fas fa-building me-2"></i>{{ dept_name }}
+          <span class="badge bg-light text-dark ms-2">
+            {{ staff_data.employees|length }} ????{% if staff_data.employees|length != 1 %}??{% endif %}
+            {% if staff_data.engineers|length > 0 %}
+              ? {{ staff_data.engineers|length }} ?????{% if staff_data.engineers|length != 1 %}??{% endif %}
+            {% endif %}
+          </span>
+        </h5>
+      </div>
+      <div class="card-body">
+        <!-- ???????? -->
+        {% if staff_data.employees %}
+        <div class="mb-4">
+          <h6 class="text-muted mb-3">
+            <i class="fas fa-users me-2"></i>???????? ({{ staff_data.employees|length }})
+          </h6>
+          <div class="table-responsive">
+            <table class="table table-striped align-middle table-sm">
+              <thead class="table-light">
+                <tr>
+                  <th>??? ??????</th>
+                  <th>?????</th>
+                  <th>???????</th>
+                  <th>??????</th>
+                  <th>??????</th>
+                  <th>????? ????????</th>
+                  <th>??????</th>
+                  <th>???????</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for emp in staff_data.employees %}
+                <tr>
+                  <td>{{ emp.employee_number or '-' }}</td>
+                  <td><strong>{{ emp.full_name }}</strong></td>
+                  <td>{{ emp.job_title or emp.position or '-' }}</td>
+                  <td>{{ emp.email or '-' }}</td>
+                  <td>{{ emp.phone or emp.mobile or '-' }}</td>
+                  <td>{% if emp.join_date %}{{ emp.join_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</td>
+                  <td>
+                    <span class="badge {% if emp.status == '???' %}bg-success{% elif emp.status == '?????' %}bg-warning{% else %}bg-secondary{% endif %}">
+                      {{ emp.status }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="d-flex gap-1">
+                      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_hr.employee_detail', employee_id=emp.id) }}">???</a>
+                      {% if can_manage %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('consulting_hr.edit_employee', employee_id=emp.id) }}">?????</a>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- ????????? -->
+        {% if staff_data.engineers %}
+        <div>
+          <h6 class="text-muted mb-3">
+            <i class="fas fa-hard-hat me-2"></i>????????? ({{ staff_data.engineers|length }})
+          </h6>
+          <div class="table-responsive">
+            <table class="table table-striped align-middle table-sm">
+              <thead class="table-light">
+                <tr>
+                  <th>?????</th>
+                  <th>??????</th>
+                  <th>??????</th>
+                  <th>??????</th>
+                  <th>????? ????????</th>
+                  <th>??????</th>
+                  <th>???? ??????</th>
+                  <th>??????</th>
+                  <th>???????</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for eng in staff_data.engineers %}
+                <tr>
+                  <td><strong>{{ eng.name }}</strong></td>
+                  <td>{{ eng.specialty }}</td>
+                  <td>{{ eng.phone or '-' }}</td>
+                  <td>{{ eng.email or '-' }}</td>
+                  <td>{% if eng.join_date %}{{ eng.join_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</td>
+                  <td>
+                    <span class="badge {% if eng.status=='???' %}bg-success{% else %}bg-secondary{% endif %}">{{ eng.status }}</span>
+                  </td>
+                  <td>{{ open_counts.get(eng.id, 0) }}</td>
+                  <td>
+                    {% set oc = overdue_counts.get(eng.id, 0) %}
+                    <span class="badge {{ 'bg-danger' if oc>0 else 'bg-success' }}">{{ oc }}</span>
+                  </td>
+                  <td>
+                    <div class="d-flex gap-1">
+                      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_hr.engineer_detail', engineer_id=eng.id) }}">???</a>
+                      {% if can_manage %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('consulting_hr.edit_engineer', engineer_id=eng.id) }}">?????</a>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- ????? ??? ?? ??? ???? ?????? ?? ??????? ?? ??? ????? -->
+        {% if not staff_data.employees and not staff_data.engineers %}
+        <div class="text-center text-muted py-4">
+          ?? ???? ?????? ?? ??????? ?? ??? ????? ??????.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="alert alert-info text-center">
+      <i class="fas fa-info-circle me-2"></i>
+      ?? ???? ?????? ?? ??????? ??????? ???????? ???????.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+{% endblock %}

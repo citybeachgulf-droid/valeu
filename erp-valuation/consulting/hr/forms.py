@@ -250,6 +250,7 @@ def validate_engineer_form(form: Dict[str, str], *, for_update: bool = False) ->
     email = _normalize_str(form.get("email"))
     join_date_raw = _normalize_str(form.get("join_date"))
     status_input = _normalize_str(form.get("status"))
+    department_id_raw = _normalize_str(form.get("department_id"))
 
     if not name:
         errors["name"] = "الاسم مطلوب"
@@ -276,6 +277,13 @@ def validate_engineer_form(form: Dict[str, str], *, for_update: bool = False) ->
     else:
         status = None if for_update else "نشط"
 
+    department_id = None
+    if department_id_raw:
+        try:
+            department_id = int(department_id_raw)
+        except (ValueError, TypeError):
+            errors["department_id"] = "معرف القسم غير صالح"
+
     data = {
         "name": name,
         "specialty": specialty,
@@ -283,6 +291,7 @@ def validate_engineer_form(form: Dict[str, str], *, for_update: bool = False) ->
         "email": email or None,
         "join_date": join_date,
         "status": status,
+        "department_id": department_id,
     }
 
     return data, errors
