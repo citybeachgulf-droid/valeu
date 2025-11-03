@@ -138,6 +138,18 @@ class Employee(db.Model):
     # معلومات إضافية
     notes = db.Column(db.Text, nullable=True)
     photo_path = db.Column(db.String(255), nullable=True)
+
+    # Invitation & credentials
+    invitation_token = db.Column(db.String(128), nullable=True, unique=True, index=True)
+    invitation_token_created_at = db.Column(db.DateTime, nullable=True)
+    invitation_expires_at = db.Column(db.DateTime, nullable=True)
+    invitation_used_at = db.Column(db.DateTime, nullable=True)
+
+    credential_username = db.Column(db.String(120), nullable=True, index=True)
+    credential_password_hash = db.Column(db.String(255), nullable=True)
+    credential_password_plain = db.Column(db.String(255), nullable=True)
+    credential_created_at = db.Column(db.DateTime, nullable=True)
+    credential_updated_at = db.Column(db.DateTime, nullable=True)
     
     # Audit
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -165,6 +177,23 @@ class Employee(db.Model):
 
     def __repr__(self) -> str:
         return f"<Employee {self.id} {self.full_name} ({self.employee_number})>"
+
+    def invitation_is_active(self) -> bool:
+        if not self.invitation_token:
+            return False
+        if self.invitation_used_at:
+            return False
+        if self.invitation_expires_at and self.invitation_expires_at < datetime.utcnow():
+            return False
+        return True
+
+    def active_invitation_token(self) -> str | None:
+        if self.invitation_is_active():
+            return self.invitation_token
+        return None
+
+    def has_credentials(self) -> bool:
+        return bool(self.credential_username and (self.credential_password_hash or self.credential_password_plain))
 
 
 # ==================== الحضور والرواتب (Attendance & Payroll) ====================
