@@ -1,4 +1,6 @@
 import os, sys, json, re
+# Ensure this module is registered as "app" even when executed as a script.
+sys.modules.setdefault("app", sys.modules[__name__])
 import hashlib
 import secrets
 from datetime import datetime, timedelta, date
