@@ -509,7 +509,7 @@ class Branch(db.Model):
     name = db.Column(db.String(100), nullable=False)
     # القسم/القطاع الخاص بالفرع (مثلاً: valuation | consultations | finance)
     department = db.Column(db.String(50), nullable=True)
-    users = db.relationship("User", backref="branch", lazy=True)
+    users = db.relationship("User", back_populates="branch", lazy=True)
     transactions = db.relationship("Transaction", backref="branch", lazy=True)
     # أقسام متعددة مرتبطة بالفرع (بدلاً من عمود واحد قديم department)
     sections = db.relationship("BranchSection", backref="branch", lazy=True, cascade="all, delete-orphan")
@@ -539,6 +539,8 @@ class User(db.Model):
     branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=True)
     # 🆕 ربط الموظف بقسم داخل الفرع (اختياري)
     section_id = db.Column(db.Integer, db.ForeignKey('branch_section.id'), nullable=True, index=True)
+    # علاقة صريحة مع الفرع لتفادي تعارض backref
+    branch = db.relationship("Branch", back_populates="users")
 
 class Transaction(db.Model):
     __tablename__ = "transaction"
