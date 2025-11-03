@@ -509,7 +509,7 @@ class Branch(db.Model):
     name = db.Column(db.String(100), nullable=False)
     # القسم/القطاع الخاص بالفرع (مثلاً: valuation | consultations | finance)
     department = db.Column(db.String(50), nullable=True)
-    users = db.relationship("User", back_populates="branch", lazy=True)
+    users = db.relationship("app.User", back_populates="branch", lazy=True)
     transactions = db.relationship("Transaction", backref="branch", lazy=True)
     # أقسام متعددة مرتبطة بالفرع (بدلاً من عمود واحد قديم department)
     sections = db.relationship("BranchSection", backref="branch", lazy=True, cascade="all, delete-orphan")
@@ -521,7 +521,7 @@ class BranchSection(db.Model):
     branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=False, index=True)
     name = db.Column(db.String(50), nullable=False)  # valuation | consultations
     # 🧑‍💼 المستخدمون المنتمون لهذا القسم
-    users = db.relationship("User", backref="section", lazy=True)
+    users = db.relationship("app.User", backref="section", lazy=True)
 
 class Bank(db.Model):
     __tablename__ = "bank"
@@ -879,8 +879,8 @@ class Consultation(db.Model):
         ConsultingProject, backref=db.backref("consultations", lazy=True)
     )
     client = db.relationship(Client, backref=db.backref("consultations", lazy=True))
-    creator = db.relationship("User", foreign_keys=[created_by])
-    consultant = db.relationship("User", foreign_keys=[consultant_id])
+    creator = db.relationship("app.User", foreign_keys=[created_by])
+    consultant = db.relationship("app.User", foreign_keys=[consultant_id])
 
 def replace_placeholders_in_docx(doc: Document, replacements: dict) -> None:
     # يدعم الاستبدال حتى لو وُجدت مسافات/علامات RTL داخل الأقواس
