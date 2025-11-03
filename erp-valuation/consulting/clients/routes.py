@@ -28,7 +28,7 @@ def _require_roles(allowed: List[str]) -> Optional[None]:
 # ---------- Pages ----------
 @clients_bp.route("/clients")
 def list_clients():
-    maybe_redirect = _require_roles(["manager", "employee", "finance"])  # consulting staff + finance
+    maybe_redirect = _require_roles(["manager", "employee", "finance", "hr"])  # consulting staff + finance + hr
     if maybe_redirect:
         return maybe_redirect
 
@@ -67,7 +67,7 @@ def list_clients():
 
 @clients_bp.route("/clients/<int:client_id>")
 def client_detail(client_id: int):
-    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance"])  # allow engineers and finance to view
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance", "hr"])  # allow engineers, finance, and hr to view
     if maybe_redirect:
         return maybe_redirect
 
@@ -88,7 +88,7 @@ def client_detail(client_id: int):
 
 @clients_bp.route("/clients/new", methods=["GET", "POST"])
 def create_client():
-    maybe_redirect = _require_roles(["manager", "employee", "finance"])  # create allowed for finance
+    maybe_redirect = _require_roles(["manager", "employee", "finance", "hr"])  # create allowed for finance and hr
     if maybe_redirect:
         return maybe_redirect
 
@@ -123,7 +123,7 @@ def create_client():
 
 @clients_bp.route("/clients/<int:client_id>/edit", methods=["GET", "POST"])
 def edit_client(client_id: int):
-    maybe_redirect = _require_roles(["manager", "employee", "finance"])  # edit allowed for finance
+    maybe_redirect = _require_roles(["manager", "employee", "finance", "hr"])  # edit allowed for finance and hr
     if maybe_redirect:
         return maybe_redirect
 
@@ -175,7 +175,7 @@ def edit_client(client_id: int):
 
 @clients_bp.route("/clients/<int:client_id>/delete", methods=["POST"])
 def delete_client(client_id: int):
-    maybe_redirect = _require_roles(["manager"])  # restrict delete to manager
+    maybe_redirect = _require_roles(["manager", "hr"])  # restrict delete to manager and hr
     if maybe_redirect:
         return maybe_redirect
 
@@ -191,7 +191,7 @@ def delete_client(client_id: int):
 @clients_bp.route("/api/clients")
 def api_clients():
     # API can be used by authenticated staff only
-    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance"])  # allow read by engineers and finance
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance", "hr"])  # allow read by engineers, finance, and hr
     if maybe_redirect:
         return maybe_redirect
 

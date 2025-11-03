@@ -56,7 +56,7 @@ def _ext_of(filename: str) -> str:
 
 @contracts_bp.route("/contracts")
 def list_contracts():
-    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance"])  # allow engineers and finance to view
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance", "hr"])  # allow engineers, finance, and hr to view
     if maybe_redirect:
         return maybe_redirect
 
@@ -122,7 +122,7 @@ def list_contracts():
 
 @contracts_bp.route("/contracts/<int:contract_id>")
 def contract_detail(contract_id: int):
-    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance"])  # allow engineers and finance to view
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance", "hr"])  # allow engineers, finance, and hr to view
     if maybe_redirect:
         return maybe_redirect
 
@@ -137,7 +137,7 @@ def contract_detail(contract_id: int):
 
 @contracts_bp.route("/contracts/new", methods=["GET", "POST"])
 def create_contract():
-    maybe_redirect = _require_roles(["manager", "employee", "finance"])  # create allowed for finance
+    maybe_redirect = _require_roles(["manager", "employee", "finance", "hr"])  # create allowed for finance and hr
     if maybe_redirect:
         return maybe_redirect
 
@@ -208,7 +208,7 @@ def create_contract():
 
 @contracts_bp.route("/contracts/<int:contract_id>/upload", methods=["POST"])
 def upload_contract_file(contract_id: int):
-    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance"])  # allow engineers and finance to upload
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance", "hr"])  # allow engineers, finance, and hr to upload
     if maybe_redirect:
         return maybe_redirect
 
@@ -241,7 +241,7 @@ def upload_contract_file(contract_id: int):
 
 @contracts_bp.route("/api/contracts")
 def api_contracts():
-    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance"])  # read allowed by engineers and finance
+    maybe_redirect = _require_roles(["manager", "employee", "engineer", "finance", "hr"])  # read allowed by engineers, finance, and hr
     if maybe_redirect:
         return maybe_redirect
 
