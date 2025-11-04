@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}الخدمات - سند{% endblock %}
+
+{% block content %}
+<div class="container-fluid" dir="rtl">
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h2><i class="fas fa-list"></i> الخدمات الحكومية</h2>
+        </div>
+        <div class="col-md-6 text-left">
+            {% if session.get('role') == 'manager' %}
+            <a href="{{ url_for('sanad.service_new') }}" class="btn btn-success">
+                <i class="fas fa-plus"></i> إضافة خدمة
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        {% if services %}
+            {% for service in services %}
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ service.name_ar }}</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">{{ service.name }}</h6>
+                        
+                        {% if service.gov_entity %}
+                        <p class="text-muted small mb-2">
+                            <i class="fas fa-building"></i>
+                            {{ service.gov_entity.name_ar }}
+                        </p>
+                        {% endif %}
+                        
+                        <hr>
+                        
+                        <div class="row">
+                            <div class="col-6">
+                                <small class="text-muted">أتعاب المكتب:</small>
+                                <p class="mb-1"><strong>{{ "%.3f"|format(service.base_office_fee) }} ر.ع</strong></p>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">الرسوم الحكومية:</small>
+                                <p class="mb-1"><strong>{{ "%.3f"|format(service.gov_fee_value) }} ر.ع</strong></p>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-2">
+                            {% if service.vat_applicable %}
+                            <span class="badge badge-info">خاضع للضريبة</span>
+                            {% endif %}
+                            <span class="badge badge-secondary">{{ service.gov_fee_type }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="alert alert-warning text-center">
+                    <i class="fas fa-exclamation-circle"></i>
+                    لا توجد خدمات مسجلة
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

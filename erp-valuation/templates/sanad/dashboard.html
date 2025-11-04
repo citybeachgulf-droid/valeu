@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}لوحة التحكم - سند{% endblock %}
+
+{% block content %}
+<div class="container-fluid" dir="rtl">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="text-primary">
+                <i class="fas fa-tachometer-alt"></i>
+                لوحة التحكم - نظام سند للخدمات الحكومية
+            </h2>
+            <p class="text-muted">{{ org.name_ar }}</p>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <h3 class="text-primary">{{ stats.tickets_today }}</h3>
+                    <p class="mb-0">معاملات اليوم</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <h3 class="text-warning">{{ stats.tickets_pending }}</h3>
+                    <p class="mb-0">معاملات قيد الانتظار</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-info">
+                <div class="card-body text-center">
+                    <h3 class="text-info">{{ stats.tickets_in_progress }}</h3>
+                    <p class="mb-0">معاملات قيد التنفيذ</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h3 class="text-success">{{ "%.3f"|format(stats.revenue_today) }} ر.ع</h3>
+                    <p class="mb-0">إيرادات اليوم</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">إجراءات سريعة</h5>
+                </div>
+                <div class="card-body">
+                    <div class="btn-group" role="group">
+                        <a href="{{ url_for('sanad.ticket_new') }}" class="btn btn-success">
+                            <i class="fas fa-plus"></i> معاملة جديدة
+                        </a>
+                        <a href="{{ url_for('sanad.pos') }}" class="btn btn-primary">
+                            <i class="fas fa-cash-register"></i> نقطة البيع
+                        </a>
+                        <a href="{{ url_for('sanad.customers_list') }}" class="btn btn-info">
+                            <i class="fas fa-users"></i> العملاء
+                        </a>
+                        <a href="{{ url_for('sanad.services_list') }}" class="btn btn-secondary">
+                            <i class="fas fa-list"></i> الخدمات
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Tickets -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">أحدث المعاملات</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_tickets %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>رقم المعاملة</th>
+                                    <th>العميل</th>
+                                    <th>الحالة</th>
+                                    <th>التاريخ</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ticket in recent_tickets %}
+                                <tr>
+                                    <td>{{ ticket.code }}</td>
+                                    <td>{{ ticket.customer.full_name if ticket.customer else '-' }}</td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if ticket.status == 'completed' %}badge-success
+                                            {% elif ticket.status == 'paid' %}badge-info
+                                            {% elif ticket.status == 'new' %}badge-warning
+                                            {% else %}badge-secondary{% endif %}">
+                                            {{ ticket.status }}
+                                        </span>
+                                    </td>
+                                    <td>{{ ticket.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        <a href="{{ url_for('sanad.ticket_detail', ticket_id=ticket.id) }}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            عرض
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4">لا توجد معاملات</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

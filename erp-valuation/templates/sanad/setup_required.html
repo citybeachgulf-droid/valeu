@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}إعداد النظام - سند{% endblock %}
+
+{% block content %}
+<div class="container" dir="rtl">
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        إعداد النظام مطلوب
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="lead">نظام سند للخدمات الحكومية غير مفعّل بعد.</p>
+                    
+                    <div class="alert alert-info">
+                        <h5>خطوات التفعيل:</h5>
+                        <ol>
+                            <li>تشغيل سكربت البيانات الأولية (Seed Data)</li>
+                            <li>إنشاء المؤسسة والفروع</li>
+                            <li>إضافة الخدمات الحكومية</li>
+                        </ol>
+                    </div>
+
+                    <h5>تشغيل سكربت البيانات الأولية:</h5>
+                    <pre class="bg-dark text-light p-3"><code>cd erp-valuation
+python -c "from sanad.seed import seed_sanad_data; from app import app; app.app_context().push(); seed_sanad_data()"</code></pre>
+
+                    <p class="mt-3">
+                        <a href="{{ url_for('sanad.dashboard') }}" class="btn btn-primary">
+                            <i class="fas fa-sync"></i> تحديث الصفحة
+                        </a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
