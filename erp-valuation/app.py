@@ -52,6 +52,9 @@ from consulting.projects.models import ConsultingProject
 from consulting.clients.models import Client
 from consulting.projects.forms import PROJECT_TYPES
 
+# Import Sanad models to register with SQLAlchemy
+from sanad import models as sanad_models
+
 # ---------------- إعداد Flask ----------------
 app = Flask(__name__)
 app.secret_key = "secret_key"
@@ -275,6 +278,10 @@ app.register_blueprint(invoices_bp)
 # لوحة المتابعة لقسم الاستشارات
 from consulting.dashboard.routes import dashboard_bp
 app.register_blueprint(dashboard_bp)
+
+# ---------------- Register Sanad Module (Government Services) ----------------
+from sanad.routes import sanad_bp
+app.register_blueprint(sanad_bp)
 
 # ---------------- Service Worker at root scope ----------------
 @app.route('/service-worker.js')
