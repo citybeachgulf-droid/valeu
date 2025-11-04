@@ -3481,7 +3481,9 @@ def _generate_default_docx(doc_type: str, placeholders: dict, out_path: str) -> 
         pass
 
     hdr_cells = amt_table.rows[0].cells
-    headers = ["البند", "القيمة", "العملة"]
+    # أعكس ترتيب الأعمدة بحيث يظهر "البند" في الجهة اليمنى في المستند RTL
+    # الترتيب الجديد من اليسار لليمين في الملف: [العملة، القيمة، البند]
+    headers = ["العملة", "القيمة", "البند"]
     for idx, text in enumerate(headers):
         p = hdr_cells[idx].paragraphs[0]
         r = p.add_run(text)
@@ -3492,24 +3494,50 @@ def _generate_default_docx(doc_type: str, placeholders: dict, out_path: str) -> 
             pass
         _set_paragraph_rtl(p, True)
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    # تلوين خفيف لرأس الجدول
+    try:
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+        def _shade_cell(cell, fill_hex: str):
+            tc_pr = cell._tc.get_or_add_tcPr()
+            shd = OxmlElement('w:shd')
+            shd.set(qn('w:val'), 'clear')
+            shd.set(qn('w:color'), 'auto')
+            shd.set(qn('w:fill'), fill_hex)
+            tc_pr.append(shd)
+        for c in hdr_cells:
+            _shade_cell(c, "EAF4FF")  # أزرق فاتح مريح
+    except Exception:
+        pass
 
     for label, value in amounts:
         row = amt_table.add_row().cells
+        # عمود العملة (يسار الملف لكن يظهر يمين الجدول في RTL بعد العكس)
         p0 = row[0].paragraphs[0]
-        r0 = p0.add_run(label)
-        r0.bold = True
+        p0.add_run("ريال")
         _set_paragraph_rtl(p0, True)
-        p0.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        p0.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
+        # عمود القيمة في المنتصف
         p1 = row[1].paragraphs[0]
         p1.add_run(str(value))
         _set_paragraph_rtl(p1, True)
         p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
+        # عمود البند (سيظهر في اليمين)
         p2 = row[2].paragraphs[0]
-        p2.add_run("ريال")
+        r2 = p2.add_run(label)
+        r2.bold = True
         _set_paragraph_rtl(p2, True)
         p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        # تلوين خفيف لخلايا الصف
+        try:
+            _shade_cell(row[0], "F8FAFC")
+            _shade_cell(row[1], "F8FAFC")
+            _shade_cell(row[2], "F8FAFC")
+        except Exception:
+            pass
 
     document.add_paragraph().add_run(" ")
 
