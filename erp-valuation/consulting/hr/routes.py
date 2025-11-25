@@ -1,11 +1,9 @@
 from __future__ import annotations
 
+import re
+import secrets
 from typing import Dict, List, Optional
 from datetime import date, datetime, timedelta
-import secrets
-import json
-import smtplib
-from email.message import EmailMessage
 
 from flask import (
     Blueprint,
@@ -16,15 +14,13 @@ from flask import (
     flash,
     jsonify,
     session,
-    current_app,
 )
 from sqlalchemy import or_, func
-from sqlalchemy.orm import joinedload
 from werkzeug.security import generate_password_hash
 
 from extensions import db
 from consulting.projects.models import ConsultingProject
-from .models import Engineer, Task, Department
+from .models import Engineer, Task, Department, Employee
 from .forms import (
     ENGINEER_SPECIALTIES,
     ENGINEER_STATUSES,
@@ -38,7 +34,7 @@ from .forms import (
 hr_bp = Blueprint(
     "consulting_hr",
     __name__,
-    url_prefix="/consulting/hr",
+    url_prefix="/consulting",
     template_folder="templates",
 )
 
@@ -52,11 +48,12 @@ def _require_roles(allowed: List[str]) -> Optional[None]:
     return None
 
 
-def _create_limited_user(username_hint: str | None, role: str):
+def _create_limited_user(username_hint: str | None, role: str) -> tuple[str, str]:
     """ينشئ مستخدمًا محدود الصلاحيات بالدور المحدد.
 
-    تعاد (user, raw_password) بحيث يمكن للنداء اللاحق ربط الحساب
-    بالموظف أو المهندس وإرسال بيانات الدخول المؤقتة.
+    - username: يُشتق من البريد/الهاتف إن وُجد وإلا يُولّد اسمًا فريدًا.
+    - password: كلمة مرور افتراضية آمنة يمكن تغييرها لاحقًا.
+    تعاد (username, raw_password) لاستخدامها في التنبيه للـ HR.
     """
     # تجنّب الاستيراد الدائري: نستورد User داخل الدالة
     from app import User
@@ -85,108 +82,49 @@ def _create_limited_user(username_hint: str | None, role: str):
     db.session.add(user)
     db.session.flush()  # للحصول على id إن لزم قبل commit
 
-    return user, raw_password
+    return username, raw_password
 
 
-def _send_invitation_email(recipient: str, subject: str, body: str) -> bool:
-    """يحاول إرسال بريد إلكتروني بسيط ويعيد نجاح العملية."""
-    if not recipient:
-        return False
-    try:
-        smtp_host = current_app.config.get("SMTP_HOST")
-        if not smtp_host:
-            return False
-        smtp_port = current_app.config.get("SMTP_PORT", 587)
-        smtp_user = current_app.config.get("SMTP_USERNAME")
-        smtp_password = current_app.config.get("SMTP_PASSWORD")
-        use_tls = current_app.config.get("SMTP_USE_TLS", True)
-        sender = current_app.config.get("SMTP_SENDER") or smtp_user
-        if not sender:
-            return False
+def _initialize_employee_invitation(
+    employee: Employee,
+    *,
+    expires_in_days: int = 7,
+    reset_credentials: bool = False,
+) -> str:
+    """Generates a unique invitation token for the employee.
 
-        message = EmailMessage()
-        message["Subject"] = subject
-        message["From"] = sender
-        message["To"] = recipient
-        message.set_content(body)
+    Optionally resets existing credentials when `reset_credentials=True`.
+    Returns the generated token.
+    """
 
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as smtp:
-            if use_tls:
-                smtp.starttls()
-            if smtp_user and smtp_password:
-                smtp.login(smtp_user, smtp_password)
-            smtp.send_message(message)
-        return True
-    except Exception as exc:
-        current_app.logger.warning("Failed to send invitation email: %s", exc, exc_info=True)
-        return False
+    if employee is None:
+        raise ValueError("employee must not be None")
 
+    # Try a few times to avoid token collisions (extremely unlikely)
+    token = None
+    for _ in range(5):
+        candidate = secrets.token_urlsafe(32)
+        if not Employee.query.filter_by(invitation_token=candidate).first():
+            token = candidate
+            break
+    if token is None:
+        raise RuntimeError("unable to generate unique invitation token")
 
-def _create_employee_invitation(employee, user, raw_password):
-    """ينشئ سجل دعوة لموظف ويعيد (invitation, url, email_sent)."""
-    from app import UserInvitation
+    now = datetime.utcnow()
+    employee.invitation_token = token
+    employee.invitation_token_created_at = now
+    employee.invitation_expires_at = now + timedelta(days=expires_in_days)
+    employee.invitation_used_at = None
 
-    token = secrets.token_urlsafe(32)
-    expires_at = datetime.utcnow() + timedelta(days=7)
-    invitation = UserInvitation(
-        user_id=user.id,
-        employee_id=employee.id,
-        token=token,
-        raw_password=raw_password,
-        expires_at=expires_at,
-        delivery_method="manual",
-    )
+    if reset_credentials:
+        employee.credential_username = None
+        employee.credential_password_hash = None
+        employee.credential_password_plain = None
+        employee.credential_created_at = None
+        employee.credential_updated_at = None
 
-    invitation_url = url_for("complete_invitation", token=token, _external=True)
-    email_sent = False
-    if employee.email:
-        subject = "دعوة إنشاء حسابك في نظام الشركة"
-        body = (
-            f"مرحبًا {employee.full_name},\n\n"
-            f"تمت إضافتك إلى نظام الموارد البشرية. لإنشاء حسابك واختيار اسم مستخدم وكلمة مرور، "
-            f"الرجاء الضغط على الرابط التالي:\n\n{invitation_url}\n\n"
-            f"اسم المستخدم المقترح: {user.username}\n"
-            f"كلمة المرور المؤقتة: {raw_password}\n\n"
-            f"سينتهي هذا الرابط في {expires_at.strftime('%Y-%m-%d')}.\n"
-            f"مع التحية."
-        )
-        email_sent = _send_invitation_email(employee.email, subject, body)
-        if email_sent:
-            invitation.delivery_method = "email"
-            invitation.sent_at = datetime.utcnow()
-
-    db.session.add(invitation)
-    return invitation, invitation_url, email_sent
-
-
-def _get_branch_choices() -> tuple[List[dict], dict]:
-    """إرجاع قائمة الفروع مع الأقسام، وخريطة للأقسام حسب الفرع."""
-    try:
-        from app import Branch, BranchSection  # type: ignore import-error
-    except Exception:
-        return [], {}
-
-    branches = Branch.query.order_by(Branch.name).all()
-    sections_by_branch: Dict[int, List] = {}
-    for section in BranchSection.query.order_by(BranchSection.name).all():
-        sections_by_branch.setdefault(section.branch_id, []).append(section)
-
-    branch_list: List[dict] = []
-    sections_map: dict = {}
-    for branch in branches:
-        sections = sections_by_branch.get(branch.id, [])
-        serialized_sections = [
-            {"id": sec.id, "name": sec.name} for sec in sections
-        ]
-        branch_list.append(
-            {
-                "id": branch.id,
-                "name": branch.name,
-                "sections": serialized_sections,
-            }
-        )
-        sections_map[str(branch.id)] = serialized_sections
-    return branch_list, sections_map
+    db.session.flush()
+    return token
 
 
 # Ensure there are some baseline departments so forms can render choices
@@ -315,11 +253,11 @@ def create_engineer():
             db.session.flush()
 
             # إنشاء حساب مستخدم محدود الدور للمهندس
-            user, raw_password = _create_limited_user(engineer.email or engineer.phone, role="engineer")
+            username, raw_password = _create_limited_user(engineer.email or engineer.phone, role="engineer")
 
             db.session.commit()
 
-            flash(f"✅ تم إضافة المهندس بنجاح. تم إنشاء مستخدم: {user.username} بكلمة مرور مؤقتة.", "success")
+            flash(f"✅ تم إضافة المهندس بنجاح. تم إنشاء مستخدم: {username} بكلمة مرور مؤقتة.", "success")
             return redirect(url_for("consulting_hr.engineer_detail", engineer_id=engineer.id))
 
     _ensure_default_departments()
@@ -522,7 +460,6 @@ from .forms import (
     PERFORMANCE_PERIODS, JOB_POSTING_STATUSES, CANDIDATE_STATUSES,
     INTERVIEW_STATUSES, INTERVIEW_RESULTS, GOAL_PRIORITIES, GOAL_STATUSES
 )
-from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 
@@ -541,7 +478,7 @@ def list_staff():
     per_page = min(max(int(request.args.get("per_page", 30) or 30), 1), 100)
     
     # جلب الموظفين
-    employee_query = Employee.query.options(joinedload(Employee.user_account))
+    employee_query = Employee.query
     if q:
         like = f"%{q}%"
         employee_query = employee_query.filter(or_(
@@ -626,7 +563,7 @@ def list_employees():
     page = max(int(request.args.get("page", 1) or 1), 1)
     per_page = min(max(int(request.args.get("per_page", 20) or 20), 1), 100)
     
-    query = Employee.query.options(joinedload(Employee.user_account))
+    query = Employee.query
     if q:
         like = f"%{q}%"
         query = query.filter(or_(
@@ -668,8 +605,6 @@ def create_employee():
     maybe_redirect = _require_roles(["manager", "hr", "hr_manager"])
     if maybe_redirect:
         return maybe_redirect
-
-    branch_choices, branch_sections_map = _get_branch_choices()
     
     form_values = {}
     form_errors = {}
@@ -680,39 +615,24 @@ def create_employee():
             for _, msg in form_errors.items():
                 flash(f"❌ {msg}", "error")
             form_values = dict(request.form)
-            form_values.setdefault("branch_id", form_values.get("branch_id", ""))
-            form_values.setdefault("branch_section_id", form_values.get("branch_section_id", ""))
         else:
             employee = Employee(**data)
             db.session.add(employee)
             db.session.flush()
 
-            # إنشاء حساب مستخدم محدود الدور للموظف
-            user, raw_password = _create_limited_user(employee.email or employee.phone, role="employee")
-            user.employee_id = employee.id
-            user.branch_id = employee.branch_id
-            user.section_id = employee.branch_section_id
+            token = _initialize_employee_invitation(employee)
+            invitation_link = url_for("consulting_hr.accept_employee_invitation", token=token, _external=True)
 
-            invitation, invitation_url, email_sent = _create_employee_invitation(employee, user, raw_password)
             db.session.commit()
-
-            flash(f"✅ تم إضافة الموظف بنجاح. تم إنشاء مستخدم: {user.username}.", "success")
-            if email_sent:
-                flash("✉️ تم إرسال رابط إنشاء الحساب للموظف عبر البريد الإلكتروني.", "info")
-            else:
-                flash(
-                    f"🔗 رابط إنشاء الحساب: {invitation_url} — كلمة المرور المؤقتة: {raw_password}",
-                    "warning",
-                )
+            flash("✅ تم إضافة الموظف بنجاح. تم إنشاء رابط دعوة لإعداد الحساب.", "success")
+            flash(f"🔗 رابط الدعوة: {invitation_link}", "info")
             return redirect(url_for("consulting_hr.employee_detail", employee_id=employee.id))
     else:
         # تعيين القيم الافتراضية
         form_values = {
             "status": "نشط",
-            "currency": "OMR",
+            "currency": "SAR",
             "employment_type": EMPLOYMENT_TYPES[0] if EMPLOYMENT_TYPES else None,
-            "branch_id": "",
-            "branch_section_id": "",
         }
     
     _ensure_default_departments()
@@ -727,8 +647,6 @@ def create_employee():
         departments=departments,
         EMPLOYEE_STATUSES=EMPLOYEE_STATUSES,
         EMPLOYMENT_TYPES=EMPLOYMENT_TYPES,
-        branch_choices=branch_choices,
-        branch_sections_json=json.dumps(branch_sections_map, ensure_ascii=False),
         title="إضافة موظف جديد",
     )
 
@@ -748,6 +666,10 @@ def employee_detail(employee_id: int):
         # يجب التحقق من أن الموظف المسجل هو نفسه (يتطلب نظام مصادقة)
         pass
     
+    invitation_link = None
+    if employee.active_invitation_token():
+        invitation_link = url_for("consulting_hr.accept_employee_invitation", token=employee.invitation_token, _external=True)
+
     # جلب البيانات المرتبطة
     recent_attendance = Attendance.query.filter_by(employee_id=employee.id)\
         .order_by(Attendance.attendance_date.desc()).limit(10).all()
@@ -774,8 +696,126 @@ def employee_detail(employee_id: int):
         recent_reviews=recent_reviews,
         documents=documents,
         expiring_docs=expiring_docs,
+        invitation_link=invitation_link,
         can_manage=can_manage,
         title=f"تفاصيل الموظف - {employee.full_name}",
+    )
+
+
+@hr_bp.route("/employees/<int:employee_id>/invitation/regenerate", methods=["POST"])
+def regenerate_employee_invitation(employee_id: int):
+    maybe_redirect = _require_roles(["manager", "hr", "hr_manager"])
+    if maybe_redirect:
+        return maybe_redirect
+
+    employee = Employee.query.get_or_404(employee_id)
+
+    if employee.has_credentials():
+        flash("⚠️ لا يمكن إعادة توليد رابط الدعوة بعد تعيين بيانات الدخول. يرجى إعادة تعيين الحساب يدويًا.", "warning")
+        return redirect(url_for("consulting_hr.employee_detail", employee_id=employee.id))
+
+    token = _initialize_employee_invitation(employee, reset_credentials=True)
+    invitation_link = url_for("consulting_hr.accept_employee_invitation", token=token, _external=True)
+
+    db.session.commit()
+    flash("✅ تم توليد رابط دعوة جديد بنجاح.", "success")
+    flash(f"🔗 رابط الدعوة: {invitation_link}", "info")
+    return redirect(url_for("consulting_hr.employee_detail", employee_id=employee.id))
+
+
+@hr_bp.route("/invite/<token>", methods=["GET", "POST"])
+def accept_employee_invitation(token: str):
+    clean_token = (token or "").strip()
+    if not clean_token:
+        return render_template("hr/employee_invite_accept.html", status="invalid"), 404
+
+    employee = Employee.query.filter_by(invitation_token=clean_token).first()
+    if employee is None:
+        return render_template("hr/employee_invite_accept.html", status="invalid"), 404
+
+    if employee.has_credentials() or employee.invitation_used_at:
+        return render_template(
+            "hr/employee_invite_accept.html",
+            status="used",
+            employee=employee,
+        ), 410
+
+    if employee.invitation_expires_at and employee.invitation_expires_at < datetime.utcnow():
+        return render_template(
+            "hr/employee_invite_accept.html",
+            status="expired",
+            employee=employee,
+        ), 410
+
+    from app import User
+
+    form_errors: Dict[str, str] = {}
+    form_values: Dict[str, str] = {"username": ""}
+
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip().lower()
+        password = request.form.get("password") or ""
+        confirm_password = request.form.get("confirm_password") or ""
+
+        form_values["username"] = username
+
+        if len(username) < 4:
+            form_errors["username"] = "اسم المستخدم يجب أن يتكون من 4 أحرف على الأقل"
+        elif not re.match(r"^[a-z0-9_.-]+$", username):
+            form_errors["username"] = "يمكن أن يحتوي اسم المستخدم على حروف صغيرة وأرقام ونقاط وشرطات فقط"
+        else:
+            if User.query.filter_by(username=username).first():
+                form_errors["username"] = "اسم المستخدم مستخدم بالفعل، يرجى اختيار اسم آخر"
+
+        if len(password) < 8:
+            form_errors["password"] = "كلمة المرور يجب أن تتكون من 8 أحرف على الأقل"
+        if password != confirm_password:
+            form_errors["confirm_password"] = "تأكيد كلمة المرور غير مطابق"
+
+        if not form_errors:
+            password_hash = generate_password_hash(password)
+            user = User(username=username, password=password_hash, role="employee")
+            db.session.add(user)
+            db.session.flush()
+
+            now = datetime.utcnow()
+            employee.credential_username = username
+            employee.credential_password_hash = password_hash
+            employee.credential_password_plain = password
+            if not employee.credential_created_at:
+                employee.credential_created_at = now
+            employee.credential_updated_at = now
+            employee.invitation_used_at = now
+            employee.invitation_token = None
+            employee.invitation_expires_at = None
+
+            db.session.commit()
+
+            login_url = url_for("login")
+            return render_template(
+                "hr/employee_invite_accept.html",
+                status="success",
+                employee=employee,
+                username=username,
+                login_url=login_url,
+            )
+
+    else:
+        # Prefill username hint from email if available
+        hint = ""
+        if employee.email:
+            hint = employee.email.split("@")[0]
+        elif employee.phone:
+            digits = re.sub(r"\D", "", employee.phone)
+            hint = digits[-8:] if digits else ""
+        form_values["username"] = hint
+
+    return render_template(
+        "hr/employee_invite_accept.html",
+        status="form",
+        employee=employee,
+        form_values=form_values,
+        form_errors=form_errors,
     )
 
 
@@ -787,7 +827,6 @@ def edit_employee(employee_id: int):
         return maybe_redirect
     
     employee = Employee.query.get_or_404(employee_id)
-    branch_choices, branch_sections_map = _get_branch_choices()
     form_values = {}
     form_errors = {}
     
@@ -797,18 +836,12 @@ def edit_employee(employee_id: int):
             for _, msg in form_errors.items():
                 flash(f"❌ {msg}", "error")
             form_values = dict(request.form)
-            form_values.setdefault("branch_id", form_values.get("branch_id", ""))
-            form_values.setdefault("branch_section_id", form_values.get("branch_section_id", ""))
         else:
             # تحديث البيانات
             for key, value in data.items():
                 if value is not None or key in ["notes", "description"]:
                     setattr(employee, key, value)
             
-            if employee.user_account:
-                employee.user_account.branch_id = employee.branch_id
-                employee.user_account.section_id = employee.branch_section_id
-
             db.session.commit()
             flash("✅ تم تحديث بيانات الموظف", "success")
             return redirect(url_for("consulting_hr.employee_detail", employee_id=employee.id))
@@ -845,10 +878,8 @@ def edit_employee(employee_id: int):
             "resignation_date": employee.resignation_date.strftime("%Y-%m-%d") if employee.resignation_date else "",
             "termination_date": employee.termination_date.strftime("%Y-%m-%d") if employee.termination_date else "",
             "base_salary": str(employee.base_salary) if employee.base_salary else "",
-            "currency": employee.currency or "OMR",
+            "currency": employee.currency or "SAR",
             "notes": employee.notes or "",
-            "branch_id": str(employee.branch_id) if employee.branch_id else "",
-            "branch_section_id": str(employee.branch_section_id) if employee.branch_section_id else "",
         }
     
     _ensure_default_departments()
@@ -863,8 +894,6 @@ def edit_employee(employee_id: int):
         departments=departments,
         EMPLOYEE_STATUSES=EMPLOYEE_STATUSES,
         EMPLOYMENT_TYPES=EMPLOYMENT_TYPES,
-        branch_choices=branch_choices,
-        branch_sections_json=json.dumps(branch_sections_map, ensure_ascii=False),
         title=f"تعديل بيانات الموظف - {employee.full_name}",
     )
 
@@ -1068,7 +1097,6 @@ def create_staff():
     maybe_redirect = _require_roles(["manager", "hr", "hr_manager", "employee"])
     if maybe_redirect:
         return maybe_redirect
-    branch_choices, branch_sections_map = _get_branch_choices()
 
     form_errors: Dict[str, str] = {}
     form_values: Dict[str, str] = {
@@ -1084,8 +1112,6 @@ def create_staff():
         "job_title": "",
         "join_date": "",
         "status": "نشط",
-        "branch_id": "",
-        "branch_section_id": "",
         # Engineer fields
         "name": "",
         "specialty": ENGINEER_SPECIALTIES[0] if ENGINEER_SPECIALTIES else "",
@@ -1126,10 +1152,10 @@ def create_staff():
                 db.session.add(engineer)
                 db.session.flush()
 
-                user, raw_password = _create_limited_user(engineer.email or engineer.phone, role="engineer")
+                username, raw_password = _create_limited_user(engineer.email or engineer.phone, role="engineer")
                 db.session.commit()
                 flash(
-                    f"✅ تم إضافة المهندس بنجاح. تم إنشاء مستخدم: {user.username} بكلمة مرور مؤقتة.",
+                    f"✅ تم إضافة المهندس بنجاح. تم إنشاء مستخدم: {username} بكلمة مرور مؤقتة.",
                     "success",
                 )
                 return redirect(url_for("consulting_hr.engineer_detail", engineer_id=engineer.id))
@@ -1149,20 +1175,15 @@ def create_staff():
                 db.session.add(employee)
                 db.session.flush()
 
-                user, raw_password = _create_limited_user(employee.email or employee.phone, role="employee")
-                user.employee_id = employee.id
-                user.branch_id = employee.branch_id
-                user.section_id = employee.branch_section_id
-                invitation, invitation_url, email_sent = _create_employee_invitation(employee, user, raw_password)
+                token = _initialize_employee_invitation(employee)
+                invitation_link = url_for("consulting_hr.accept_employee_invitation", token=token, _external=True)
+
                 db.session.commit()
-                flash(f"✅ تم إضافة الموظف بنجاح. تم إنشاء مستخدم: {user.username}.", "success")
-                if email_sent:
-                    flash("✉️ تم إرسال رابط إنشاء الحساب للموظف عبر البريد الإلكتروني.", "info")
-                else:
-                    flash(
-                        f"🔗 رابط إنشاء الحساب: {invitation_url} — كلمة المرور المؤقتة: {raw_password}",
-                        "warning",
-                    )
+                flash(
+                    "✅ تم إضافة الموظف بنجاح. تم إنشاء رابط دعوة لإعداد الحساب.",
+                    "success",
+                )
+                flash(f"🔗 رابط الدعوة: {invitation_link}", "info")
                 return redirect(url_for("consulting_hr.employee_detail", employee_id=employee.id))
 
     _ensure_default_departments()
@@ -1176,8 +1197,6 @@ def create_staff():
         EMPLOYMENT_TYPES=EMPLOYMENT_TYPES,
         EMPLOYEE_STATUSES=EMPLOYEE_STATUSES,
         ENGINEER_STATUSES=ENGINEER_STATUSES,
-        branch_choices=branch_choices,
-        branch_sections_json=json.dumps(branch_sections_map, ensure_ascii=False),
         title="إضافة موظف/مهندس",
     )
 

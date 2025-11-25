@@ -1,147 +1,161 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<style>
-body {
-  direction: rtl;
-  text-align: right;
-  font-family: 'Tajawal', sans-serif;
-}
-.container {
-  max-width: 1200px;
-  padding: 2rem 1rem;
-}
-
-/* رؤوس الصفحات */
-h3 {
-  font-weight: 600;
-  color: #4a148c;
-}
-.text-muted {
-  font-size: 0.9rem;
-}
-
-/* الأزرار */
-.btn-primary, .btn-outline-secondary {
-  border-radius: 8px;
-  transition: 0.3s;
-}
-.btn-primary:hover { background-color: #5a32a3; }
-.btn-outline-secondary:hover { background-color: #f8f9fa; color: #000; }
-
-/* بطاقات الموظف */
-.card { border-radius: 10px; }
-.card-body { padding: 1rem; }
-
-/* الجداول */
-.table thead { background-color: #f5f5f5; }
-.table tbody tr:hover { background-color: #fdfcff; }
-.badge { padding: 0.4em 0.6em; font-size: 0.85rem; border-radius: 0.5rem; }
-
-/* عرض الجداول الصغيرة داخل الأعمدة */
-.table-responsive { margin-bottom: 1rem; }
-</style>
-
 <div class="container py-4" data-expiring-count="{{ expiring_docs|length }}">
-  
   {% if expiring_docs %}
-  <div class="alert alert-warning mb-3">
-    تنبيهات: بعض الوثائق على وشك الانتهاء.
+  <div class="alert alert-warning d-flex align-items-center gap-2" role="alert">
+    <span class="fs-4">??</span>
+    <div>
+      ???? ??????? ?????? ???????? ???? ?????? ????? ??? ?????? ??????.
+    </div>
   </div>
   {% endif %}
 
-  <!-- معلومات الموظف الأساسية -->
-  <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
+  <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
     <div>
-      <h3>{{ employee.full_name }}</h3>
+      <h3 class="mb-1">{{ employee.full_name }}</h3>
       <p class="text-muted small mb-0">
-        {{ employee.job_title or employee.position or 'غير محدد' }}
-        {% if employee.department %} | {{ employee.department.name }}{% endif %}
+        {% if employee.job_title or employee.position %}
+          {{ employee.job_title or employee.position }}
+        {% else %}
+          ???? ???? ????? ????
+        {% endif %}
+        {% if employee.department %}
+          ? {{ employee.department.name }}
+        {% endif %}
       </p>
     </div>
     <div class="d-flex flex-wrap gap-2">
-      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.dashboard') }}">لوحة HR</a>
-      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.list_employees') }}">قائمة الموظفين</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.dashboard') }}">???? HR</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.list_employees') }}">???? ???????</a>
       {% if can_manage %}
-      <a class="btn btn-outline-primary" href="{{ url_for('manage_employees') }}">👥 إدارة حسابات المستخدمين</a>
-      <a class="btn btn-primary" href="{{ url_for('consulting_hr.edit_employee', employee_id=employee.id) }}">تعديل الموظف</a>
+      <a class="btn btn-primary" href="{{ url_for('consulting_hr.edit_employee', employee_id=employee.id) }}">?? ????? ????????</a>
       {% endif %}
     </div>
   </div>
 
   <div class="row g-3">
-    <!-- العمود الأيسر: بطاقة الموظف ومعلومات التواصل -->
     <div class="col-lg-4 d-flex flex-column gap-3">
       <div class="card">
         <div class="card-body">
-          <h5 class="card-title mb-3">بيانات أساسية</h5>
-          <dl class="row small mb-0">
-            <dt class="col-5 text-muted">الرقم الوظيفي</dt>
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <h5 class="card-title mb-0">???????? ????????</h5>
+            <span class="badge {% if employee.status == '???' %}bg-success{% elif employee.status == '?????' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ employee.status or '??? ????' }}</span>
+          </div>
+          <dl class="mb-0 small row">
+            <dt class="col-5 text-muted">????? ???????</dt>
             <dd class="col-7">{{ employee.employee_number or '-' }}</dd>
-            <dt class="col-5 text-muted">نوع التوظيف</dt>
+
+            <dt class="col-5 text-muted">??? ???????</dt>
             <dd class="col-7">{{ employee.employment_type or '-' }}</dd>
-            <dt class="col-5 text-muted">القسم</dt>
+
+            <dt class="col-5 text-muted">?????</dt>
             <dd class="col-7">{{ employee.department.name if employee.department else '-' }}</dd>
-            <dt class="col-5 text-muted">تاريخ الانضمام</dt>
+
+            <dt class="col-5 text-muted">????? ????????</dt>
             <dd class="col-7">{% if employee.join_date %}{{ employee.join_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</dd>
-            <dt class="col-5 text-muted">تاريخ بداية العقد</dt>
+
+            <dt class="col-5 text-muted">????? ?????</dt>
             <dd class="col-7">{% if employee.contract_start_date %}{{ employee.contract_start_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</dd>
-            <dt class="col-5 text-muted">تاريخ نهاية العقد</dt>
+
+            <dt class="col-5 text-muted">????? ?????</dt>
             <dd class="col-7">{% if employee.contract_end_date %}{{ employee.contract_end_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</dd>
-            <dt class="col-5 text-muted">الراتب الأساسي</dt>
+
+            <dt class="col-5 text-muted">?????? ???????</dt>
             <dd class="col-7">{{ employee.base_salary or '-' }} {{ employee.currency or '' }}</dd>
-            <dt class="col-5 text-muted">الحالة</dt>
-            <dd class="col-7">
-              <span class="badge {% if employee.status == 'نشط' %}bg-success{% elif employee.status == 'إجازة' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ employee.status or 'غير محدد' }}</span>
-            </dd>
           </dl>
         </div>
       </div>
 
       <div class="card">
         <div class="card-body">
-          <h5 class="card-title mb-3">معلومات التواصل</h5>
-          <ul class="list-unstyled small mb-0">
-            <li><strong>البريد الإلكتروني:</strong> {{ employee.email or '-' }}</li>
-            <li><strong>الهاتف:</strong> {{ employee.phone or '-' }}</li>
-            <li><strong>الجوال:</strong> {{ employee.mobile or '-' }}</li>
-            <li><strong>العنوان:</strong> {{ employee.address or '-' }}</li>
-            <li><strong>المدينة:</strong> {{ employee.city or '-' }}</li>
-            <li><strong>الدولة:</strong> {{ employee.country or '-' }}</li>
+          <h5 class="card-title mb-3">??????? ???????</h5>
+          <ul class="list-unstyled mb-0 small">
+            <li class="mb-2"><strong>??????:</strong> {{ employee.email or '-' }}</li>
+            <li class="mb-2"><strong>??????:</strong> {{ employee.phone or '-' }}</li>
+            <li class="mb-2"><strong>??????:</strong> {{ employee.mobile or '-' }}</li>
+            <li class="mb-2"><strong>???????:</strong> {{ employee.address or '-' }}</li>
+            <li class="mb-2"><strong>???????:</strong> {{ employee.city or '-' }}</li>
+            <li><strong>??????:</strong> {{ employee.country or '-' }}</li>
           </ul>
         </div>
       </div>
 
-      {% if can_manage %}
       <div class="card">
         <div class="card-body">
-          <h5 class="card-title mb-3">حساب النظام</h5>
-          {% if employee.user_account %}
-          <p class="small mb-1"><strong>اسم المستخدم:</strong> {{ employee.user_account.username }}</p>
-          <p class="small mb-1"><strong>الدور:</strong> {{ employee.user_account.role }}</p>
-          {% if employee.user_account.branch %}
-          <p class="small mb-3"><strong>الفرع:</strong> {{ employee.user_account.branch.name }}</p>
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="card-title mb-0">???? ??????? ???????</h5>
+            {% if employee.invitation_is_active() %}
+            <span class="badge bg-info text-dark">????? ?????? ????</span>
+            {% elif employee.has_credentials() %}
+            <span class="badge bg-success">????? ?????</span>
+            {% else %}
+            <span class="badge bg-secondary">??? ??? ?????</span>
+            {% endif %}
+          </div>
+
+          {% if employee.has_credentials() %}
+          <div class="mb-3">
+            <span class="text-muted small d-block mb-1">??? ???????</span>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <code class="small mb-0">{{ employee.credential_username }}</code>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-copy="{{ employee.credential_username }}" data-copy-label="????" data-copy-success="?????">????</button>
+            </div>
+          </div>
+          <div class="mb-3">
+            <span class="text-muted small d-block mb-1">????? ??????</span>
+            {% if employee.credential_password_plain %}
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <code class="small mb-0">{{ employee.credential_password_plain }}</code>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-copy="{{ employee.credential_password_plain }}" data-copy-label="????" data-copy-success="?????">????</button>
+            </div>
+            {% else %}
+            <p class="text-muted small mb-0">?? ???? ????? ????? ?? ???? ?????.</p>
+            {% endif %}
+          </div>
+          {% if employee.credential_updated_at %}
+          <p class="text-muted small mb-3">???? ??????? ?????: {{ employee.credential_updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
           {% endif %}
-          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('manage_employees') }}">إدارة الحساب</a>
-          {% else %}
-          <p class="text-muted small mb-3">لا يوجد حساب مرتبط بهذا الموظف.</p>
-          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('manage_employees') }}">إنشاء / ربط حساب</a>
+          {% endif %}
+
+          {% if invitation_link %}
+          <div class="mb-2">
+            <span class="text-muted small d-block mb-1">???? ?????</span>
+            <div class="input-group input-group-sm">
+              <input type="text" class="form-control" value="{{ invitation_link }}" readonly>
+              <button type="button" class="btn btn-outline-secondary" data-copy="{{ invitation_link }}" data-copy-label="????" data-copy-success="?????">????</button>
+            </div>
+          </div>
+          {% if employee.invitation_expires_at %}
+          <p class="text-muted small mb-2">???? ????? ???????: {{ employee.invitation_expires_at.strftime('%Y-%m-%d %H:%M') }}</p>
+          {% endif %}
+          {% elif not employee.has_credentials() %}
+          <p class="text-muted small mb-2">?? ???? ????? ????? ?? ??????. ??? ????? ??? ????? ??? ?????? ??? ?????? ???? ?????? ?????.</p>
+          {% endif %}
+
+          {% if not employee.has_credentials() %}
+          <form method="post" action="{{ url_for('consulting_hr.regenerate_employee_invitation', employee_id=employee.id) }}" class="d-flex flex-wrap gap-2">
+            <button type="submit" class="btn btn-sm btn-outline-primary">???? ????? ????? ???</button>
+          </form>
+          {% endif %}
+
+          {% if employee.has_credentials() %}
+          <p class="text-muted small mt-3 mb-0">?? ?????: ???? ????? ??? ??????? ?????? ?????? ??????? ????? ???????.</p>
           {% endif %}
         </div>
       </div>
-      {% endif %}
 
       <div class="card">
         <div class="card-body">
-          <h5 class="card-title mb-3">جهة الاتصال للطوارئ</h5>
+          <h5 class="card-title mb-3">??? ??????? ?? ???????</h5>
           {% if employee.emergency_contact_name or employee.emergency_contact_phone or employee.emergency_contact_relation %}
-          <ul class="list-unstyled small mb-0">
-            <li><strong>الاسم:</strong> {{ employee.emergency_contact_name or '-' }}</li>
-            <li><strong>الهاتف:</strong> {{ employee.emergency_contact_phone or '-' }}</li>
-            <li><strong>صلة القرابة:</strong> {{ employee.emergency_contact_relation or '-' }}</li>
+          <ul class="list-unstyled mb-0 small">
+            <li class="mb-2"><strong>?????:</strong> {{ employee.emergency_contact_name or '-' }}</li>
+            <li class="mb-2"><strong>??????:</strong> {{ employee.emergency_contact_phone or '-' }}</li>
+            <li><strong>???????:</strong> {{ employee.emergency_contact_relation or '-' }}</li>
           </ul>
           {% else %}
-          <p class="text-muted small mb-0">لا توجد بيانات للطوارئ.</p>
+          <p class="text-muted small mb-0">?? ??? ????? ?????? ??????? ???????.</p>
           {% endif %}
         </div>
       </div>
@@ -149,56 +163,53 @@ h3 {
       {% if employee.notes %}
       <div class="card">
         <div class="card-body">
-          <h5 class="card-title mb-3">ملاحظات</h5>
-          <p class="small mb-0">{{ employee.notes }}</p>
+          <h5 class="card-title mb-3">??????? ??????</h5>
+          <p class="mb-0 small">{{ employee.notes }}</p>
         </div>
       </div>
       {% endif %}
     </div>
 
-    <!-- العمود الأيمن: الجداول والإحصائيات -->
     <div class="col-lg-8 d-flex flex-column gap-3">
-      <!-- بطاقات صغيرة للإحصائيات -->
       <div class="row g-3">
         <div class="col-md-4">
-          <div class="card h-100 text-center">
+          <div class="card h-100">
             <div class="card-body">
-              <p class="text-muted small mb-1">تاريخ الانضمام</p>
+              <p class="text-muted small mb-1">????? ????????</p>
               <h5 class="mb-0">{% if employee.join_date %}{{ employee.join_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</h5>
             </div>
           </div>
         </div>
         <div class="col-md-4">
-          <div class="card h-100 text-center">
+          <div class="card h-100">
             <div class="card-body">
-              <p class="text-muted small mb-1">نوع التوظيف</p>
-              <h5 class="mb-0">{{ employee.employment_type or 'غير محدد' }}</h5>
+              <p class="text-muted small mb-1">??? ???????</p>
+              <h5 class="mb-0">{{ employee.employment_type or '??? ????' }}</h5>
             </div>
           </div>
         </div>
         <div class="col-md-4">
-          <div class="card h-100 text-center">
+          <div class="card h-100">
             <div class="card-body">
-              <p class="text-muted small mb-1">رصيد الإجازات المتبقي</p>
-              <h5 class="mb-0">{% if employee.leave_balances %}{{ employee.leave_balances | sum(attribute='remaining_balance') }} يوم{% else %}-{% endif %}</h5>
+              <p class="text-muted small mb-1">?????? ?????? ????????</p>
+              <h5 class="mb-0">{% if employee.leave_balances %}{{ employee.leave_balances | sum(attribute='remaining_balance') }} ???{% else %}-{% endif %}</h5>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- جدول الحضور -->
       <div class="card">
         <div class="card-body">
-          <h5 class="card-title mb-3">آخر الحضور</h5>
+          <h5 class="card-title mb-3">???? ????? ??????</h5>
           <div class="table-responsive">
-            <table class="table table-hover align-middle small">
+            <table class="table table-hover align-middle">
               <thead>
                 <tr>
-                  <th>التاريخ</th>
-                  <th>الحالة</th>
-                  <th>تسجيل الدخول</th>
-                  <th>تسجيل الخروج</th>
-                  <th>ساعات العمل</th>
+                  <th>???????</th>
+                  <th>??????</th>
+                  <th>????? ??????</th>
+                  <th>????? ??????</th>
+                  <th>???????</th>
                 </tr>
               </thead>
               <tbody>
@@ -206,14 +217,16 @@ h3 {
                 <tr>
                   <td>{{ att.attendance_date.strftime('%Y-%m-%d') }}</td>
                   <td>
-                    <span class="badge {% if att.status == 'حاضر' %}bg-success{% elif att.status == 'متغيب' %}bg-danger{% elif att.status == 'إجازة' %}bg-info text-dark{% else %}bg-secondary{% endif %}">{{ att.status }}</span>
+                    <span class="badge {% if att.status == '????' %}bg-success{% elif att.status == '????' %}bg-danger{% elif att.status == '?????' %}bg-info text-dark{% else %}bg-secondary{% endif %}">{{ att.status }}</span>
                   </td>
                   <td>{% if att.check_in %}{{ att.check_in.strftime('%H:%M') }}{% else %}-{% endif %}</td>
                   <td>{% if att.check_out %}{{ att.check_out.strftime('%H:%M') }}{% else %}-{% endif %}</td>
-                  <td>{{ att.hours_worked or '-' }}</td>
+                  <td>{% if att.hours_worked is not none %}{{ att.hours_worked }}{% else %}-{% endif %}</td>
                 </tr>
                 {% else %}
-                <tr><td colspan="5" class="text-center text-muted">لا توجد بيانات حضور.</td></tr>
+                <tr>
+                  <td colspan="5" class="text-center text-muted">?? ???? ????? ???? ?????.</td>
+                </tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -221,32 +234,33 @@ h3 {
         </div>
       </div>
 
-      <!-- جدول الإجازات -->
       <div class="card">
         <div class="card-body">
-          <h5 class="card-title mb-3">آخر الإجازات</h5>
+          <h5 class="card-title mb-3">???? ????? ???????</h5>
           <div class="table-responsive">
-            <table class="table table-striped align-middle small">
+            <table class="table table-striped align-middle">
               <thead>
                 <tr>
-                  <th>نوع الإجازة</th>
-                  <th>الفترة</th>
-                  <th>الأيام</th>
-                  <th>الحالة</th>
+                  <th>??? ???????</th>
+                  <th>??????</th>
+                  <th>??? ??????</th>
+                  <th>??????</th>
                 </tr>
               </thead>
               <tbody>
                 {% for leave in recent_leaves %}
                 <tr>
                   <td>{{ leave.leave_type.name if leave.leave_type else '-' }}</td>
-                  <td>{{ leave.start_date.strftime('%Y-%m-%d') }} إلى {{ leave.end_date.strftime('%Y-%m-%d') }}</td>
+                  <td>{{ leave.start_date.strftime('%Y-%m-%d') }} ? {{ leave.end_date.strftime('%Y-%m-%d') }}</td>
                   <td>{{ leave.total_days }}</td>
                   <td>
-                    <span class="badge {% if leave.status == 'موافق' %}bg-success{% elif leave.status == 'قيد الانتظار' %}bg-warning text-dark{% elif leave.status == 'مرفوض' %}bg-danger{% else %}bg-secondary{% endif %}">{{ leave.status }}</span>
+                    <span class="badge {% if leave.status == '?????' %}bg-success{% elif leave.status == '????' %}bg-warning text-dark{% elif leave.status == '?????' %}bg-danger{% else %}bg-secondary{% endif %}">{{ leave.status }}</span>
                   </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="4" class="text-center text-muted">لا توجد بيانات إجازات.</td></tr>
+                <tr>
+                  <td colspan="4" class="text-center text-muted">?? ???? ????? ????? ?????.</td>
+                </tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -254,19 +268,54 @@ h3 {
         </div>
       </div>
 
-      <!-- جدول الوثائق -->
       <div class="card">
         <div class="card-body">
-          <h5 class="card-title mb-3">الوثائق</h5>
+          <h5 class="card-title mb-3">???? ??????? ??????</h5>
           <div class="table-responsive">
-            <table class="table table-striped align-middle small">
+            <table class="table table-hover align-middle">
               <thead>
                 <tr>
-                  <th>اسم الوثيقة</th>
-                  <th>النوع</th>
-                  <th>تاريخ الإصدار</th>
-                  <th>تاريخ الانتهاء</th>
-                  <th>الحالة</th>
+                  <th>??????</th>
+                  <th>?????</th>
+                  <th>??????? ?????</th>
+                  <th>??????</th>
+                  <th>???????</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for review in recent_reviews %}
+                <tr>
+                  <td>{{ review.review_period }}</td>
+                  <td>{{ review.review_year }}</td>
+                  <td>{% if review.overall_score is not none %}{{ review.overall_score }} / 100{% else %}-{% endif %}</td>
+                  <td>
+                    <span class="badge {% if review.status == '?????' %}bg-success{% elif review.status == '?????' %}bg-secondary{% elif review.status == '?????' %}bg-info text-dark{% else %}bg-secondary{% endif %}">{{ review.status }}</span>
+                  </td>
+                  <td>{% if review.reviewer_comments %}{{ review.reviewer_comments[:80] }}{% else %}-{% endif %}</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="5" class="text-center text-muted">?? ???? ??????? ???? ?????.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title mb-3">????????? ????????</h5>
+          <div class="table-responsive">
+            <table class="table table-striped align-middle">
+              <thead>
+                <tr>
+                  <th>???????</th>
+                  <th>?????</th>
+                  <th>????? ???????</th>
+                  <th>?????? ????????</th>
+                  <th>??????</th>
                 </tr>
               </thead>
               <tbody>
@@ -278,28 +327,29 @@ h3 {
                   <td>{% if doc.expiry_date %}{{ doc.expiry_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</td>
                   <td>
                     {% if doc.is_expired() %}
-                      <span class="badge bg-danger">منتهية</span>
+                    <span class="badge bg-danger">?????</span>
                     {% elif doc.expiry_date %}
-                      {% set days_left = doc.days_until_expiry() %}
-                      {% if days_left is not none and days_left <= 30 %}
-                        <span class="badge bg-warning text-dark">تنتهي خلال {{ days_left }} يوم</span>
-                      {% else %}
-                        <span class="badge bg-success">صالحة</span>
-                      {% endif %}
+                    {% set days_left = doc.days_until_expiry() %}
+                    {% if days_left is not none and days_left <= 30 %}
+                    <span class="badge bg-warning text-dark">????? ???? {{ days_left }} ???</span>
                     {% else %}
-                      <span class="badge bg-secondary">غير محددة</span>
+                    <span class="badge bg-success">????</span>
+                    {% endif %}
+                    {% else %}
+                    <span class="badge bg-secondary">???? ??????</span>
                     {% endif %}
                   </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="5" class="text-center text-muted">لا توجد وثائق.</td></tr>
+                <tr>
+                  <td colspan="5" class="text-center text-muted">?? ???? ??????? ??????.</td>
+                </tr>
                 {% endfor %}
               </tbody>
             </table>
           </div>
         </div>
       </div>
-
     </div>
   </div>
 </div>
@@ -308,20 +358,60 @@ h3 {
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-  const container = document.querySelector('.container[data-expiring-count]');
-  const expiringCount = parseInt(container?.getAttribute('data-expiring-count') || '0', 10);
-  if (expiringCount > 0) {
-    const docNames = {{ expiring_docs | map(attribute='document_name') | list | tojson }};
-    Swal.fire({
-      icon: 'warning',
-      title: 'وثائق على وشك الانتهاء',
-      text: expiringCount === 1
-        ? `الوثيقة "${docNames[0]}" ستنتهي قريبًا.`
-        : `هناك ${expiringCount} وثائق على وشك الانتهاء: ${docNames.join(', ')}`,
-      confirmButtonText: 'تم',
+  document.addEventListener('DOMContentLoaded', function () {
+    const container = document.querySelector('.container[data-expiring-count]');
+    const expiringCount = parseInt(container?.getAttribute('data-expiring-count') || '0', 10);
+    if (expiringCount > 0) {
+      const docNames = {{ expiring_docs | map(attribute='document_name') | list | tojson }};
+      Swal.fire({
+        icon: 'warning',
+        title: '????? ????????? ????????',
+        text: expiringCount === 1
+          ? `??????? "${docNames[0]}" ????? ???????? ?????? ??? ??????.`
+          : `???? ${expiringCount} ??????? ?????? ????????: ${docNames.join('? ')}`,
+        confirmButtonText: '?????',
+      });
+    }
+
+    document.querySelectorAll('[data-copy]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const value = btn.getAttribute('data-copy') || '';
+        if (!value) {
+          return;
+        }
+
+        const defaultLabel = btn.getAttribute('data-copy-label') || btn.textContent;
+        const successLabel = btn.getAttribute('data-copy-success') || defaultLabel;
+
+        function markSuccess() {
+          btn.textContent = successLabel;
+          btn.disabled = true;
+          setTimeout(function () {
+            btn.textContent = defaultLabel;
+            btn.disabled = false;
+          }, 1500);
+        }
+
+        navigator.clipboard.writeText(value)
+          .then(markSuccess)
+          .catch(function () {
+            const tmp = document.createElement('textarea');
+            tmp.value = value;
+            tmp.style.position = 'fixed';
+            tmp.style.opacity = '0';
+            document.body.appendChild(tmp);
+            tmp.select();
+            try {
+              document.execCommand('copy');
+              markSuccess();
+            } catch (err) {
+              console.error('Clipboard copy failed', err);
+            } finally {
+              document.body.removeChild(tmp);
+            }
+          });
+      });
     });
-  }
-});
+  });
 </script>
 {% endblock %}
