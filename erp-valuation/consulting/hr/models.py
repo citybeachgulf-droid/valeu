@@ -122,6 +122,8 @@ class Employee(db.Model):
     position = db.Column(db.String(100), nullable=True, index=True)
     job_title = db.Column(db.String(150), nullable=True, index=True)
     employment_type = db.Column(db.String(50), nullable=True, index=True)  # دوام كامل / جزئي / عقد / مستقل
+    branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=True, index=True)
+    branch_section_id = db.Column(db.Integer, db.ForeignKey("branch_section.id"), nullable=True, index=True)
     join_date = db.Column(db.Date, nullable=True, index=True)
     contract_start_date = db.Column(db.Date, nullable=True)
     contract_end_date = db.Column(db.Date, nullable=True, index=True)
@@ -133,7 +135,7 @@ class Employee(db.Model):
     
     # الرواتب
     base_salary = db.Column(db.Numeric(12, 2), nullable=True)
-    currency = db.Column(db.String(10), default="SAR", nullable=True)
+    currency = db.Column(db.String(10), default="OMR", nullable=True)
     
     # معلومات إضافية
     notes = db.Column(db.Text, nullable=True)
@@ -165,6 +167,28 @@ class Employee(db.Model):
 
     def __repr__(self) -> str:
         return f"<Employee {self.id} {self.full_name} ({self.employee_number})>"
+
+    @property
+    def branch_name(self) -> Optional[str]:
+        if not self.branch_id:
+            return None
+        try:
+            from app import Branch  # type: ignore import-error
+        except Exception:
+            return None
+        branch = Branch.query.get(self.branch_id)
+        return branch.name if branch else None
+
+    @property
+    def branch_section_name(self) -> Optional[str]:
+        if not self.branch_section_id:
+            return None
+        try:
+            from app import BranchSection  # type: ignore import-error
+        except Exception:
+            return None
+        section = BranchSection.query.get(self.branch_section_id)
+        return section.name if section else None
 
 
 # ==================== الحضور والرواتب (Attendance & Payroll) ====================
@@ -532,7 +556,7 @@ class JobPosting(db.Model):
     
     salary_min = db.Column(db.Numeric(12, 2), nullable=True)
     salary_max = db.Column(db.Numeric(12, 2), nullable=True)
-    currency = db.Column(db.String(10), default="SAR")
+    currency = db.Column(db.String(10), default="OMR")
     
     posting_date = db.Column(db.Date, nullable=False, index=True)
     closing_date = db.Column(db.Date, nullable=True, index=True)

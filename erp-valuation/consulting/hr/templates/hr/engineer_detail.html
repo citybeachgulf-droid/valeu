@@ -106,7 +106,9 @@
                     {% else %}-{% endif %}
                   </td>
                   <td style="width:260px">
-                    <form class="d-flex align-items-center gap-2 task-update-form" data-task-id="{{ t.id }}">
+                    <form class="d-flex align-items-center gap-2 task-update-form"
+                          data-task-id="{{ t.id }}"
+                          data-update-url="{{ url_for('consulting_hr.update_task', task_id=t.id) }}">
                       <select class="form-select form-select-sm" name="status" style="width: 150px;">
                         {% for s in TASK_STATUSES %}
                         <option value="{{ s }}" {% if t.status==s %}selected{% endif %}>{{ s }}</option>
@@ -149,9 +151,10 @@
       form.addEventListener('submit', async function (e) {
         e.preventDefault();
         const taskId = form.getAttribute('data-task-id');
+        const updateUrl = form.getAttribute('data-update-url');
         const fd = new FormData(form);
         try {
-          const res = await fetch(`${location.origin}/consulting/tasks/${taskId}/update`, {
+          const res = await fetch(updateUrl, {
             method: 'POST',
             body: fd,
             headers: { 'X-Requested-With': 'XMLHttpRequest' },

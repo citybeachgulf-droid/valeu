@@ -1,142 +1,140 @@
 {% extends 'base.html' %}
-{% set title = '👨‍💼 لوحة المدير' %}
-
-{% block head_extra %}
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Tahoma, sans-serif; }
-  body { background:#f4f6f8; color:#333; }
-
-  /* ---------- Sidebar ---------- */
-  .sidebar { width:260px; background:#1e1e2f; color:#fff; transition: transform 0.3s ease; flex-shrink:0; height:100vh; position:fixed; top:0; left:0; overflow-y:auto; z-index:1000; }
-  .sidebar h2 { text-align:center; padding:1.5rem 0; font-size:1.3rem; letter-spacing:1px; }
-  .sidebar ul { list-style:none; }
-  .sidebar li { padding:0.8rem 1.2rem; cursor:pointer; transition: background 0.2s; text-align:center; }
-  .sidebar li:hover { background:#2c2c44; }
-  .sidebar li.active { background:#ffb800; color:#1e1e2f; font-weight:bold; }
-
-  /* ---------- Main ---------- */
-  .main { margin-left:260px; padding:1.5rem; transition: margin-left 0.3s ease; }
-
-  /* ---------- Topbar ---------- */
-  .topbar { display:flex; justify-content:space-between; align-items:center; padding:0.8rem 1rem; background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.05); margin-bottom:1.5rem; }
-  .topbar h1 { font-size:1.2rem; text-align:center; flex:1; }
-
-  /* ---------- Cards ---------- */
-  .card { background:#fff; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.08); margin-bottom:1.5rem; padding:1rem; text-align:center; transition: transform 0.3s; }
-  .card:hover { transform: translateY(-5px); }
-  .card h3 { margin-bottom:0.8rem; }
-  .card p { margin-bottom:0.5rem; }
-
-  /* ---------- Status Badges ---------- */
-  .badge { display:inline-block; padding:0.4em 0.8em; border-radius:12px; font-size:0.85rem; font-weight:bold; }
-  .pending { background:#ffc107; color:#000; }
-  .completed { background:#28a745; color:#fff; }
-  .rejected { background:#dc3545; color:#fff; }
-
-  /* ---------- Responsive ---------- */
-  @media (max-width:992px) {
-    .sidebar { transform:translateX(-100%); }
-    .sidebar.open { transform:translateX(0); }
-    .main { margin-left:0; padding:1rem; }
-    .toggle-btn { display:block; cursor:pointer; font-size:1.5rem; color:#1e1e2f; margin-bottom:1rem; }
-  }
-  @media (max-width:576px) {
-    .card h3 { font-size:1rem; }
-    .card p { font-size:0.85rem; }
-    .topbar h1 { font-size:1rem; }
-  }
-
-  /* ---------- Animations ---------- */
-  .fade-in { opacity:0; animation: fadeIn 0.6s forwards; }
-  @keyframes fadeIn { to { opacity:1; } }
-
-</style>
-{% endblock %}
+{% from 'partials/nav.html' import manager_nav %}
+{% set title = 'لوحة المدير' %}
 
 {% block navbar %}
-<nav class="sidebar" id="sidebar">
-  <h2>لوحة المدير</h2>
-  <ul>
-    <li class="active"><a href="{{ url_for('manage_employees') }}" style="color:inherit; text-decoration:none;">👥 إدارة الموظفين</a></li>
-    <li><a href="{{ url_for('manage_branches') }}" style="color:inherit; text-decoration:none;">🏢 إدارة الفروع</a></li>
-    <li><a href="{{ url_for('add_bank') }}" style="color:inherit; text-decoration:none;">🏦 إضافة بنك</a></li>
-    <li><a href="{{ url_for('banks_overview') }}" style="color:inherit; text-decoration:none;">🏦 البنوك</a></li>
-    <li><a href="{{ url_for('inactive_bank_employees') }}" style="color:inherit; text-decoration:none;">🕒 موظفين البنوك المتوقفين </a></li>
-    <li><a href="{{ url_for('branch_documents') }}" style="color:inherit; text-decoration:none;">📁 مستندات الفروع</a></li>
-    <li><a href="{{ url_for('commissions_page') }}" style="color:inherit; text-decoration:none;">💸 عمولة الموظفين</a></li>
-    <li><a href="{{ url_for('customers_page') }}" style="color:inherit; text-decoration:none;">👥 العملاء</a></li>
-    <li><a href="/reports" style="color:#ffb800; text-decoration:none;">📑 التقارير</a></li>
-  </ul>
-</nav>
+  {{ manager_nav(active='dashboard') }}
 {% endblock %}
 
 {% block content %}
-<div class="main">
-  <span class="toggle-btn" onclick="toggleSidebar()">☰</span>
-  <div class="topbar">
-    <h1>👨‍💼 لوحة المدير</h1>
+<div class="app-page-title" data-aos="fade-up">
+  <h1>لوحة القيادة</h1>
+  <div class="app-page-title__meta">
+    <span>متابعة سير عمليات التقييم، وحالة الفروع.</span>
+    {% if transactions %}<span class="pill">عمليات جارية: {{ transactions|length }}</span>{% endif %}
+    {% if branches %}<span class="pill">فروع نشطة: {{ branches|length }}</span>{% endif %}
   </div>
+</div>
 
-  {% if expiring_docs and expiring_docs|length > 0 %}
-  <div class="card fade-in" style="background:#fff3cd; color:#856404;">
-    ⚠️ هناك مستندات/عقود قريبة الانتهاء خلال 30 يوماً.
-    <a href="{{ url_for('branch_documents') }}" style="color:#856404; font-weight:bold; text-decoration:underline;">عرض التفاصيل</a>
-  </div>
-  {% endif %}
-
-  {% if (delayed_not_received and delayed_not_received|length) or (delayed_received_no_report and delayed_received_no_report|length) %}
-  <a href="{{ url_for('manager_delayed') }}" style="text-decoration:none;">
-    <div class="card fade-in" style="background:#f8d7da; color:#721c24;">
-      ⏱️ معاملات متأخرة (أكثر من 5 ساعات) — اضغط للعرض التفصيلي
+{% if expiring_docs and expiring_docs|length > 0 %}
+<div class="app-card app-section--bordered mb-4" data-aos="fade-up" data-aos-delay="60">
+  <div class="d-flex flex-column flex-md-row justify-content-between gap-2 align-items-md-center">
+    <div>
+      <h3 class="app-card__title mb-1">وثائق بحاجة للتجديد قريباً</h3>
+      <p class="app-card__subtitle mb-0">يوجد {{ expiring_docs|length }} وثيقة تنتهي خلال أقل من 30 يوماً.</p>
     </div>
-  </a>
-  {% endif %}
+    <a href="{{ url_for('branch_documents') }}" class="btn btn-outline-primary">عرض الوثائق</a>
+  </div>
+</div>
+{% endif %}
 
-  <h3 class="fade-in" style="margin:2rem 0; text-align:center;">📋 جميع المعاملات</h3>
-  <div>
+{% if (delayed_not_received and delayed_not_received|length) or (delayed_received_no_report and delayed_received_no_report|length) %}
+<div class="app-card mb-4" data-aos="fade-up" data-aos-delay="90" style="background: linear-gradient(125deg, rgba(220, 38, 38, 0.12), rgba(249, 115, 22, 0.08));">
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+    <div>
+      <h3 class="app-card__title mb-2 text-danger">تنبيهات التأخير</h3>
+      <p class="mb-0 text-danger">هناك معاملات متأخرة تحتاج متابعة عاجلة. راجع تفاصيلها لضمان عدم تجاوز SLA.</p>
+    </div>
+    <a href="{{ url_for('manager_delayed') }}" class="btn btn-danger">عرض المعاملات المتأخرة</a>
+  </div>
+</div>
+{% endif %}
+
+<div class="stats-row" data-aos="fade-up" data-aos-delay="120">
+  <div class="stat-card">
+    <span class="stat-card__label">إجمالي قيمة التقديرات</span>
+    <span class="stat-card__value">
+      {{ '{:,.0f}'.format(transactions|sum(attribute='total_estimate') if transactions else 0) }} ر.ع
+    </span>
+    <div class="text-muted small">إجمالي التقديرات للعمليات الحالية.</div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-card__label">المعاملات في طور الإنجاز</span>
+    <span class="stat-card__value">{{ transactions|length or 0 }}</span>
+    <div class="text-muted small">يتضمن المعاملات الجارية في كافة الفروع.</div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-card__label">إجمالي الدخل للفروع</span>
+    <span class="stat-card__value">
+      {{ '{:,.0f}'.format(branches|sum(attribute='income') if branches else 0) }} ر.ع
+    </span>
+    <div class="text-muted small">القيمة الصافية المجمعة لجميع الفروع.</div>
+  </div>
+</div>
+
+<div class="app-section" data-aos="fade-up" data-aos-delay="150">
+  <div class="section-title">المعاملات الجارية</div>
+  {% if transactions %}
+  <div class="app-grid app-grid--two">
     {% for t in transactions %}
-    <div class="card fade-in">
-      <h3>🏦 {{ t.bank.name|default("غير محدد") }}</h3>
-      <p>👤 العميل: {{ t.client }}</p>
-      <p>👨‍💻 الموظف: {{ t.employee }}</p>
-      <p>📍 الموقع: {{ t.state }} - {{ t.region }}</p>
-      <p>📅 التاريخ: {{ t.date.strftime('%Y-%m-%d') }}</p>
-      <span class="badge status-{{ t.status|lower }}">{{ t.status }}</span>
-      <div style="margin-top:0.8rem;">
-        <p>🏠 المساحة: {{ t.area }} م²</p>
-        <p>🌍 قيمة الأرض: {{ "{:,.0f}".format(t.land_value) }} ريال</p>
-        <p>🏗️ قيمة المبنى: {{ "{:,.0f}".format(t.building_value) }} ريال</p>
-        <p>📊 إجمالي التقدير: {{ "{:,.0f}".format(t.total_estimate) }} ريال</p>
-        <p>💵 الرسوم: {{ "{:,.0f}".format(t.fee) }} ريال</p>
+    <div class="app-card d-grid gap-3" data-aos="fade-up" data-aos-delay="{{ loop.index * 40 }}">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <h3 class="app-card__title mb-1">{{ t.client }}</h3>
+          <p class="app-card__subtitle mb-0">{{ t.bank.name if t.bank else 'بنك غير محدد' }}</p>
+        </div>
+        <span class="badge bg-soft-primary">{{ t.status }}</span>
       </div>
-    </div>
-    {% else %}
-    <div class="card fade-in">
-      <p>لا توجد معاملات مسجلة</p>
+      <div class="d-grid gap-1">
+        <div class="text-muted small">الموظف المسؤول: <span class="fw-semibold">{{ t.employee }}</span></div>
+        <div class="text-muted small">الموقع: {{ t.state }} - {{ t.region }}</div>
+        <div class="text-muted small">تاريخ الطلب: {{ t.date.strftime('%Y-%m-%d') }}</div>
+      </div>
+      <div class="panel">
+        <div class="d-flex flex-wrap gap-3">
+          <div>
+            <div class="text-muted small mb-1">مساحة الأرض</div>
+            <strong>{{ '{:,.0f}'.format(t.area) }} م²</strong>
+          </div>
+          <div>
+            <div class="text-muted small mb-1">قيمة الأرض</div>
+            <strong>{{ '{:,.0f}'.format(t.land_value) }} ر.ع</strong>
+          </div>
+          <div>
+            <div class="text-muted small mb-1">قيمة المبنى</div>
+            <strong>{{ '{:,.0f}'.format(t.building_value) }} ر.ع</strong>
+          </div>
+          <div>
+            <div class="text-muted small mb-1">أتعاب التقييم</div>
+            <strong>{{ '{:,.0f}'.format(t.fee) }} ر.ع</strong>
+          </div>
+        </div>
+      </div>
     </div>
     {% endfor %}
   </div>
+  {% else %}
+  <div class="empty-state">
+    <h4>لا توجد معاملات حالية</h4>
+    <p>عند إضافة معاملات جديدة ستظهر هنا للمتابعة الفورية.</p>
+    <a href="{{ url_for('manage_branches') }}" class="btn btn-primary">الانتقال لإدارة الفروع</a>
+  </div>
+  {% endif %}
+</div>
 
-  <h3 class="fade-in" style="margin:2rem 0; text-align:center;">📊 أرباح الفروع</h3>
-  <div>
+<div class="app-section" data-aos="fade-up" data-aos-delay="180">
+  <div class="section-title">ملخص أداء الفروع</div>
+  {% if branches %}
+  <div class="app-grid app-grid--three">
     {% for branch in branches %}
-    <a href="{{ url_for('manager_branch_summary', bid=branch.id) }}" style="text-decoration:none; color:inherit;">
-      <div class="card fade-in">
-        <h3>🏢 {{ branch.name }}</h3>
-        <p>💰 الدخل: {{ branch.income }} ريال</p>
-        <p>📉 المصاريف: {{ branch.expenses }} ريال</p>
-        <p class="badge completed">📊 الربح: {{ branch.profit }} ريال</p>
+    <a href="{{ url_for('manager_branch_summary', bid=branch.id) }}" class="text-decoration-none text-reset">
+      <div class="app-card d-grid gap-2" data-aos="fade-up" data-aos-delay="{{ loop.index * 30 }}">
+        <h3 class="app-card__title mb-0">{{ branch.name }}</h3>
+        <div class="text-muted small">إجمالي الدخل</div>
+        <strong>{{ '{:,.0f}'.format(branch.income) }} ر.ع</strong>
+        <div class="text-muted small">إجمالي المصروفات</div>
+        <strong>{{ '{:,.0f}'.format(branch.expenses) }} ر.ع</strong>
+        <div class="status-chip status-chip--success mt-2">الربح الصافي: {{ '{:,.0f}'.format(branch.profit) }} ر.ع</div>
       </div>
     </a>
     {% endfor %}
   </div>
+  {% else %}
+  <div class="empty-state">
+    <h4>لا توجد بيانات فروع</h4>
+    <p>قم بإضافة الفروع أو ربطها لعرض مؤشرات الأداء.</p>
+    <a href="{{ url_for('manage_branches') }}" class="btn btn-outline-primary">إدارة الفروع</a>
+  </div>
+  {% endif %}
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('open');
-}
-</script>
 {% endblock %}

@@ -15,14 +15,14 @@
       <li class="list-group-item">المساحة: <b>{{ area }}</b> م²</li>
       <li class="list-group-item">على شارع: <b>{{ 'نعم' if street else 'لا' }}</b></li>
       <li class="list-group-item">زاوية: <b>{{ 'نعم' if corner else 'لا' }}</b></li>
-      <li class="list-group-item">سعر المتر (أدنى/متوسط/أعلى): <b>{{ price_min }} / {{ price_mid }} / {{ price_max }}</b> ريال</li>
+      <li class="list-group-item">سعر المتر (أدنى/متوسط/أعلى): <b>{{ price_min }} / {{ price_mid }} / {{ price_max }}</b> ر.ع</li>
       <li class="list-group-item">معامل الزيادة الإجمالي: <b>{{ '%.2f'|format(factor) }}x</b></li>
     </ul>
 
     <div class="row text-center mt-4">
-      <div class="col-md-4"><div class="card p-3"><div>الحد الأدنى</div><div class="fs-4 text-muted">{{ '%.2f'|format(est_min) }} ريال</div></div></div>
-      <div class="col-md-4"><div class="card p-3"><div>المتوسط</div><div class="fs-4 text-primary">{{ '%.2f'|format(est_mid) }} ريال</div></div></div>
-      <div class="col-md-4"><div class="card p-3"><div>الحد الأعلى</div><div class="fs-4 text-success">{{ '%.2f'|format(est_max) }} ريال</div></div></div>
+      <div class="col-md-4"><div class="card p-3"><div>الحد الأدنى</div><div class="fs-4 text-muted">{{ '%.2f'|format(est_min) }} ر.ع</div></div></div>
+      <div class="col-md-4"><div class="card p-3"><div>المتوسط</div><div class="fs-4 text-primary">{{ '%.2f'|format(est_mid) }} ر.ع</div></div></div>
+      <div class="col-md-4"><div class="card p-3"><div>الحد الأعلى</div><div class="fs-4 text-success">{{ '%.2f'|format(est_max) }} ر.ع</div></div></div>
     </div>
 
     {% if filename %}

@@ -75,6 +75,23 @@ h3 { font-weight: 600; color: #4a148c; }
         <input type="text" class="form-control" name="phone" value="{{ form_values.phone }}">
       </div>
       <div class="col-md-3">
+        <label class="form-label">الفرع <span class="text-danger">*</span></label>
+        <select class="form-select {% if form_errors.get('branch_id') %}is-invalid{% endif %}" name="branch_id" id="staffBranchSelect">
+          <option value="">-- اختر الفرع --</option>
+          {% for branch in branch_choices %}
+          <option value="{{ branch.id }}" {% if form_values.branch_id == branch.id|string or form_values.branch_id == branch.id %}selected{% endif %}>{{ branch.name }}</option>
+          {% endfor %}
+        </select>
+        {% if form_errors.get('branch_id') %}<div class="invalid-feedback d-block">{{ form_errors.get('branch_id') }}</div>{% endif %}
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">القسم الداخلي</label>
+        <select class="form-select {% if form_errors.get('branch_section_id') %}is-invalid{% endif %}" name="branch_section_id" id="staffBranchSectionSelect" data-current="{{ form_values.branch_section_id or '' }}">
+          <option value="">-- اختر --</option>
+        </select>
+        {% if form_errors.get('branch_section_id') %}<div class="invalid-feedback d-block">{{ form_errors.get('branch_section_id') }}</div>{% endif %}
+      </div>
+      <div class="col-md-3">
         <label class="form-label">??? ???????</label>
         <select class="form-select" name="employment_type">
           <option value="">-- ???? --</option>

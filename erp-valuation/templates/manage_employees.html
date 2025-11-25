@@ -1,160 +1,238 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>👥 إدارة الموظفين</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Tahoma, sans-serif; }
-  body { background:#f4f6f8; color:#333; }
-  .container { max-width:1200px; margin:auto; padding:1rem; }
+{% extends 'base.html' %}
+{% from 'partials/nav.html' import manager_nav %}
+{% set title = 'إدارة حسابات الموظفين' %}
 
-  h2,h5 { text-align:center; margin-bottom:1rem; }
+{% block navbar %}
+  {{ manager_nav(active='employees') }}
+{% endblock %}
 
-  /* Card */
-  .card { background:#fff; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.08); padding:1.5rem; margin-bottom:2rem; transition: transform 0.3s; text-align:center; }
-  .card:hover { transform:translateY(-5px); }
+{% block content %}
+<div class="app-page-title" data-aos="fade-up">
+  <h1>إدارة حسابات الموظفين</h1>
+  <div class="app-page-title__meta">
+    <span>إنشاء حسابات جديدة وربطها بالفروع والأشخاص المعتمدين.</span>
+    <span class="pill">إجمالي المستخدمين: {{ users|length }}</span>
+  </div>
+</div>
 
-  form { display:flex; flex-wrap:wrap; gap:1rem; justify-content:center; align-items:end; }
-  input, select { padding:0.5rem 0.7rem; border-radius:8px; border:1px solid #ccc; width:100%; max-width:200px; }
-  button, a { padding:0.5rem 1rem; border-radius:8px; font-weight:bold; cursor:pointer; transition: all 0.3s; border:none; text-align:center; }
-  button:hover, a:hover { opacity:0.9; }
-
-  .btn-primary { background:#0d6efd; color:#fff; }
-  .btn-danger { background:#dc3545; color:#fff; }
-
-  table { width:100%; border-collapse:collapse; margin-top:1rem; text-align:center; }
-  th, td { padding:0.75rem; border:1px solid #ddd; }
-  thead { background:#1e1e2f; color:#fff; }
-  tbody tr:nth-child(even) { background:#f4f4f4; }
-
-  @media(max-width:768px){
-    form { flex-direction:column; align-items:center; }
-    input, select, button { max-width:100%; }
-  }
-
-  /* Fade in animation */
-  .fade-in { opacity:0; animation: fadeIn 0.6s forwards; }
-  @keyframes fadeIn { to { opacity:1; } }
-</style>
-</head>
-<body data-back-button-label="{{ role_home_label }}" data-back-button-fallback="{{ role_home_url }}">
-
-<div class="container">
-  <h2 class="fade-in">👥 إدارة الموظفين</h2>
-
-  <!-- إضافة موظف -->
-  <div class="card fade-in">
-    <h5>➕ إضافة موظف جديد</h5>
-    <form method="POST">
-      <input type="text" name="username" placeholder="اسم المستخدم" required>
-      <input type="password" name="password" placeholder="كلمة المرور" required>
-      <select name="role" required>
-        <option value="">اختر الدور</option>
-        <option value="employee">موظف</option>
-        <option value="hr">الموارد البشرية</option>
-        <option value="engineer">مهندس</option>
-        <option value="finance">مالية</option>
-        <option value="manager">مدير</option>
-      </select>
-      <select name="branch_id" required>
-        <option value="">اختر الفرع</option>
-        {% for b in branches %}
-          <option value="{{ b.id }}">{{ b.name }}</option>
-        {% endfor %}
-      </select>
-      <select name="section_id">
-        <option value="">القسم (اختياري)</option>
-        {% for b in branches %}
-          {% for s in b.sections or [] %}
-            <option value="{{ s.id }}">{{ b.name }} — {{ 'الاستشارات' if s.name=='consultations' else ('التثمين' if s.name=='valuation' else s.name) }}</option>
+<div class="app-grid" data-aos="fade-up" data-aos-delay="80">
+  <div class="app-card">
+    <div class="app-card__header">
+      <div>
+        <h3 class="app-card__title">إضافة مستخدم جديد</h3>
+        <p class="app-card__subtitle mb-0">حدد الدور والفرع لضمان منح الصلاحيات المناسبة.</p>
+      </div>
+    </div>
+    <form method="POST" class="row g-3 text-start">
+      <div class="col-md-4">
+        <label class="form-label">اسم المستخدم</label>
+        <input type="text" name="username" class="form-control" placeholder="مثل: ahmad.alqahtani" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">كلمة المرور</label>
+        <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">الدور الوظيفي</label>
+        <select name="role" class="form-select" required>
+          <option value="" disabled selected>اختر الدور</option>
+          <option value="employee">موظف فرع</option>
+          <option value="consulting_employee">موظف استشارات هندسية</option>
+          <option value="hr">موارد بشرية</option>
+          <option value="engineer">مهندس تقييم</option>
+          <option value="finance">مالية</option>
+          <option value="manager">مدير</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">الفرع الرئيسي</label>
+        <select name="branch_id" class="form-select" required>
+          <option value="" disabled selected>اختر فرعاً</option>
+          {% for b in branches %}
+            {% set dept_raw = (b.department or '') %}
+            {% set dept_code = dept_raw|lower %}
+            {% if 'consult' in dept_code or 'استشار' in dept_raw %}
+              {% set dept_code = 'consultations' %}
+            {% endif %}
+            <option value="{{ b.id }}" data-department-code="{{ dept_code }}">{{ b.name }}</option>
           {% endfor %}
-        {% endfor %}
-      </select>
-      <button type="submit" class="btn-primary">إضافة</button>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">القسم الداخلي (اختياري)</label>
+        <select name="section_id" class="form-select">
+          <option value="">بدون قسم محدد</option>
+          {% for b in branches %}
+            {% for s in b.ordered_sections or [] %}
+              {% set section_raw = (s.name or '') %}
+              {% set section_code = section_raw|lower %}
+              {% if 'consult' in section_code or 'استشار' in section_raw %}
+                {% set section_code = 'consultations' %}
+              {% endif %}
+              <option value="{{ s.id }}" data-section-code="{{ section_code }}">{{ b.name }} - {{ 'الاستشارات' if s.name=='consultations' else ('التقييم' if s.name=='valuation' else s.name) }}</option>
+            {% endfor %}
+          {% endfor %}
+        </select>
+        <div class="form-text">يمكن تركه فارغاً في حال عدم الحاجة إلى تخصيص القسم.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">ربط بموظف الموارد البشرية (اختياري)</label>
+        <select name="employee_id" class="form-select">
+          <option value="">بدون ربط</option>
+          {% for emp in hr_employees %}
+            {% set assigned_user = emp.user_account %}
+            <option value="{{ emp.id }}" {% if assigned_user %}disabled{% endif %}>
+              {{ emp.full_name }}{% if emp.employee_number %} - {{ emp.employee_number }}{% endif %}
+              {% if assigned_user %}(مربوط بـ {{ assigned_user.username }}){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 d-flex justify-content-end">
+        <button type="submit" class="btn btn-primary">إنشاء الحساب</button>
+      </div>
     </form>
   </div>
+</div>
 
- <!-- جدول الموظفين محسّن -->
-<div class="card fade-in">
-  <h5>📋 قائمة الموظفين</h5>
-  <div style="overflow-x:auto;">
-    <table class="custom-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>اسم المستخدم</th>
-          <th>الدور</th>
-          <th>الفرع</th>
-          <th>القسم</th>
-          <th>إجراءات</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for u in users %}
-        <tr>
-          <td>{{ u.id }}</td>
-          <td>{{ u.username }}</td>
-          <td>{{ u.role }}</td>
-          <td>{{ u.branch.name if u.branch else "غير محدد" }}</td>
-          <td>{% if u.section %}{{ 'الاستشارات' if u.section.name=='consultations' else ('التثمين' if u.section.name=='valuation' else u.section.name) }}{% else %}—{% endif %}</td>
-          <td>
-            {% if u.role != 'manager' %}
-              <a href="{{ url_for('delete_employee', uid=u.id) }}" class="btn-delete" onclick="return confirm('هل أنت متأكد من الحذف؟')">🗑 حذف</a>
-            {% else %}
-              <span style="color:#888;">🚫</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="6">لا يوجد موظفين</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<div class="app-section" data-aos="fade-up" data-aos-delay="140">
+  <div class="app-card">
+    <div class="app-card__header">
+      <div>
+        <h3 class="app-card__title">سجل المستخدمين</h3>
+        <p class="app-card__subtitle mb-0">عرض تفاصيل الدخول، الأقسام، والدعوات الأخيرة.</p>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>اسم المستخدم</th>
+            <th>الدور</th>
+            <th>الفرع</th>
+            <th>القسم</th>
+            <th>الموظف المرتبط</th>
+            <th class="text-center">الإجراءات</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>{{ u.id }}</td>
+            <td class="fw-semibold">{{ u.username }}</td>
+            <td><span class="status-chip status-chip--info">{{ u.role }}</span></td>
+            <td>{{ u.branch.name if u.branch else "غير محدد" }}</td>
+            <td>
+              {% if u.section %}
+                {{ 'الاستشارات' if u.section.name=='consultations' else ('التقييم' if u.section.name=='valuation' else u.section.name) }}
+              {% else %}
+                <span class="text-muted">غير مرتبط</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if u.employee %}
+                <div class="fw-semibold">{{ u.employee.full_name }}</div>
+                {% if u.employee.employee_number %}
+                <div class="text-muted small">رقم الموظف: {{ u.employee.employee_number }}</div>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">لم يتم الربط</span>
+              {% endif %}
+              <form method="POST" class="d-flex flex-wrap gap-2 align-items-center mt-2" action="{{ url_for('link_user_to_employee', user_id=u.id) }}">
+                <select name="employee_id" class="form-select form-select-sm" style="min-width: 200px;">
+                  <option value="">اختر موظفاً</option>
+                  {% for emp in hr_employees %}
+                    {% set assigned_user = emp.user_account %}
+                    <option value="{{ emp.id }}"
+                      {% if u.employee and u.employee.id == emp.id %}selected{% endif %}
+                      {% if assigned_user and assigned_user.id != u.id %}disabled{% endif %}>
+                      {{ emp.full_name }}{% if emp.employee_number %} - {{ emp.employee_number }}{% endif %}
+                      {% if assigned_user and assigned_user.id != u.id %}(مربوط بـ {{ assigned_user.username }}){% endif %}
+                    </option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-outline-primary btn-sm">تحديث الربط</button>
+              </form>
+              {% set invite = latest_invitations.get(u.id) %}
+              {% if invite %}
+              <div class="panel mt-3">
+                <div class="text-muted small mb-1">رابط الدعوة</div>
+                <input type="text" class="form-control form-control-sm" readonly value="{{ url_for('complete_invitation', token=invite.token, _external=True) }}">
+                <div class="text-muted small mt-2">
+                  كلمة المرور المؤقتة:
+                  {% if invite.raw_password %}
+                    <code>{{ invite.raw_password }}</code>
+                  {% else %}
+                    <span class="badge bg-success">تم تغييرها</span>
+                  {% endif %}
+                </div>
+                {% if invite.used_at %}
+                <div class="text-muted small mt-1">استخدمت في {{ invite.used_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                {% elif invite.expires_at %}
+                <div class="text-muted small mt-1">تنتهي في {{ invite.expires_at.strftime('%Y-%m-%d') }}</div>
+                {% endif %}
+              </div>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if u.role != 'manager' %}
+              <a href="{{ url_for('delete_employee', uid=u.id) }}" class="btn btn-outline-danger btn-sm" onclick="return confirm('هل أنت متأكد من حذف هذا الحساب؟')">حذف</a>
+              {% else %}
+              <span class="text-muted">غير متاح</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-4">لا توجد حسابات مسجلة حالياً.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
+{% endblock %}
 
-<style>
-.custom-table { 
-  width: 100%; 
-  border-collapse: collapse; 
-  text-align: center; 
-  font-size: 0.95rem;
-}
+{% block scripts %}
+  {{ super() }}
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const roleSelect = document.querySelector('select[name="role"]');
+      const sectionSelect = document.querySelector('select[name="section_id"]');
+      const branchSelect = document.querySelector('select[name="branch_id"]');
 
-.custom-table thead { 
-  background: linear-gradient(90deg, #0d6efd, #6610f2); 
-  color: #fff; 
-  position: sticky; 
-  top: 0; 
-  z-index: 2;
-}
+      const getSelectedCode = (selectEl, attr) => {
+        if (!selectEl) {
+          return null;
+        }
+        const option = selectEl.options[selectEl.selectedIndex];
+        return option ? option.getAttribute(attr) : null;
+      };
 
-.custom-table th, .custom-table td { 
-  padding: 0.75rem; 
-  border: 1px solid #ddd; 
-  vertical-align: middle; 
-}
+      const syncRoleWithSection = () => {
+        const sectionCode = getSelectedCode(sectionSelect, 'data-section-code');
+        const branchCode = getSelectedCode(branchSelect, 'data-department-code');
+        const isConsulting = sectionCode === 'consultations' || branchCode === 'consultations';
+        if (!roleSelect) {
+          return;
+        }
+        if (isConsulting) {
+          roleSelect.value = 'consulting_employee';
+        } else if (roleSelect.value === 'consulting_employee') {
+          roleSelect.value = 'employee';
+        }
+      };
 
-.custom-table tbody tr:nth-child(even) { background:#f9f9f9; }
-.custom-table tbody tr:hover { background:#e2e6ea; transform: scale(1.01); transition: 0.2s; }
+      if (branchSelect) {
+        branchSelect.addEventListener('change', syncRoleWithSection);
+      }
+      if (sectionSelect) {
+        sectionSelect.addEventListener('change', syncRoleWithSection);
+      }
+      syncRoleWithSection();
+    });
+  </script>
+{% endblock %}
 
-.btn-delete {
-  display:inline-block;
-  padding:0.35rem 0.6rem;
-  background:#dc3545;
-  color:#fff;
-  border-radius:6px;
-  text-decoration:none;
-  font-size:0.85rem;
-  transition: all 0.2s;
-}
-.btn-delete:hover { background:#c82333; transform: scale(1.05); }
-</style>
-
-
-</div>
-
-  <script defer src="{{ url_for('static', filename='js/back-button.js') }}"></script>
-</body>
-</html>

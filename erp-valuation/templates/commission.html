@@ -1,91 +1,116 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-   <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="#">🛠️ نظام التثمين</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto">
-        <!-- زر الصفحة الرئيسية -->
-        <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('engineer_dashboard') }}">🏠 الصفحة الرئيسية</a>
-        </li>
-        <!-- زر تسجيل الخروج -->
-        <li class="nav-item">
-          <a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 تسجيل الخروج</a>
-        </li>
-      </ul>
-    </div>
+{% extends 'base.html' %}
+{% from 'partials/nav.html' import manager_nav, app_nav %}
+{% set title = 'حساب عمولة المنجزين' %}
+
+{% block navbar %}
+  {% if role == 'manager' %}
+    {{ manager_nav(active='commissions') }}
+  {% else %}
+    {{ app_nav(
+      brand='لوحة التقييم',
+      brand_url=url_for('engineer_dashboard'),
+      appearance='dark',
+      collapse_id='commissionNav',
+      items=[
+        {'label': 'لوحة المهام', 'href': url_for('engineer_dashboard')},
+        {'label': 'حساب العمولات', 'href': url_for('commissions_page'), 'active': True}
+      ],
+      actions=[
+        {'label': 'تسجيل الخروج', 'href': url_for('logout'), 'variant': 'outline-light'}
+      ]
+    ) }}
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="app-page-title" data-aos="fade-up">
+  <h1>حساب عمولة المنجزين</h1>
+  <div class="app-page-title__meta">
+    <span>تجميع معاملات العقارات والسيارات لمعرفة العمولة المستحقة.</span>
+    <span class="pill">إجمالي المعاملات المحتسبة: {{ total_count }}</span>
   </div>
-</nav>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>💸 صفحة العمولات</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body { background-color: #f8f9fa; }
-    .card { border-radius: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-    .highlight { background: #e9f7ef; border: 1px solid #28a745; }
-    @media (max-width: 576px) {
-      .btn-block-sm { width: 100%; }
-    }
-  </style>
-</head>
-<body class="container py-4" data-back-button-label="{{ role_home_label }}" data-back-button-fallback="{{ role_home_url }}">
+</div>
 
-  <h3 class="text-center mb-4">💸 تقرير العمولات</h3>
-
-  <!-- ✅ فلتر الموظفين (للمدير فقط) -->
-  {% if role == "manager" %}
-  <form method="POST" class="mb-4">
-    <div class="row g-2">
-      <div class="col-12 col-md-6">
-        <select class="form-select" name="brought_by" required>
-          <option value="">-- اختر اسم من جلب المعاملة --</option>
-          {% for name in brought_by_names %}
-            <option value="{{ name }}" {% if selected_brought_by and name == selected_brought_by %}selected{% endif %}>
-              {{ name }}
-            </option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-12 col-md-2">
-        <button type="submit" class="btn btn-primary w-100 btn-block-sm">🔍 عرض</button>
-      </div>
+{% if role == "manager" %}
+<div class="app-card mb-4" data-aos="fade-up" data-aos-delay="80">
+  <h3 class="app-card__title mb-3">تصفية حسب الموظف الذي جلب المعاملة</h3>
+  <form method="POST" class="row g-2 align-items-end">
+    <div class="col-12 col-md-6">
+      <label class="form-label">اسم الموظف</label>
+      <select class="form-select" name="brought_by" required>
+        <option value="">اختر اسماً</option>
+        {% for name in brought_by_names %}
+          <option value="{{ name }}" {% if selected_brought_by and name == selected_brought_by %}selected{% endif %}>
+            {{ name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-3">
+      <button type="submit" class="btn btn-primary w-100">تطبيق التصفية</button>
     </div>
   </form>
-  {% endif %}
+</div>
+{% endif %}
 
-  <!-- ✅ عرض النتائج -->
-  <div class="card p-3 mb-3">
-    <h5 class="text-center">📊 تفاصيل المعاملات</h5>
+<div class="app-grid" data-aos="fade-up" data-aos-delay="120">
+  <div class="app-card">
+    <div class="app-card__header">
+      <div>
+        <h3 class="app-card__title">معاملات العقارات</h3>
+        <p class="app-card__subtitle mb-0">كل 50 ريال عماني تحتسب معاملة واحدة.</p>
+      </div>
+    </div>
     <ul class="list-group list-group-flush">
-      <li class="list-group-item">
-        🏠 معاملات العقار: <strong>{{ real_estate_count }}</strong> (دخل: {{ "{:,.0f}".format(real_estate_income) }} ريال)
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        عدد المعاملات المحتسبة
+        <span class="fw-bold">{{ real_estate_count }}</span>
       </li>
-      <li class="list-group-item">
-        🚗 معاملات السيارات: <strong>{{ vehicle_count }}</strong> (دخل: {{ "{:,.0f}".format(vehicle_income) }} ريال)
-      </li>
-      <li class="list-group-item highlight">
-        💰 الدخل الكلي: <strong>{{ "{:,.0f}".format(total_income) }} ريال</strong>
-      </li>
-      <li class="list-group-item">
-        🧮 عدد المعاملات المحتسبة: <strong>{{ total_count }}</strong>
-      </li>
-      <li class="list-group-item">
-        💵 العمولة المستحقة: <strong class="text-success">{{ "{:,.0f}".format(commission) }} ريال</strong>
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        إجمالي الدخل
+        <span class="fw-bold">{{ "{:,.0f}".format(real_estate_income) }} ر.ع</span>
       </li>
     </ul>
   </div>
 
-  <div class="text-center">
-    <a href="{{ url_for('manager_dashboard') }}" class="btn btn-secondary">⬅ رجوع</a>
+  <div class="app-card">
+    <div class="app-card__header">
+      <div>
+        <h3 class="app-card__title">معاملات السيارات</h3>
+        <p class="app-card__subtitle mb-0">كل ثلاث سيارات تحتسب معاملة واحدة.</p>
+      </div>
+    </div>
+    <ul class="list-group list-group-flush">
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        عدد السيارات المحتسبة
+        <span class="fw-bold">{{ vehicle_count }}</span>
+      </li>
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        إجمالي الدخل
+        <span class="fw-bold">{{ "{:,.0f}".format(vehicle_income) }} ر.ع</span>
+      </li>
+    </ul>
   </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</div>
 
-  <script defer src="{{ url_for('static', filename='js/back-button.js') }}"></script>
-</body>
-</html>
+<div class="app-card mt-4" data-aos="fade-up" data-aos-delay="180">
+  <div class="numbers-strip">
+    <div class="numbers-strip__item">
+      <span class="text-muted">إجمالي الدخل</span>
+      <strong>{{ "{:,.0f}".format(total_income) }} ر.ع</strong>
+    </div>
+    <div class="numbers-strip__item">
+      <span class="text-muted">إجمالي المعاملات المحتسبة</span>
+      <strong>{{ total_count }}</strong>
+    </div>
+    <div class="numbers-strip__item">
+      <span class="text-muted">العمولة المستحقة</span>
+      <strong class="text-success">{{ "{:,.0f}".format(commission) }} ر.ع</strong>
+      <span class="form-text">تحتسب بواقع 15 ريالاً عمانياً بعد 30 معاملة.</span>
+    </div>
+  </div>
+  <div class="d-flex justify-content-end gap-2">
+    <a href="{{ url_for('manager_dashboard') if role == 'manager' else url_for('engineer_dashboard') }}" class="btn btn-outline-primary">العودة للوحة الرئيسية</a>
+  </div>
+</div>
+{% endblock %}

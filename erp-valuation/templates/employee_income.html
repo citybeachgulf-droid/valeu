@@ -44,7 +44,7 @@
     <div class="card shadow-sm mb-4">
       <div class="card-body text-center">
         <h4>💰 إجمالي دخل الموظف <span class="text-primary">"{{ selected_emp }}"</span></h4>
-        <p class="fs-3 text-success">{{ income }} ريال</p>
+        <p class="fs-3 text-success">{{ income }} ر.ع</p>
       </div>
     </div>
 
@@ -70,7 +70,7 @@
     <td>{{ t.client }}</td>
     <td>{{ t.date }}</td>
     <td>{{ t.status }}</td>
-    <td>{{ t.fee }} ريال</td>
+    <td>{{ t.fee }} ر.ع</td>
     <td>
       {% if t.payment_status == "مدفوعة" %}
         <span class="badge bg-success">مدفوعة ✅</span>

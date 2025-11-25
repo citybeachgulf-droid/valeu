@@ -4,7 +4,7 @@ sys.modules.setdefault("app", sys.modules[__name__])
 import hashlib
 import secrets
 from datetime import datetime, timedelta, date
-from typing import List
+from typing import Iterable, List
 import fitz  # PyMuPDF (kept to preserve functionality if used in templates/utilities)
 import pytesseract  # OCR (kept to preserve functionality if used elsewhere)
 from PIL import Image  # Image handling (kept)
@@ -14,6 +14,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from extensions import db
 from sqlalchemy import func, or_, and_, text, inspect
+from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import OperationalError
 from pywebpush import webpush, WebPushException
 from docx import Document
@@ -51,6 +52,7 @@ if CONSULTING_DIR_OVERRIDE:
 from consulting.projects.models import ConsultingProject
 from consulting.clients.models import Client
 from consulting.projects.forms import PROJECT_TYPES
+from consulting.hr.models import Employee
 
 # ---------------- إعداد Flask ----------------
 app = Flask(__name__)
@@ -144,9 +146,11 @@ def build_b2_public_url(file_name: str) -> str | None:
 ROLE_HOME_ENDPOINTS: dict[str, tuple[str, str]] = {
     "manager": ("manager_dashboard", "العودة للوحة المدير"),
     "employee": ("employee_dashboard", "العودة للوحة الموظف"),
+    "consulting_employee": ("consulting_employee.dashboard", "العودة للوحة موظف الاستشارات"),
     "engineer": ("engineer_dashboard", "العودة للوحة المهندس"),
     "finance": ("finance_dashboard", "العودة للوحة المالية"),
     "hr": ("consulting_hr.dashboard", "العودة للوحة الموارد البشرية"),
+    "hr_manager": ("consulting_hr.dashboard", "العودة للوحة الموارد البشرية"),
     "consultant": ("consulting_dashboard.dashboard_home", "العودة للوحة الاستشارات"),
     "admin": ("manager_dashboard", "العودة للوحة المدير"),
     "visit": ("index", "العودة للصفحة الرئيسية"),
@@ -157,6 +161,24 @@ def _resolve_role_home() -> tuple[str, str]:
     """Return (url, label) pointing to the home page for the active role."""
 
     role = session.get("role")
+    # موظفو الفروع قد يملكون قسماً داخلياً يحدد الواجهة الرئيسية لهم
+    if role == "employee":
+        user_id = session.get("user_id")
+        if user_id:
+            user = User.query.get(user_id)
+            if user and user.section_id:
+                section = BranchSection.query.get(user.section_id)
+                if section and section.name:
+                    section_code = normalize_section_name(section.name)
+                    mapped = SECTION_HOME_ENDPOINTS.get(section_code)
+                    if mapped:
+                        endpoint, label = mapped
+                        try:
+                            home_url = url_for(endpoint)
+                            return home_url, label
+                        except Exception:
+                            pass
+
     endpoint, label = ROLE_HOME_ENDPOINTS.get(role, ("index", "العودة للصفحة الرئيسية"))
 
     try:
@@ -275,6 +297,9 @@ app.register_blueprint(invoices_bp)
 # لوحة المتابعة لقسم الاستشارات
 from consulting.dashboard.routes import dashboard_bp
 app.register_blueprint(dashboard_bp)
+
+from consulting.employee.routes import consulting_employee_bp
+app.register_blueprint(consulting_employee_bp)
 
 # ---------------- Service Worker at root scope ----------------
 @app.route('/service-worker.js')
@@ -516,12 +541,108 @@ class Branch(db.Model):
     # أقسام متعددة مرتبطة بالفرع (بدلاً من عمود واحد قديم department)
     sections = db.relationship("BranchSection", backref="branch", lazy=True, cascade="all, delete-orphan")
 
+    @property
+    def ordered_sections(self):
+        """Return branch sections sorted by the configured priority."""
+        return sort_sections_by_priority(self.sections)
+
 class BranchSection(db.Model):
     __tablename__ = "branch_section"
     __table_args__ = {"extend_existing": True}
     id = db.Column(db.Integer, primary_key=True)
     branch_id = db.Column(db.Integer, db.ForeignKey("branch.id"), nullable=False, index=True)
     name = db.Column(db.String(50), nullable=False)  # valuation | consultations
+
+
+SECTION_ALIASES: dict[str, str] = {
+    # Engineering consultations
+    "consultations": "consultations",
+    "consultation": "consultations",
+    "consulting": "consultations",
+    "consultation department": "consultations",
+    "consulting department": "consultations",
+    "قسم الاستشارات": "consultations",
+    "قسم الاستشارات الهندسية": "consultations",
+    "الهندسية": "consultations",
+    "الاستشارات": "consultations",
+    "الاستشارات الهندسية": "consultations",
+    # Human resources
+    "hr": "hr",
+    "human resources": "hr",
+    "human_resource": "hr",
+    "human-resources": "hr",
+    "الموارد البشرية": "hr",
+    "الموارد البشريه": "hr",
+    "موارد بشرية": "hr",
+    "قسم الموارد البشرية": "hr",
+    "شؤون الموظفين": "hr",
+    # Finance
+    "finance": "finance",
+    "financial": "finance",
+    "financial department": "finance",
+    "المالية": "finance",
+    "القسم المالي": "finance",
+    # Owners associations
+    "owners": "owners_associations",
+    "owners associations": "owners_associations",
+    "associations": "owners_associations",
+    "جمعيات": "owners_associations",
+    "جمعيات الملاك": "owners_associations",
+    "ادارة جمعيات الملاك": "owners_associations",
+    "إدارة جمعيات الملاك": "owners_associations",
+    # Property management
+    "property": "property_management",
+    "properties": "property_management",
+    "property management": "property_management",
+    "property-management": "property_management",
+    "ادارة الممتلكات": "property_management",
+    "إدارة الممتلكات": "property_management",
+    "ادارة العقارات": "property_management",
+    "إدارة العقارات": "property_management",
+    # Valuation
+    "valuation": "valuation",
+    "التثمين": "valuation",
+    "التقييم": "valuation",
+    "عقار": "valuation",
+    "العقارات": "valuation",
+}
+
+SECTION_DISPLAY_ORDER: tuple[str, ...] = (
+    "consultations",
+    "valuation",
+    "hr",
+    "finance",
+    "owners_associations",
+    "property_management",
+)
+SECTION_ORDER_INDEX: dict[str, int] = {
+    name: idx for idx, name in enumerate(SECTION_DISPLAY_ORDER)
+}
+
+SECTION_HOME_ENDPOINTS: dict[str, tuple[str, str]] = {
+    "consultations": ("consulting_dashboard.dashboard_home", "لوحة الاستشارات الهندسية"),
+    "hr": ("consulting_hr.dashboard", "لوحة الموارد البشرية"),
+    "finance": ("finance_dashboard", "العودة للوحة المالية"),
+    "owners_associations": ("owners_associations_dashboard", "لوحة جمعيات الملاك"),
+    "property_management": ("property_management_dashboard", "لوحة إدارة الممتلكات"),
+}
+
+
+def normalize_section_name(name: str | None) -> str:
+    key = (name or "").strip().lower()
+    return SECTION_ALIASES.get(key, key)
+
+
+def sort_sections_by_priority(sections: Iterable) -> list:
+    """Return a new list of sections sorted using SECTION_DISPLAY_ORDER."""
+    order_map = SECTION_ORDER_INDEX
+
+    def _key(section):
+        sname = getattr(section, "name", "") or ""
+        normalized = normalize_section_name(sname)
+        return order_map.get(normalized, len(order_map)), normalized
+
+    return sorted(list(sections), key=_key)
     # 🧑‍💼 المستخدمون المنتمون لهذا القسم
     users = db.relationship("User", backref="section", lazy=True)
 
@@ -544,8 +665,34 @@ class User(db.Model):
     branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=True)
     # 🆕 ربط الموظف بقسم داخل الفرع (اختياري)
     section_id = db.Column(db.Integer, db.ForeignKey('branch_section.id'), nullable=True, index=True)
+    # 🆕 ربط حساب النظام بسجل الموظف في نظام الموارد البشرية
+    employee_id = db.Column(db.Integer, db.ForeignKey('hr_employee.id'), nullable=True, unique=True, index=True)
     # علاقة صريحة مع الفرع لتفادي تعارض backref
     branch = db.relationship("Branch", back_populates="users")
+    employee = db.relationship("Employee", backref=db.backref("user_account", uselist=False))
+    invitations = db.relationship(
+        "UserInvitation",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="UserInvitation.created_at.desc()",
+    )
+
+
+class UserInvitation(db.Model):
+    __tablename__ = "user_invitation"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey("hr_employee.id"), nullable=True, index=True)
+    token = db.Column(db.String(128), unique=True, nullable=False, index=True)
+    raw_password = db.Column(db.String(128), nullable=True)
+    delivery_method = db.Column(db.String(20), nullable=True)
+    sent_at = db.Column(db.DateTime, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    used_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship("User", back_populates="invitations")
+    employee = db.relationship("Employee", backref=db.backref("invitations", lazy="dynamic"))
 
 class Transaction(db.Model):
     __tablename__ = "transaction"
@@ -1150,18 +1297,19 @@ def naturaltime_ar(dt):
 
 # ---------------- حالة مستند حسب تاريخ الانتهاء ----------------
 def document_status(doc):
+    """إرجاع حالة المستند حسب تاريخ الانتهاء."""
     try:
-        exp = getattr(doc, "expires_at", None)
-        if not exp:
-            return "بدون انتهاء"
-        delta_days = (exp - datetime.utcnow()).days
+        expiration = getattr(doc, "expires_at", None)
+        if not expiration:
+            return "بدون تاريخ انتهاء"
+        delta_days = (expiration - datetime.utcnow()).days
         if delta_days < 0:
             return "منتهي"
         if delta_days <= 30:
-            return "قريب الانتهاء"
+            return "قارب على الانتهاء"
         return "ساري"
     except Exception:
-        return "بدون انتهاء"
+        return "بدون تاريخ انتهاء"
 
 # ---------------- المسارات ----------------
 @app.route("/")
@@ -1193,6 +1341,8 @@ def index():
         except Exception:
             pass
         return redirect(url_for("employee_dashboard"))
+    elif role == "consulting_employee":
+        return redirect(url_for("consulting_employee.dashboard"))
     elif role == "engineer":
         # إذا كان المهندس ضمن قسم "الاستشارات" فحوّله مباشرة لواجهة الاستشارات
         try:
@@ -1230,7 +1380,7 @@ def _parse_date(value: str | None) -> date | None:
 
 @app.route("/consultations")
 def consultations_list():
-    if session.get("role") not in ["manager", "finance", "consultant"]:
+    if session.get("role") not in ["manager", "finance", "consultant", "hr", "hr_manager"]:
         return redirect(url_for("login"))
 
     # Filters
@@ -1433,7 +1583,7 @@ def consultations_new():
 
 @app.route("/consultations/<int:cid>")
 def consultations_detail(cid: int):
-    if session.get("role") not in ["manager", "finance", "consultant"]:
+    if session.get("role") not in ["manager", "finance", "consultant", "hr", "hr_manager"]:
         return redirect(url_for("login"))
     c = Consultation.query.get_or_404(cid)
     # prefetch project and client (from consulting models)
@@ -1982,28 +2132,7 @@ def manage_branches():
                 flash("⚠️ يرجى اختيار الفرع واسم القسم", "danger")
             else:
                 # توحيد كتابة اسم القسم لسهولة التوجيه
-                normalized = section_name.strip().lower()
-                # أسماء مختصرة مقبولة
-                aliases = {
-                    "consultation": "consultations",
-                    "consulting": "consultations",
-                    "الاستشارات": "consultations",
-                    "الاستشارات الهندسية": "consultations",
-                    "valuation": "valuation",
-                    "التثمين": "valuation",
-                    "owners": "owners_associations",
-                    "جمعيات": "owners_associations",
-                    "جمعيات الملاك": "owners_associations",
-                    "ادارة جمعيات الملاك": "owners_associations",
-                    "إدارة جمعيات الملاك": "owners_associations",
-                    "properties": "property_management",
-                    "الممتلكات": "property_management",
-                    "ادارة الممتلكات": "property_management",
-                    "إدارة الممتلكات": "property_management",
-                    "ادارة العقارات": "property_management",
-                    "إدارة العقارات": "property_management",
-                }
-                normalized = aliases.get(normalized, normalized)
+                normalized = normalize_section_name(section_name)
                 exists = BranchSection.query.filter_by(branch_id=branch_id, name=normalized).first()
                 if exists:
                     flash("⚠️ القسم موجود لهذا الفرع", "warning")
@@ -2085,7 +2214,7 @@ def commissions_page():
     # 🔹 حساب العقارات
     real_estate_txns = [t for t in transactions if t.transaction_type == "real_estate"]
     real_estate_income = sum(t.fee for t in real_estate_txns)
-    # كل 50 ريال = 1 معاملة
+    # كل 50 ريال عماني = 1 معاملة
     real_estate_count = sum(max(1, int(t.fee // 50)) for t in real_estate_txns)
 
     # 🔹 حساب السيارات
@@ -2263,6 +2392,7 @@ def manager_branch_summary(bid: int):
         branch_sections = BranchSection.query.filter_by(branch_id=bid).all()
     except Exception:
         branch_sections = []
+    branch_sections = sort_sections_by_priority(branch_sections)
 
     sections_summary = []
     for sec in branch_sections:
@@ -2470,6 +2600,7 @@ def open_branch_interface(bid: int):
         branch_sections = BranchSection.query.filter_by(branch_id=bid).all()
     except Exception:
         branch_sections = []
+    branch_sections = sort_sections_by_priority(branch_sections)
     if branch_sections and len(branch_sections) == 1:
         return _redirect_to_section((branch_sections[0].name or "").lower())
 
@@ -2489,6 +2620,8 @@ def open_branch_interface(bid: int):
         return redirect(url_for("engineer_dashboard"))
     if role == "finance":
         return redirect(url_for("finance_dashboard"))
+    if role in {"hr", "hr_manager"}:
+        return redirect(url_for("consulting_hr.dashboard"))
     return redirect(url_for("index"))
 
 @app.route("/branch/<int:bid>/interface/<string:section>", endpoint="open_branch_section")
@@ -2499,16 +2632,11 @@ def open_branch_section(bid: int, section: str):
     return _redirect_to_section(section)
 
 def _redirect_to_section(section: str):
-    s = (section or "").strip().lower()
-    if s in ("consultations", "consultation", "consulting", "الاستشارات"):
-        return redirect(url_for("consulting_dashboard.dashboard_home"))
-    if s in ("finance", "financial", "المالية"):
-        return redirect(url_for("finance_dashboard"))
-    # 🆕 أقسام إضافية: إدارة جمعيات الملاك / إدارة الممتلكات
-    if s in ("owners_associations", "جمعيات الملاك", "owners", "associations"):
-        return redirect(url_for("owners_associations_dashboard"))
-    if s in ("property_management", "ادارة الممتلكات", "properties"):
-        return redirect(url_for("property_management_dashboard"))
+    section_code = normalize_section_name(section)
+    mapped = SECTION_HOME_ENDPOINTS.get(section_code)
+    if mapped:
+        endpoint, _label = mapped
+        return redirect(url_for(endpoint))
     # valuation أو غير معروف => الافتراضي حسب الدور
     role = session.get("role")
     if role == "manager":
@@ -3507,7 +3635,7 @@ def _generate_default_docx(doc_type: str, placeholders: dict, out_path: str) -> 
         p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
         p2 = row[2].paragraphs[0]
-        p2.add_run("ريال")
+        p2.add_run("ريال عماني")
         _set_paragraph_rtl(p2, True)
         p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
@@ -4804,15 +4932,16 @@ def update_bank_invoice_stage(bank_id):
 # ---------------- إدارة الموظفين ----------------
 @app.route("/manage_employees", methods=["GET", "POST"])
 def manage_employees():
-    if session.get("role") != "manager":
+    if session.get("role") not in {"manager", "hr", "hr_manager"}:
         return redirect(url_for("login"))
 
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form["password"]
-        role = request.form["role"]
+        role = (request.form.get("role") or "").strip()
         branch_id = request.form.get("branch_id")
         section_id = request.form.get("section_id") or None
+        employee_id_raw = request.form.get("employee_id") or None
         try:
             section_id = int(section_id) if section_id else None
         except Exception:
@@ -4821,20 +4950,132 @@ def manage_employees():
             branch_id = int(branch_id) if branch_id else None
         except Exception:
             branch_id = None
+        linked_employee = None
+        if employee_id_raw:
+            try:
+                employee_id_val = int(employee_id_raw)
+            except Exception:
+                employee_id_val = None
+            else:
+                if employee_id_val:
+                    linked_employee = Employee.query.get(employee_id_val)
+                    if not linked_employee:
+                        flash("🚫 الموظف المحدد غير موجود", "danger")
+                        return redirect(url_for("manage_employees"))
+                    if linked_employee.user_account is not None:
+                        flash("🚫 هذا الموظف مرتبط بالفعل بحساب مستخدم آخر", "danger")
+                        return redirect(url_for("manage_employees"))
+        section_code = None
+        section_obj = None
+        if section_id:
+            section_obj = BranchSection.query.get(section_id)
+            if section_obj and section_obj.name:
+                section_code = normalize_section_name(section_obj.name)
+        branch_obj = None
+        if branch_id:
+            branch_obj = Branch.query.get(branch_id)
+            dept_value = (branch_obj.department or '').strip() if branch_obj else ''
+            if dept_value and not section_code:
+                section_code = normalize_section_name(dept_value)
+        if role == 'consulting_employee' and section_code != 'consultations':
+            flash('يرجى اختيار قسم الاستشارات لهذا الدور.', 'danger')
+            return redirect(url_for('manage_employees'))
+        if section_code == 'consultations' and role not in {'consulting_employee', 'consultant', 'hr', 'hr_manager', 'manager'}:
+            role = 'consulting_employee'
+        if not role:
+            role = 'employee'
         hashed_pw = generate_password_hash(password)
-        user = User(username=username, password=hashed_pw, role=role, branch_id=branch_id, section_id=section_id)
+        user = User(
+            username=username,
+            password=hashed_pw,
+            role=role,
+            branch_id=branch_id,
+            section_id=section_id,
+            employee_id=linked_employee.id if linked_employee else None,
+        )
         db.session.add(user)
         db.session.commit()
         flash("✅ تم إضافة الموظف بنجاح", "success")
+        section_code = None
+        if user.section_id:
+            sec = BranchSection.query.get(user.section_id)
+            if sec and sec.name:
+                section_code = normalize_section_name(sec.name)
+        elif user.branch_id:
+            branch = Branch.query.get(user.branch_id)
+            if branch and getattr(branch, "department", None):
+                section_code = normalize_section_name(branch.department)
+        if section_code == "consultations":
+            return redirect(url_for("consulting_dashboard.dashboard_home"))
         return redirect(url_for("manage_employees"))
 
-    users = User.query.all()
+    users = (
+        User.query.options(
+            joinedload(User.employee),
+            joinedload(User.invitations),
+        )
+        .order_by(User.id.asc())
+        .all()
+    )
     branches = Branch.query.all()
-    return render_template("manage_employees.html", users=users, branches=branches)
+    hr_employees = (
+        Employee.query.options(joinedload(Employee.user_account))
+        .order_by(Employee.first_name, Employee.last_name)
+        .all()
+    )
+    latest_invitations = {}
+    if users:
+        user_ids = [u.id for u in users]
+        invitations = (
+            UserInvitation.query.filter(UserInvitation.user_id.in_(user_ids))
+            .order_by(UserInvitation.user_id.asc(), UserInvitation.created_at.desc())
+            .all()
+        )
+        for inv in invitations:
+            if inv.user_id not in latest_invitations:
+                latest_invitations[inv.user_id] = inv
+    return render_template(
+        "manage_employees.html",
+        users=users,
+        branches=branches,
+        hr_employees=hr_employees,
+        latest_invitations=latest_invitations,
+    )
+
+@app.route("/manage_employees/<int:user_id>/link", methods=["POST"])
+def link_user_to_employee(user_id: int):
+    if session.get("role") not in {"manager", "hr", "hr_manager"}:
+        return redirect(url_for("login"))
+    user = User.query.get_or_404(user_id)
+    employee_id_raw = request.form.get("employee_id") or ""
+    target_employee = None
+
+    if employee_id_raw:
+        try:
+            employee_id_val = int(employee_id_raw)
+        except Exception:
+            flash("🚫 معرف الموظف غير صالح", "danger")
+            return redirect(url_for("manage_employees"))
+        target_employee = Employee.query.get(employee_id_val)
+        if not target_employee:
+            flash("🚫 الموظف المحدد غير موجود", "danger")
+            return redirect(url_for("manage_employees"))
+        existing_user = target_employee.user_account
+        if existing_user and existing_user.id != user.id:
+            flash("🚫 هذا الموظف مرتبط بالفعل بحساب آخر", "danger")
+            return redirect(url_for("manage_employees"))
+
+    user.employee_id = target_employee.id if target_employee else None
+    db.session.commit()
+    if target_employee:
+        flash("✅ تم ربط الحساب بالموظف المحدد", "success")
+    else:
+        flash("✅ تم إزالة ارتباط الحساب بأي موظف", "success")
+    return redirect(url_for("manage_employees"))
 
 @app.route("/manager/employees/delete/<int:uid>")
 def delete_employee(uid):
-    if session.get("role") != "manager":
+    if session.get("role") not in {"manager", "hr", "hr_manager"}:
         return redirect(url_for("login"))
     u = User.query.get_or_404(uid)
     db.session.delete(u)
@@ -4844,7 +5085,7 @@ def delete_employee(uid):
 
 @app.route("/assign_branch/<int:uid>", methods=["POST"])
 def assign_branch(uid):
-    if session.get("role") != "manager":
+    if session.get("role") not in {"manager", "hr", "hr_manager"}:
         return redirect(url_for("login"))
     branch_id = request.form.get("branch_id")
     user = User.query.get_or_404(uid)
@@ -4853,6 +5094,58 @@ def assign_branch(uid):
         db.session.commit()
         flash("✅ تم تحديد فرع الموظف بنجاح", "success")
     return redirect(url_for("manager_dashboard"))
+
+
+@app.route("/invitation/<string:token>", methods=["GET", "POST"])
+def complete_invitation(token: str):
+    invitation = UserInvitation.query.filter_by(token=token).first_or_404()
+    user = invitation.user
+    status = "pending"
+    now = datetime.utcnow()
+    if invitation.used_at:
+        status = "used"
+    elif invitation.expires_at and invitation.expires_at < now:
+        status = "expired"
+
+    form_values = {"username": user.username or ""}
+    errors = {}
+
+    if request.method == "POST" and status == "pending":
+        username = (request.form.get("username") or "").strip()
+        password = request.form.get("password") or ""
+        confirm_password = request.form.get("confirm_password") or ""
+        form_values["username"] = username or user.username or ""
+
+        if not username:
+            errors["username"] = "يرجى إدخال اسم المستخدم"
+        else:
+            existing = User.query.filter(User.username == username, User.id != user.id).first()
+            if existing:
+                errors["username"] = "اسم المستخدم مستخدم من قبل"
+
+        if len(password) < 8:
+            errors["password"] = "كلمة المرور يجب أن لا تقل عن 8 أحرف"
+        elif password != confirm_password:
+            errors["password"] = "كلمتا المرور غير متطابقتين"
+
+        if not errors:
+            user.username = username
+            user.password = generate_password_hash(password)
+            invitation.used_at = datetime.utcnow()
+            invitation.raw_password = None
+            db.session.commit()
+            flash("✅ تم إنشاء حسابك بنجاح. يمكنك تسجيل الدخول الآن.", "success")
+            return redirect(url_for("login"))
+        else:
+            for message in errors.values():
+                flash(f"⚠️ {message}", "warning")
+
+    return render_template(
+        "invitation_complete.html",
+        invitation=invitation,
+        status=status,
+        form_values=form_values,
+    )
 
 @app.route("/r/<string:token>")
 def public_report(token):
@@ -5313,6 +5606,7 @@ def employee_add_bank_document():
 
 # ---------------- صفحة العملاء (إضافة/قائمة وتصدير CSV) ----------------
 @app.route("/customers", methods=["GET", "POST"])
+@app.route("/customers/", methods=["GET", "POST"])
 def customers_page():
     if session.get("role") not in ["manager", "employee", "finance"]:
         return redirect(url_for("login"))
@@ -5538,6 +5832,19 @@ with app.app_context():
             db.session.execute(text("ALTER TABLE transaction ADD COLUMN sent_to_engineer_at TIMESTAMP"))
             db.session.commit()
             print("✅ تمت إضافة عمود sent_to_engineer_at")
+    except Exception:
+        db.session.rollback()
+
+    # محاولة إضافة عمود employee_id لجدول المستخدمين مع فهرس فريد
+    try:
+        added_employee_column = False
+        if not column_exists("user", "employee_id"):
+            db.session.execute(text("ALTER TABLE user ADD COLUMN employee_id INTEGER"))
+            added_employee_column = True
+        db.session.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_user_employee_id ON user (employee_id)"))
+        db.session.commit()
+        if added_employee_column:
+            print("✅ تمت إضافة عمود employee_id إلى user")
     except Exception:
         db.session.rollback()
 

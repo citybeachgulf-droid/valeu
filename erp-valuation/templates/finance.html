@@ -1,605 +1,525 @@
 {% extends 'base.html' %}
-{% set title = '💰 لوحة المالية' %}
+{% from 'partials/nav.html' import finance_nav %}
+{% set title = 'لوحة المالية' %}
 
 {% block navbar %}
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 animate__animated animate__fadeInDown">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="#">🛠️ نظام التثمين</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto">
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('finance_dashboard') }}">🏠 الصفحة الرئيسية</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('finance_paid') }}">✅ المدفوعة</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('customers_page') }}">👥 العملاء</a></li>
-        <li class="nav-item"><a class="nav-link text-warning" href="/reports">📑 التقارير</a></li>
-        <li class="nav-item"><a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 تسجيل الخروج</a></li>
-      </ul>
-    </div>
-  </div>
-
-</nav>
+  {{ finance_nav(active='dashboard') }}
 {% endblock %}
 
 {% block content %}
-<div class="container py-4">
-  <h2 class="mb-4" data-aos="fade-up">💰 لوحة التحكم المالية</h2>
+<div class="app-page-title" data-aos="fade-up">
+  <h1>لوحة التحكم المالية</h1>
+  <div class="app-page-title__meta">
+    <span>إدارة الفواتير البنكية، عروض الأسعار، وفواتير العملاء مع تحصيل المدفوعات.</span>
+  </div>
+</div>
 
-  <!-- Tabs header -->
-  <ul class="nav nav-tabs mb-3" id="financeTabs" role="tablist">
+<div class="stats-row" data-aos="fade-up" data-aos-delay="60">
+  <div class="stat-card">
+    <span class="stat-card__label">إجمالي الدخل</span>
+    <span class="stat-card__value">{{ "{:,.0f}".format(total_income or 0) }} ر.ع</span>
+    <div class="text-muted small">يشمل جميع الفواتير التي تم تحصيلها.</div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-card__label">إجمالي المصروفات</span>
+    <span class="stat-card__value">{{ "{:,.0f}".format(total_expenses or 0) }} ر.ع</span>
+    <div class="text-muted small">مصروفات مسجلة عبر فريق المالية.</div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-card__label">صافي الربح</span>
+    <span class="stat-card__value">{{ "{:,.0f}".format(net_profit or 0) }} ر.ع</span>
+    <div class="text-muted small">الفارق بين الدخل والمصروفات الحالية.</div>
+  </div>
+</div>
+
+<div class="app-card mt-4" data-aos="fade-up" data-aos-delay="100">
+  <ul class="nav nav-pills app-tabs" id="financeTabs" role="tablist">
     <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="bank-invoices-tab" data-bs-toggle="tab" data-bs-target="#bank-invoices" type="button" role="tab" aria-controls="bank-invoices" aria-selected="true">🏦 فواتير البنوك</button>
+      <button class="nav-link active" id="bank-invoices-tab" data-bs-toggle="tab" data-bs-target="#bank-invoices" type="button" role="tab" aria-controls="bank-invoices" aria-selected="true">
+        فواتير البنوك
+      </button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="customer-quotes-tab" data-bs-toggle="tab" data-bs-target="#customer-quotes" type="button" role="tab" aria-controls="customer-quotes" aria-selected="false">🧾 عروض الأسعار</button>
+      <button class="nav-link" id="customer-quotes-tab" data-bs-toggle="tab" data-bs-target="#customer-quotes" type="button" role="tab" aria-controls="customer-quotes" aria-selected="false">
+        عروض الأسعار
+      </button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="customer-invoices-tab" data-bs-toggle="tab" data-bs-target="#customer-invoices" type="button" role="tab" aria-controls="customer-invoices" aria-selected="false">🧮 فواتير العملاء</button>
+      <button class="nav-link" id="customer-invoices-tab" data-bs-toggle="tab" data-bs-target="#customer-invoices" type="button" role="tab" aria-controls="customer-invoices" aria-selected="false">
+        فواتير العملاء
+      </button>
     </li>
   </ul>
 
-  <div class="tab-content mb-4" id="financeTabsContent">
-    <!-- Bank Invoices Tab -->
+  <div class="tab-content mt-4" id="financeTabsContent">
+    <!-- Bank invoices -->
     <div class="tab-pane fade show active" id="bank-invoices" role="tabpanel" aria-labelledby="bank-invoices-tab" tabindex="0">
-      <div class="row mb-4" data-aos="fade-up">
-        <div class="col-md-6" data-aos="zoom-in">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <h5 class="mb-3">📄 إنشاء فاتورة بنك</h5>
-              <form method="POST" action="{{ url_for('finance_create_bank_invoice') }}" class="row g-2">
-                <div class="col-md-6">
-                  <label class="form-label">البنك</label>
-                  <select name="bank_id" class="form-select" required>
-                    <option value="">اختر البنك</option>
-                    {% for b in banks %}
-                      <option value="{{ b.id }}">{{ b.name }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">المبلغ</label>
-                  <input type="number" step="0.01" name="amount" class="form-control" required>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">رقم معاملة (اختياري)</label>
-                  <input type="number" name="transaction_id" class="form-control" placeholder="إن وجد">
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">ملاحظة</label>
-                  <input type="text" name="note" class="form-control" placeholder="ملاحظة">
-                </div>
-                <div class="col-6">
-                  <label class="form-label">تطبيق الضريبة</label>
-                  <select name="apply_vat" class="form-select">
-                    <option value="1" selected>نعم</option>
-                    <option value="0">لا</option>
-                  </select>
-                </div>
-                <div class="col-6">
-                  <label class="form-label">نسبة الضريبة %</label>
-                  <input type="number" step="0.01" min="0" max="100" name="vat" class="form-control" value="{{ vat_default_percent }}">
-                </div>
-                <div class="col-12 d-flex justify-content-end">
-                  <button class="btn btn-success">إصدار فاتورة</button>
-                </div>
-              </form>
+      <div class="app-grid app-grid--two">
+        <div class="app-card">
+          <div class="app-card__header">
+            <div>
+              <h3 class="app-card__title">إنشاء فاتورة بنك</h3>
+              <p class="app-card__subtitle mb-0">سجّل فاتورة جديدة ثم تابع حالتها حتى الاستلام.</p>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div class="row mb-4" data-aos="fade-up">
-        <div class="col-md-12">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <h5 class="mb-3">📄 آخر فواتير البنوك</h5>
-              <div class="table-responsive">
-                <table class="table table-bordered table-striped">
-                  <thead class="table-dark">
-                    <tr>
-                      <th>#</th>
-                      <th>رقم الفاتورة</th>
-                      <th>البنك</th>
-                      <th>المبلغ</th>
-                      <th>إصدار</th>
-                      <th>تسليم</th>
-                      <th>استلام</th>
-                      <th>الحالة</th>
-                      <th>إجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for inv in recent_bank_invoices %}
-                    <tr>
-                      <td>{{ inv.id }}</td>
-                      <td>{{ inv.invoice_number or ('INV-BANK-' ~ inv.id) }}</td>
-                      <td>{{ inv.bank_id }}</td>
-                      <td>{{ inv.amount }}</td>
-                      <td>{{ inv.issued_at.strftime('%Y-%m-%d') if inv.issued_at else '-' }}</td>
-                      <td>{{ inv.delivered_at.strftime('%Y-%m-%d') if inv.delivered_at else '-' }}</td>
-                      <td>{{ inv.received_at.strftime('%Y-%m-%d') if inv.received_at else '-' }}</td>
-                      <td>
-                        {% if inv.received_at %}تم استلام المبلغ{% elif inv.delivered_at %}تم التسليم{% elif inv.issued_at %}تم الإصدار{% else %}-{% endif %}
-                      </td>
-                      <td class="text-nowrap">
-                        <div class="d-flex gap-2 flex-wrap">
-                          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('download_bank_invoice_doc', invoice_id=inv.id) }}">تنزيل</a>
-                          {% if not inv.delivered_at %}
-                          <form method="post" action="{{ url_for('finance_update_bank_invoice_status', invoice_id=inv.id) }}">
-                            <input type="hidden" name="action" value="deliver">
-                            <button class="btn btn-sm btn-warning">تسليم</button>
-                          </form>
-                          {% endif %}
-                          {% if inv.delivered_at and not inv.received_at %}
-                          <form method="post" action="{{ url_for('finance_update_bank_invoice_status', invoice_id=inv.id) }}" enctype="multipart/form-data" class="d-flex gap-2 align-items-center">
-                            <input type="hidden" name="action" value="receive">
-                            <input type="file" name="receipt_file" class="form-control form-control-sm" accept=".jpg,.jpeg,.png,.pdf" required>
-                            <button class="btn btn-sm btn-success">استلام</button>
-                          </form>
-                          {% endif %}
-                        </div>
-                      </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="6" class="text-center">لا توجد فواتير بعد</td></tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
+          <form method="POST" action="{{ url_for('finance_create_bank_invoice') }}" class="row g-3 text-start">
+            <div class="col-md-6">
+              <label class="form-label">البنك</label>
+              <select name="bank_id" class="form-select" required>
+                <option value="">اختر البنك</option>
+                {% for b in banks %}
+                  <option value="{{ b.id }}">{{ b.name }}</option>
+                {% endfor %}
+              </select>
             </div>
+            <div class="col-md-6">
+              <label class="form-label">المبلغ</label>
+              <input type="number" step="0.01" name="amount" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">رقم معاملة (اختياري)</label>
+              <input type="number" name="transaction_id" class="form-control" placeholder="إن وجد">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">ملاحظة</label>
+              <input type="text" name="note" class="form-control" placeholder="ملاحظة">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">تطبيق الضريبة</label>
+              <select name="apply_vat" class="form-select">
+                <option value="1" selected>نعم</option>
+                <option value="0">لا</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">نسبة الضريبة %</label>
+              <input type="number" step="0.01" min="0" max="100" name="vat" class="form-control" value="{{ vat_default_percent }}">
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-primary">إصدار الفاتورة</button>
+            </div>
+          </form>
+        </div>
+        <div class="app-card">
+          <div class="app-card__header">
+            <h3 class="app-card__title mb-0">أحدث فواتير البنوك</h3>
+          </div>
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>#</th>
+                  <th>رقم الفاتورة</th>
+                  <th>البنك</th>
+                  <th>المبلغ</th>
+                  <th>إصدار</th>
+                  <th>تسليم</th>
+                  <th>استلام</th>
+                  <th>الحالة</th>
+                  <th class="text-center">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for inv in recent_bank_invoices %}
+                {% if inv.received_at %}
+                  {% set status_text = 'تم الاستلام' %}
+                  {% set status_class = 'status-chip--success' %}
+                {% elif inv.delivered_at %}
+                  {% set status_text = 'تم التسليم' %}
+                  {% set status_class = 'status-chip--warning' %}
+                {% elif inv.issued_at %}
+                  {% set status_text = 'تم الإصدار' %}
+                  {% set status_class = 'status-chip--info' %}
+                {% else %}
+                  {% set status_text = 'قيد التحضير' %}
+                  {% set status_class = 'status-chip--warning' %}
+                {% endif %}
+                <tr>
+                  <td>{{ inv.id }}</td>
+                  <td>{{ inv.invoice_number or ('INV-BANK-' ~ inv.id) }}</td>
+                  <td>{{ inv.bank_id }}</td>
+                  <td>{{ "{:,.2f}".format(inv.amount or 0) }} ر.ع</td>
+                  <td>{{ inv.issued_at.strftime('%Y-%m-%d') if inv.issued_at else '-' }}</td>
+                  <td>{{ inv.delivered_at.strftime('%Y-%m-%d') if inv.delivered_at else '-' }}</td>
+                  <td>{{ inv.received_at.strftime('%Y-%m-%d') if inv.received_at else '-' }}</td>
+                  <td><span class="status-chip {{ status_class }}">{{ status_text }}</span></td>
+                  <td class="text-center">
+                    <div class="d-flex flex-wrap gap-2 justify-content-center">
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('download_bank_invoice_doc', invoice_id=inv.id) }}">تنزيل</a>
+                      {% if not inv.delivered_at %}
+                      <form method="post" action="{{ url_for('finance_update_bank_invoice_status', invoice_id=inv.id) }}">
+                        <input type="hidden" name="action" value="deliver">
+                        <button class="btn btn-sm btn-warning">تسليم</button>
+                      </form>
+                      {% endif %}
+                      {% if inv.delivered_at and not inv.received_at %}
+                      <form method="post" action="{{ url_for('finance_update_bank_invoice_status', invoice_id=inv.id) }}" enctype="multipart/form-data" class="d-flex gap-2 align-items-center flex-wrap justify-content-center">
+                        <input type="hidden" name="action" value="receive">
+                        <input type="file" name="receipt_file" class="form-control form-control-sm" accept=".jpg,.jpeg,.png,.pdf" required>
+                        <button class="btn btn-sm btn-success">استلام</button>
+                      </form>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="text-center text-muted py-3">لا توجد فواتير بنكية مسجلة بعد.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Customer Quotes Tab -->
+    <!-- Customer quotes -->
     <div class="tab-pane fade" id="customer-quotes" role="tabpanel" aria-labelledby="customer-quotes-tab" tabindex="0">
-      <div class="row mb-4" data-aos="fade-up">
-        <div class="col-md-6" data-aos="zoom-in">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <h5 class="mb-3">🧾 إنشاء عرض سعر للعميل</h5>
-              <form method="POST" action="{{ url_for('finance_create_customer_quote') }}" class="row g-2">
-                <div class="col-md-6">
-                  <label class="form-label">اسم العميل</label>
-                  <input type="text" name="customer_name" class="form-control" required>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">المبلغ</label>
-                  <input type="number" step="0.01" name="amount" class="form-control" required>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">صالح حتى (اختياري)</label>
-                  <input type="date" name="valid_until" class="form-control">
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">رقم معاملة (اختياري)</label>
-                  <input type="number" name="transaction_id" class="form-control" placeholder="إن وجد">
-                </div>
-                <div class="col-12">
-                  <label class="form-label">ملاحظة</label>
-                  <input type="text" name="note" class="form-control" placeholder="ملاحظة">
-                </div>
-                <div class="col-12 d-flex justify-content-end">
-                  <button class="btn btn-primary">إنشاء</button>
-                </div>
-              </form>
+      <div class="app-grid app-grid--two">
+        <div class="app-card">
+          <div class="app-card__header">
+            <div>
+              <h3 class="app-card__title">إنشاء عرض سعر</h3>
+              <p class="app-card__subtitle mb-0">حرّر عرضاً مخصصاً للعميل واحتفظ بنسخة قابلة للتنزيل.</p>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div class="row mb-4" data-aos="fade-up">
-        <div class="col-md-12">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <h5 class="mb-3">🧾 آخر عروض أسعار العملاء</h5>
-              <div class="table-responsive">
-                <table class="table table-bordered table-striped">
-                  <thead class="table-dark">
-                    <tr>
-                      <th>#</th>
-                      <th>العميل</th>
-                      <th>المبلغ</th>
-                      <th>صالح حتى</th>
-                      <th>ملاحظة</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for q in recent_customer_quotes %}
-                    <tr>
-                      <td>{{ q.id }}</td>
-                      <td>{{ q.customer_name }}</td>
-                      <td>{{ q.amount }}</td>
-                      <td>{{ q.valid_until.strftime('%Y-%m-%d') if q.valid_until else '-' }}</td>
-                      <td class="d-flex gap-2">
-                        <span>{{ q.note or '-' }}</span>
-                        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('download_customer_quote_doc', quote_id=q.id) }}">تنزيل</a>
-                      </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="5" class="text-center">لا توجد عروض عملاء بعد</td></tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
+          <form method="POST" action="{{ url_for('finance_create_customer_quote') }}" class="row g-3 text-start">
+            <div class="col-md-6">
+              <label class="form-label">اسم العميل</label>
+              <input type="text" name="customer_name" class="form-control" required>
             </div>
+            <div class="col-md-6">
+              <label class="form-label">المبلغ</label>
+              <input type="number" step="0.01" name="amount" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">صالح حتى (اختياري)</label>
+              <input type="date" name="valid_until" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">رقم معاملة (اختياري)</label>
+              <input type="number" name="transaction_id" class="form-control" placeholder="إن وجد">
+            </div>
+            <div class="col-12">
+              <label class="form-label">ملاحظات</label>
+              <input type="text" name="note" class="form-control" placeholder="تفاصيل إضافية">
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-primary">إنشاء العرض</button>
+            </div>
+          </form>
+        </div>
+        <div class="app-card">
+          <div class="app-card__header">
+            <h3 class="app-card__title mb-0">أحدث عروض الأسعار</h3>
+          </div>
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>#</th>
+                  <th>العميل</th>
+                  <th>المبلغ</th>
+                  <th>صالح حتى</th>
+                  <th>الملاحظات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for q in recent_customer_quotes %}
+                <tr>
+                  <td>{{ q.id }}</td>
+                  <td>{{ q.customer_name }}</td>
+                  <td>{{ "{:,.2f}".format(q.amount or 0) }} ر.ع</td>
+                  <td>{{ q.valid_until.strftime('%Y-%m-%d') if q.valid_until else '-' }}</td>
+                  <td>
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                      <span>{{ q.note or '-' }}</span>
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('download_customer_quote_doc', quote_id=q.id) }}">تنزيل</a>
+                    </div>
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center text-muted py-3">لا توجد عروض أسعار مسجلة بعد.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Customer Invoices Tab -->
+    <!-- Customer invoices -->
     <div class="tab-pane fade" id="customer-invoices" role="tabpanel" aria-labelledby="customer-invoices-tab" tabindex="0">
-      <div class="row mb-4" data-aos="fade-up">
-        <div class="col-md-6" data-aos="zoom-in" data-aos-delay="80">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <h5 class="mb-3">🧮 إنشاء فاتورة للعميل</h5>
-              <form method="POST" action="{{ url_for('finance_create_customer_invoice') }}" class="row g-2">
-                <div class="col-md-6">
-                  <label class="form-label">اسم العميل</label>
-                  <input type="text" name="customer_name" class="form-control" required>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">المبلغ</label>
-                  <input type="number" step="0.01" name="amount" class="form-control" required>
-                </div>
-                <!-- سيتم ربط الفاتورة تلقائيًا بأحدث معاملة غير مدفوعة لنفس اسم العميل (ضمن فرعك) إن وُجدت -->
-                <div class="col-md-6">
-                  <label class="form-label">ملاحظة</label>
-                  <input type="text" name="note" class="form-control" placeholder="ملاحظة">
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">فاتورة استشارات (اختياري)</label>
-                  <input type="number" name="consulting_invoice_id" class="form-control" placeholder="رقم فاتورة الاستشارات">
-                </div>
-                <div class="col-6">
-                  <label class="form-label">تطبيق الضريبة</label>
-                  <select name="apply_vat" class="form-select">
-                    <option value="1" selected>نعم</option>
-                    <option value="0">لا</option>
-                  </select>
-                </div>
-                <div class="col-6">
-                  <label class="form-label">نسبة الضريبة %</label>
-                  <input type="number" step="0.01" min="0" max="100" name="vat" class="form-control" value="{{ vat_default_percent }}">
-                </div>
-                <div class="col-12 d-flex justify-content-end">
-                  <button class="btn btn-success">إصدار فاتورة</button>
-                </div>
-              </form>
+      <div class="app-grid app-grid--two">
+        <div class="app-card">
+          <div class="app-card__header">
+            <div>
+              <h3 class="app-card__title">إنشاء فاتورة عميل</h3>
+              <p class="app-card__subtitle mb-0">اربط الفاتورة بالاستشارة المناسبة عند الحاجة.</p>
             </div>
           </div>
-        </div>
-      </div>
-      
-      <!-- فواتير الاستشارات -->
-      <div class="row mb-4" data-aos="fade-up">
-        <div class="col-md-12">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <h5 class="mb-3">📋 فواتير الاستشارات</h5>
-              <div class="table-responsive">
-                <table class="table table-bordered table-striped">
-                  <thead class="table-dark">
-                    <tr>
-                      <th>#</th>
-                      <th>العميل</th>
-                      <th>المشروع</th>
-                      <th>المبلغ</th>
-                      <th>تاريخ الإصدار</th>
-                      <th>تاريخ الاستحقاق</th>
-                      <th>الحالة</th>
-                      <th>إجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for inv in recent_consulting_invoices %}
-                    <tr>
-                      <td>{{ inv.id }}</td>
-                      <td>{{ inv.client.name if inv.client else '-' }}</td>
-                      <td>{{ inv.project.name if inv.project else '-' }}</td>
-                      <td>{{ '%.2f'|format(inv.amount) }}</td>
-                      <td>{{ inv.issue_date.strftime('%Y-%m-%d') if inv.issue_date else '-' }}</td>
-                      <td>{{ inv.due_date.strftime('%Y-%m-%d') if inv.due_date else '-' }}</td>
-                      <td>
-                        <span class="badge {% if inv.status == 'مدفوعة' %}bg-success{% elif inv.is_overdue() %}bg-danger{% else %}bg-warning{% endif %}">
-                          {{ inv.status }}
-                        </span>
-                      </td>
-                      <td class="text-nowrap">
-                        <div class="d-flex gap-2 flex-wrap">
-                          <a class="btn btn-outline-info btn-sm" href="{{ url_for('consulting_invoices.invoice_detail', invoice_id=inv.id) }}" target="_blank">عرض</a>
-                          {% set has_finance_invoice = false %}
-                          {% for fin_inv in recent_customer_invoices %}
-                            {% if fin_inv.consulting_invoice_id == inv.id %}
-                              {% set has_finance_invoice = true %}
-                            {% endif %}
-                          {% endfor %}
-                          {% if not has_finance_invoice %}
-                          <form method="post" action="{{ url_for('finance_create_from_consulting_invoice', consulting_invoice_id=inv.id) }}" class="d-inline">
-                            <div class="d-flex gap-2 align-items-center">
-                              <input type="hidden" name="apply_vat" value="1">
-                              <input type="number" step="0.01" min="0" max="100" name="vat" class="form-control form-control-sm" value="{{ vat_default_percent }}" placeholder="ضريبة %" style="width: 80px;">
-                              <button class="btn btn-sm btn-primary" type="submit">إنشاء فاتورة مالية</button>
-                            </div>
-                          </form>
-                          {% else %}
-                          <span class="badge bg-success">مربوطة</span>
-                          {% endif %}
-                        </div>
-                      </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="8" class="text-center">لا توجد فواتير استشارات بعد</td></tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
+          <form method="POST" action="{{ url_for('finance_create_customer_invoice') }}" class="row g-3 text-start">
+            <div class="col-md-6">
+              <label class="form-label">اسم العميل</label>
+              <input type="text" name="customer_name" class="form-control" required>
             </div>
+            <div class="col-md-6">
+              <label class="form-label">المبلغ</label>
+              <input type="number" step="0.01" name="amount" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">ملاحظة</label>
+              <input type="text" name="note" class="form-control" placeholder="ملاحظة">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">فاتورة استشارات (اختياري)</label>
+              <input type="number" name="consulting_invoice_id" class="form-control" placeholder="رقم فاتورة الاستشارات">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">تطبيق الضريبة</label>
+              <select name="apply_vat" class="form-select">
+                <option value="1" selected>نعم</option>
+                <option value="0">لا</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">نسبة الضريبة %</label>
+              <input type="number" step="0.01" min="0" max="100" name="vat" class="form-control" value="{{ vat_default_percent }}">
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-primary">إصدار الفاتورة</button>
+            </div>
+          </form>
+        </div>
+        <div class="app-card">
+          <div class="app-card__header">
+            <h3 class="app-card__title mb-0">فواتير الاستشارات</h3>
+          </div>
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>#</th>
+                  <th>العميل</th>
+                  <th>المشروع</th>
+                  <th>المبلغ</th>
+                  <th>الإصدار</th>
+                  <th>الاستحقاق</th>
+                  <th>الحالة</th>
+                  <th class="text-center">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for inv in recent_consulting_invoices %}
+                <tr>
+                  <td>{{ inv.id }}</td>
+                  <td>{{ inv.client.name if inv.client else '-' }}</td>
+                  <td>{{ inv.project.name if inv.project else '-' }}</td>
+                  <td>{{ '%.2f'|format(inv.amount or 0) }} ر.ع</td>
+                  <td>{{ inv.issue_date.strftime('%Y-%m-%d') if inv.issue_date else '-' }}</td>
+                  <td>{{ inv.due_date.strftime('%Y-%m-%d') if inv.due_date else '-' }}</td>
+                  <td>
+                    <span class="status-chip {% if inv.status == 'مدفوعة' %}status-chip--success{% elif inv.is_overdue() %}status-chip--danger{% else %}status-chip--warning{% endif %}">
+                      {{ inv.status }}
+                    </span>
+                  </td>
+                  <td class="text-center">
+                    <div class="d-flex flex-wrap gap-2 justify-content-center">
+                      <a class="btn btn-sm btn-outline-info" href="{{ url_for('consulting_invoices.invoice_detail', invoice_id=inv.id) }}" target="_blank">عرض</a>
+                      {% set has_finance_invoice = false %}
+                      {% for fin_inv in recent_customer_invoices %}
+                        {% if fin_inv.consulting_invoice_id == inv.id %}
+                          {% set has_finance_invoice = true %}
+                        {% endif %}
+                      {% endfor %}
+                      {% if not has_finance_invoice %}
+                      <form method="post" action="{{ url_for('finance_create_from_consulting_invoice', consulting_invoice_id=inv.id) }}" class="d-flex gap-2 align-items-center">
+                        <input type="hidden" name="apply_vat" value="1">
+                        <input type="number" step="0.01" min="0" max="100" name="vat" class="form-control form-control-sm" value="{{ vat_default_percent }}" placeholder="ضريبة %">
+                        <button class="btn btn-sm btn-primary" type="submit">إنشاء فاتورة مالية</button>
+                      </form>
+                      {% else %}
+                      <span class="badge bg-success">مرتبطة</span>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-center text-muted py-3">لا توجد فواتير استشارات حالياً.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
 
-      <div class="row mb-4" data-aos="fade-up">
-        <div class="col-md-12">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <h5 class="mb-3">🧮 آخر فواتير العملاء</h5>
-              <div class="table-responsive">
-                <table class="table table-bordered table-striped">
-                  <thead class="table-dark">
-                    <tr>
-                      <th>#</th>
-                      <th>العميل</th>
-                      <th>المبلغ</th>
-                      <th>تاريخ الإصدار</th>
-                      <th>ملاحظة</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for inv in recent_customer_invoices %}
-                    <tr>
-                      <td>{{ inv.id }}</td>
-                      <td>{{ inv.invoice_number or ('INV-CUST-' ~ inv.id) }}</td>
-                      <td>
-                        {{ inv.customer_name }}
-                        {% if inv.consulting_invoice_id %}
-                        <br><small class="text-muted">🔗 مرتبطة بفاتورة استشارات #{{ inv.consulting_invoice_id }}</small>
-                        {% endif %}
-                      </td>
-                      <td>{{ inv.amount }}</td>
-                      <td>{{ inv.issued_at.strftime('%Y-%m-%d') if inv.issued_at else '-' }}</td>
-                      <td class="d-flex gap-2">
-                        <span>{{ inv.note or '-' }}</span>
-                        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('download_customer_invoice_doc', invoice_id=inv.id) }}">تنزيل</a>
-                        {% if inv.consulting_invoice_id %}
-                        <a class="btn btn-outline-info btn-sm" href="{{ url_for('consulting_invoices.invoice_detail', invoice_id=inv.consulting_invoice_id) }}" target="_blank">فاتورة الاستشارات</a>
-                        {% endif %}
-                      </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="5" class="text-center">لا توجد فواتير عملاء بعد</td></tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+      <div class="app-card mt-4">
+        <div class="app-card__header">
+          <h3 class="app-card__title mb-0">أحدث فواتير العملاء</h3>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>الفاتورة</th>
+                <th>العميل</th>
+                <th>المبلغ</th>
+                <th>تاريخ الإصدار</th>
+                <th>الملاحظات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for inv in recent_customer_invoices %}
+              <tr>
+                <td>{{ inv.id }}</td>
+                <td>{{ inv.invoice_number or ('INV-CUST-' ~ inv.id) }}</td>
+                <td>
+                  {{ inv.customer_name }}
+                  {% if inv.consulting_invoice_id %}
+                  <br><small class="text-muted">مرتبطة بفاتورة استشارات #{{ inv.consulting_invoice_id }}</small>
+                  {% endif %}
+                </td>
+                <td>{{ "{:,.2f}".format(inv.amount or 0) }} ر.ع</td>
+                <td>{{ inv.issued_at.strftime('%Y-%m-%d') if inv.issued_at else '-' }}</td>
+                <td>
+                  <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <span>{{ inv.note or '-' }}</span>
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('download_customer_invoice_doc', invoice_id=inv.id) }}">تنزيل</a>
+                    {% if inv.consulting_invoice_id %}
+                    <a class="btn btn-sm btn-outline-info" href="{{ url_for('consulting_invoices.invoice_detail', invoice_id=inv.consulting_invoice_id) }}" target="_blank">فاتورة الاستشارات</a>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6" class="text-center text-muted py-3">لا توجد فواتير عملاء مسجلة بعد.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- KPIs -->
-  <div class="row mb-4" data-aos="fade-up">
-    <div class="col-md-4" data-aos="zoom-in">
-      <div class="card shadow-sm text-center">
-        <div class="card-body">
-          <h5>📥 إجمالي الدخل</h5>
-          <p class="fs-4 text-success">{{ total_income }} ريال</p>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-4" data-aos="zoom-in" data-aos-delay="60">
-      <div class="card shadow-sm text-center">
-        <div class="card-body">
-          <h5>📤 إجمالي المصاريف</h5>
-          <p class="fs-4 text-danger">{{ total_expenses }} ريال</p>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-4" data-aos="zoom-in" data-aos-delay="120">
-      <div class="card shadow-sm text-center">
-        <div class="card-body">
-          <h5>💹 صافي الربح</h5>
-          <p class="fs-4 text-primary">{{ net_profit }} ريال</p>
-        </div>
-      </div>
-    </div>
+<div class="app-card mt-4" data-aos="fade-up" data-aos-delay="160">
+  <div class="app-card__header">
+    <h3 class="app-card__title mb-0">المعاملات غير المدفوعة</h3>
   </div>
-
-  <!-- Unpaid transactions table remains as is -->
-  <div class="card shadow-sm mb-4" data-aos="fade-up">
-    <div class="card-body">
-      <h5 class="mb-3">❌ المعاملات غير المدفوعة</h5>
-      <table class="table table-bordered">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>العميل</th>
-            <th>الموظف</th>
-            <th>الرسوم</th>
-            <th>المدفوع</th>
-            <th>الحالة</th>
-            <th>إضافة دفعة</th>
-            <th>تنزيل مستند</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for t in transactions %}
-          <tr>
-            <td>{{ t.id }}</td>
-            <td>{{ t.client }}</td>
-            <td>{{ t.employee }}</td>
-            <td>{{ t.fee }} ريال</td>
-            <td>{{ t.paid }} ريال</td>
-            <td>{{ t.payment_status }}</td>
-            <td>
-              <form action="{{ url_for('add_payment', tid=t.id) }}" method="post" enctype="multipart/form-data" class="d-flex gap-2">
-                <input type="number" step="0.01" name="amount" placeholder="المبلغ" class="form-control form-control-sm" required>
-                <select name="method" class="form-select form-select-sm" required>
-                  <option value="كاش">كاش</option>
-                  <option value="تحويل">تحويل</option>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>العميل</th>
+          <th>الموظف</th>
+          <th>الرسوم</th>
+          <th>المدفوع</th>
+          <th>الحالة</th>
+          <th>إضافة دفعة</th>
+          <th>مستندات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transactions %}
+        <tr>
+          <td>{{ t.id }}</td>
+          <td>{{ t.client }}</td>
+          <td>{{ t.employee }}</td>
+          <td>{{ "{:,.2f}".format(t.fee or 0) }} ر.ع</td>
+          <td>{{ "{:,.2f}".format(t.paid or 0) }} ر.ع</td>
+          <td>{{ t.payment_status }}</td>
+          <td>
+            <form action="{{ url_for('add_payment', tid=t.id) }}" method="post" enctype="multipart/form-data" class="d-flex flex-wrap gap-2">
+              <input type="number" step="0.01" name="amount" placeholder="المبلغ" class="form-control form-control-sm" required>
+              <select name="method" class="form-select form-select-sm" required>
+                <option value="كاش">كاش</option>
+                <option value="تحويل">تحويل</option>
+              </select>
+              <input type="file" name="receipt_file" class="form-control form-control-sm">
+              <button type="submit" class="btn btn-success btn-sm">إضافة</button>
+            </form>
+          </td>
+          <td>
+            <form method="get" class="row g-2 align-items-end text-start">
+              <div class="col-12">
+                <input type="text" name="details" class="form-control form-control-sm" placeholder="وصف/تفاصيل (اختياري)">
+              </div>
+              <div class="col-6">
+                <label class="form-label mb-1 small">نسبة الضريبة %</label>
+                <input type="number" name="vat" class="form-control form-control-sm" value="{{ vat_default_percent }}" min="0" max="100" step="0.01">
+              </div>
+              <div class="col-6">
+                <label class="form-label mb-1 small">تطبيق الضريبة</label>
+                <select name="apply_vat" class="form-select form-select-sm">
+                  <option value="1" selected>نعم</option>
+                  <option value="0">لا</option>
                 </select>
-                <input type="file" name="receipt_file" class="form-control form-control-sm">
-                <button type="submit" class="btn btn-success btn-sm">💵</button>
-              </form>
-            </td>
-            <td>
-              <form method="get" class="row g-2 align-items-end">
-                <div class="col-12">
-                  <input type="text" name="details" class="form-control form-control-sm" placeholder="وصف/تفاصيل (اختياري)">
-                </div>
-                <div class="col-6">
-                  <label class="form-label mb-1 small">نسبة الضريبة %</label>
-                  <input type="number" name="vat" class="form-control form-control-sm" value="{{ vat_default_percent }}" min="0" max="100" step="0.01">
-                </div>
-                <div class="col-6">
-                  <label class="form-label mb-1 small">تطبيق الضريبة</label>
-                  <select name="apply_vat" class="form-select form-select-sm">
-                    <option value="1" selected>نعم</option>
-                    <option value="0">لا</option>
-                  </select>
-                </div>
-                <div class="col-12 d-flex gap-2 flex-wrap">
-                  <button type="submit" formaction="{{ url_for('download_quote_doc', transaction_id=t.id) }}" class="btn btn-outline-primary btn-sm">عرض سعر</button>
-                  <button type="submit" formaction="{{ url_for('download_invoice_doc', transaction_id=t.id) }}" class="btn btn-outline-secondary btn-sm">فاتورة</button>
-                  <button type="submit" formaction="{{ url_for('print_invoice_html', transaction_id=t.id) }}?auto=1" class="btn btn-sm btn-success">طباعة</button>
-                </div>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+              </div>
+              <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" formaction="{{ url_for('download_quote_doc', transaction_id=t.id) }}" class="btn btn-outline-primary btn-sm">عرض سعر</button>
+                <button type="submit" formaction="{{ url_for('download_invoice_doc', transaction_id=t.id) }}" class="btn btn-outline-secondary btn-sm">فاتورة</button>
+                <button type="submit" formaction="{{ url_for('print_invoice_html', transaction_id=t.id) }}?auto=1" class="btn btn-sm btn-success">طباعة</button>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-3">لا توجد معاملات متأخرة حالياً.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
+</div>
 
-  <!-- Add expense -->
-  <div class="card shadow-sm" data-aos="fade-up">
-    <div class="card-body">
-      <h5 class="mb-3">➕ إضافة مصروف جديد</h5>
-      <form method="POST" enctype="multipart/form-data">
-        <div class="row g-3">
-          <div class="col-md-4">
-            <label class="form-label">اسم المصروف</label>
-            <input type="text" name="expense_name" class="form-control" required>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">المبلغ</label>
-            <input type="number" step="0.01" name="amount" class="form-control" required>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">📎 إيصال المصروف</label>
-            <input type="file" name="file" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
-          </div>
-          <div class="col-md-2 d-flex align-items-end">
-            <button type="submit" class="btn btn-danger w-100">حفظ</button>
-          </div>
-        </div>
-      </form>
-    </div>
+<div class="app-card mt-4 mb-4" data-aos="fade-up" data-aos-delay="200">
+  <div class="app-card__header">
+    <h3 class="app-card__title mb-0">إضافة مصروف جديد</h3>
   </div>
-
+  <form method="POST" enctype="multipart/form-data" class="row g-3 text-start">
+    <div class="col-md-4">
+      <label class="form-label">اسم المصروف</label>
+      <input type="text" name="expense_name" class="form-control" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">المبلغ</label>
+      <input type="number" step="0.01" name="amount" class="form-control" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">إيصال المصروف</label>
+      <input type="file" name="file" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+      <button type="submit" class="btn btn-danger w-100">حفظ</button>
+    </div>
+  </form>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// تتبع إدخال المستخدم لمنع التحديث التلقائي غير المرغوب
 var __isUserEditing = false;
 var __updateBannerEl = null;
-function __setupEditingGuards(){
-  try {
-    var formEl = document.querySelector('form');
-    var inputs = document.querySelectorAll('input, select, textarea');
-    inputs.forEach(function(el){
-      el.addEventListener('focus', function(){ __isUserEditing = true; });
-      el.addEventListener('input', function(){ __isUserEditing = true; });
-      el.addEventListener('blur', function(){ setTimeout(function(){ __isUserEditing = false; }, 1000); });
-    });
-    if (formEl) formEl.addEventListener('submit', function(){ __isUserEditing = false; });
-  } catch (_) {}
+function __markEditing() {
+  __isUserEditing = true;
+  if (__updateBannerEl) {
+    __updateBannerEl.classList.remove("d-none");
+  }
 }
-function __ensureUpdateBanner(){
-  if (__updateBannerEl) return __updateBannerEl;
-  var banner = document.createElement('div');
-  banner.style.position = 'fixed';
-  banner.style.bottom = '16px';
-  banner.style.left = '50%';
-  banner.style.transform = 'translateX(-50%)';
-  banner.style.background = '#0d6efd';
-  banner.style.color = '#fff';
-  banner.style.padding = '10px 14px';
-  banner.style.borderRadius = '8px';
-  banner.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-  banner.style.display = 'none';
-  banner.style.zIndex = '2147483647';
-  banner.innerHTML = 'حدث تحديث للبيانات. <button id="__doReloadBtn" style="margin-inline-start:8px" class="btn btn-light btn-sm">تحديث الآن</button>';
-  document.body.appendChild(banner);
-  var btn = banner.querySelector('#__doReloadBtn');
-  if (btn) btn.addEventListener('click', function(){ location.reload(); });
-  __updateBannerEl = banner;
-  return banner;
-}
-document.addEventListener('DOMContentLoaded', __setupEditingGuards);
-</script>
-<!-- تم تعطيل التحديث التلقائي -->
-<script>
-if ("serviceWorker" in navigator && "PushManager" in window) {
-  navigator.serviceWorker.register("/service-worker.js")
-    .then(function(reg) {
-      console.log("✅ Service Worker مسجل:", reg);
-      if (Notification && Notification.permission !== "granted") {
-        Notification.requestPermission().then(function() {
-          subscribeUser().catch(console.error);
-        });
-      } else {
-        subscribeUser().catch(console.error);
-      }
-    })
-    .catch(function(err) { console.error("❌ فشل التسجيل:", err); });
-}
-
-// تشغيل نغمة عند وصول PUSH
-(function setupBeepListener(){
-  if (!navigator.serviceWorker) return;
-  navigator.serviceWorker.addEventListener("message", function(event){
-    if (!event || !event.data || event.data.type !== "PUSH_NOTIFICATION") return;
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = "sine";
-      o.frequency.value = 880;
-      o.connect(g);
-      g.connect(ctx.destination);
-      g.gain.setValueAtTime(0.0001, ctx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
-      o.start();
-      o.stop(ctx.currentTime + 0.4);
-    } catch (_) {}
-  });
-})();
+document.querySelectorAll("input, select, textarea").forEach(function (el) {
+  el.addEventListener("input", __markEditing);
+});
+window.addEventListener("beforeunload", function (event) {
+  if (__isUserEditing) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+});
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = atob(base64);
+  const rawData = window.atob(base64);
   const outputArray = new Uint8Array(rawData.length);
   for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
   return outputArray;
@@ -620,7 +540,4 @@ async function subscribeUser() {
   }
 }
 </script>
-
 {% endblock %}
-
-

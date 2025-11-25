@@ -1,321 +1,434 @@
 {% extends 'base.html' %}
-{% set title = '🏗️ لوحة الموظف' %}
+{% from 'partials/nav.html' import app_nav %}
+{% set title = 'لوحة الموظف' %}
 
 {% block head_extra %}
   <style>
-    /* --- الخطوط والألوان --- */
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; }
-    h2, h5, h6 { font-weight: 700; }
-    .form-label { font-weight: 500; }
-    .card { border-radius: 15px; box-shadow: 0 6px 18px rgba(0,0,0,0.1); transition: transform 0.3s ease; }
-    .card:hover { transform: translateY(-4px); }
-    .nav-pills .nav-link { border-radius: 50px; margin: 0 4px; }
-    .alert-info { border-radius: 12px; background-color: #e7f1ff; color: #0d6efd; }
-    .tab-content > .tab-pane { animation: fadeIn 0.5s ease-in-out; }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
+    .employee-tabs .nav-link {
+      border-radius: var(--app-radius-sm);
+      padding: 0.6rem 1.25rem;
+      color: var(--app-muted-strong);
+      background: transparent;
+      transition: all 0.2s ease;
     }
-
-    /* responsive tweaks */
-    @media (max-width: 768px) {
-      .card { padding: 15px; }
-      .nav-pills { flex-wrap: wrap; justify-content: center; }
+    .employee-tabs .nav-link.active {
+      background: var(--app-primary);
+      color: #fff;
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.18);
+    }
+    .employee-tabs .nav-link:not(.active):hover {
+      background: rgba(37, 99, 235, 0.08);
+      color: var(--app-primary);
+    }
+    .employee-section-divider {
+      border-top: 1px dashed rgba(15, 23, 42, 0.12);
+      margin: 1.5rem 0 1rem;
+      padding-top: 1rem;
     }
   </style>
 {% endblock %}
 
 {% block navbar %}
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm animate__animated animate__fadeInDown">
-  <div class="container-fluid">
-    <a class="navbar-brand fw-bold" href="#">🛠️ نظام التثمين</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto">
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('employee_dashboard') }}">🏠 الصفحة الرئيسية</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('customers_page') }}">👥 العملاء</a></li>
-        <li class="nav-item"><a class="nav-link text-warning" href="/reports">📑 التقارير</a></li>
-        <li class="nav-item"><a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 تسجيل الخروج</a></li>
-      </ul>
-    </div>
-  </div>
-</nav>
+  {{ app_nav(
+      brand='لوحة الموظف',
+      brand_url=url_for('employee_dashboard'),
+      appearance='dark',
+      items=[
+        {'label': 'الرئيسية', 'href': url_for('employee_dashboard'), 'active': request.endpoint == 'employee_dashboard'},
+        {'label': 'العملاء', 'href': url_for('customers_page')},
+        {'label': 'التقارير', 'href': url_for('reports')}
+      ],
+      actions=[
+        {'label': 'تسجيل الخروج', 'href': url_for('logout'), 'variant': 'outline-light'}
+      ]
+  ) }}
 {% endblock %}
 
 {% block content %}
-<div class="container mt-5">
+<div class="app-page-title" data-aos="fade-up">
+  <h1>مرحبًا بك في لوحة الموظف</h1>
+  <div class="app-page-title__meta">
+    <span>سجل معاملات العملاء وارفع مستندات البنوك والفروع من مكان واحد.</span>
+    <span class="pill">معاملات العقار: {{ real_estate_brought_count }}</span>
+    <span class="pill">معاملات المركبات: {{ vehicle_brought_count }}</span>
+  </div>
+</div>
 
-  <!-- عنوان رئيسي -->
-  <h2 class="text-center mb-5" data-aos="fade-up">📌 لوحة البيانات</h2>
+<div class="stats-row" data-aos="fade-up" data-aos-delay="90">
+  <div class="stat-card">
+    <span class="stat-card__label">معاملات عقارية جُلبت بواسطة حسابك</span>
+    <span class="stat-card__value">{{ real_estate_brought_count }}</span>
+    <div class="text-muted small">تعتمد على نطاق التاريخ المحدد في التصفية.</div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-card__label">معاملات مركبات جُلبت بواسطة حسابك</span>
+    <span class="stat-card__value">{{ vehicle_brought_count }}</span>
+    <div class="text-muted small">حدّث البيانات بتغيير فترة التصفية.</div>
+  </div>
+</div>
 
-  <!-- فلترة الفترة -->
-  <form method="GET" class="row g-3 mb-4">
-    <div class="col-12 col-md-3">
+<div class="app-card mt-4" data-aos="fade-up" data-aos-delay="120">
+  <div class="app-card__header">
+    <div>
+      <h3 class="app-card__title">تصفية الفترة الزمنية</h3>
+      <p class="app-card__subtitle mb-0">اختر تاريخ البداية والنهاية لتحديث الأرقام أعلاه.</p>
+    </div>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('employee_dashboard') }}">إعادة التعيين</a>
+  </div>
+  <form method="GET" class="row g-3">
+    <div class="col-12 col-md-4">
       <label class="form-label">من تاريخ</label>
       <input type="date" name="start_date" class="form-control" value="{{ start_date or '' }}">
     </div>
-    <div class="col-12 col-md-3">
+    <div class="col-12 col-md-4">
       <label class="form-label">إلى تاريخ</label>
       <input type="date" name="end_date" class="form-control" value="{{ end_date or '' }}">
     </div>
-    <div class="col-12 col-md-3 d-flex align-items-end">
-      <button class="btn btn-outline-primary w-100">تطبيق الفترة</button>
-    </div>
-    <div class="col-12 col-md-3 d-flex align-items-end">
-      <a class="btn btn-outline-secondary w-100" href="{{ url_for('employee_dashboard') }}">مسح الفلتر</a>
+    <div class="col-12 col-md-4 d-flex align-items-end">
+      <button class="btn btn-primary w-100">تطبيق التصفية</button>
     </div>
   </form>
+</div>
 
-  <!-- بطاقات الإحصائيات -->
-  <div class="row mb-4">
-    <div class="col-md-6 mb-3">
-      <div class="alert alert-secondary shadow-sm rounded-3">
-        🏠 عدد معاملات العقار التي جلبتها: <strong>{{ real_estate_brought_count }}</strong>
-      </div>
-    </div>
-    <div class="col-md-6 mb-3">
-      <div class="alert alert-secondary shadow-sm rounded-3">
-        🚗 عدد معاملات السيارة التي جلبتها: <strong>{{ vehicle_brought_count }}</strong>
-      </div>
+<div class="app-card mt-4" data-aos="fade-up" data-aos-delay="150">
+  <div class="app-card__header">
+    <div>
+      <h3 class="app-card__title">إدارة المعاملات والمستندات</h3>
+      <p class="app-card__subtitle mb-0">استخدم التبويبات للاختيار بين تسجيل معاملة جديدة أو رفع مستند.</p>
     </div>
   </div>
 
-  <!-- تبويبات المهام -->
-  <ul class="nav nav-pills justify-content-center mb-4" id="employeeTabs" role="tablist" data-aos="zoom-in">
+  <ul class="nav nav-pills employee-tabs justify-content-center" id="employeeTabs" role="tablist">
     <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="tab-transaction-tab" data-bs-toggle="tab" data-bs-target="#tab-transaction" type="button" role="tab">➕ إضافة معاملة</button>
+      <button class="nav-link active" id="tab-transaction-tab" data-bs-toggle="tab" data-bs-target="#tab-transaction" type="button" role="tab">تسجيل معاملة</button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="tab-bankdocs-tab" data-bs-toggle="tab" data-bs-target="#tab-bankdocs" type="button" role="tab">🏦 إضافة مستندات للبنك</button>
+      <button class="nav-link" id="tab-bankdocs-tab" data-bs-toggle="tab" data-bs-target="#tab-bankdocs" type="button" role="tab">مستندات البنوك</button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="tab-branchdocs-tab" data-bs-toggle="tab" data-bs-target="#tab-branchdocs" type="button" role="tab">📁 مستندات الشركة/الفرع</button>
+      <button class="nav-link" id="tab-branchdocs-tab" data-bs-toggle="tab" data-bs-target="#tab-branchdocs" type="button" role="tab">مستندات الفرع</button>
     </li>
   </ul>
 
-  <div class="tab-content">
+  <div class="tab-content pt-4">
+    <div class="tab-pane fade show active" id="tab-transaction" role="tabpanel" tabindex="0">
+      <form method="POST" action="{{ url_for('add_transaction') }}" enctype="multipart/form-data" class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">اسم العميل</label>
+          <input type="text" name="client_name" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">رقم جوال العميل</label>
+          <input type="text" name="client_phone" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">نوع المعاملة</label>
+          <select name="transaction_type" id="transaction_type" class="form-select" required>
+            <option value="">اختر نوع المعاملة</option>
+            <option value="real_estate">تقييم عقاري</option>
+            <option value="vehicle">تقييم مركبة</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">البنك المحيل</label>
+          <select name="bank_id" class="form-select" required>
+            <option value="">اختر البنك</option>
+            {% for bank in banks %}
+              <option value="{{ bank.id }}">{{ bank.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
 
-    <!-- تبويب إضافة معاملة -->
-    <div class="tab-pane fade show active" id="tab-transaction" role="tabpanel">
-      <div class="row justify-content-center">
-        <div class="col-md-8" data-aos="fade-up">
-          <div class="card p-4">
-            <h5 class="mb-4">➕ إضافة معاملة جديدة</h5>
-            <form method="POST" action="{{ url_for('add_transaction') }}" enctype="multipart/form-data">
+        <div class="col-md-6">
+          <label class="form-label">فرع البنك</label>
+          <input type="text" name="bank_branch" class="form-control" placeholder="اسم الفرع أو المدينة" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">اسم موظف البنك (إن وجد)</label>
+          <input type="text" name="bank_employee_name" class="form-control">
+        </div>
 
-              <!-- بيانات العميل -->
-              <div class="row g-3">
-                <div class="col-md-6">
-                  <label class="form-label">👤 اسم العميل</label>
-                  <input type="text" name="client_name" class="form-control" required>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">📞 رقم العميل</label>
-                  <input type="text" name="client_phone" class="form-control" required>
-                </div>
-              </div>
+        <div class="col-md-6">
+          <label class="form-label">المسوّق الذي جلب المعاملة</label>
+          <input type="text" name="brought_by" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">الموظف المستلم للمعاملة</label>
+          <input type="text" name="visited_by" class="form-control" required>
+        </div>
 
-              <div class="row g-3 mt-2">
-                <div class="col-md-6">
-                  <label class="form-label">📂 نوع المعاملة</label>
-                  <select name="transaction_type" id="transaction_type" class="form-select" required>
-                    <option value="">-- اختر النوع --</option>
-                    <option value="real_estate">🏠 عقار</option>
-                    <option value="vehicle">🚗 مركبة</option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">🏦 البنك</label>
-                  <select name="bank_id" class="form-select" required>
-                    <option value="">-- اختر البنك --</option>
-                    {% for bank in banks %}
-                      <option value="{{ bank.id }}">{{ bank.name }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-              </div>
-
-              <!-- معلومات إضافية -->
-              <div class="row g-3 mt-2">
-                <div class="col-md-6">
-                  <label class="form-label">🏦 فرع البنك</label>
-                  <input type="text" name="bank_branch" class="form-control" placeholder="اكتب اسم فرع البنك" required>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">👤 موظف البنك (اختياري)</label>
-                  <input type="text" name="bank_employee_name" class="form-control">
-                </div>
-              </div>
-
-              <div class="row g-3 mt-2">
-                <div class="col-md-6">
-                  <label class="form-label">من جلب المعاملة؟</label>
-                  <input type="text" name="brought_by" class="form-control" required>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">من قام بالزيارة؟</label>
-                  <input type="text" name="visited_by" class="form-control" required>
-                </div>
-              </div>
-
-              <!-- الحقول الديناميكية -->
-              <div id="real_estate_fields" style="display:none;" class="mt-3 border-top pt-3">
-                <h6>🏠 تفاصيل العقار</h6>
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <label class="form-label">الولاية</label>
-                    <input type="text" name="state" class="form-control" required>
-                  </div>
-                  <div class="col-md-6">
-                    <label class="form-label">المنطقة</label>
-                    <input type="text" name="region" class="form-control" required>
-                  </div>
-                </div>
-                <div class="row g-3 mt-2">
-                  <div class="col-md-6">
-                    <label class="form-label">المساحة (م²)</label>
-                    <input type="number" step="0.01" name="area" id="area" class="form-control" required>
-                  </div>
-                  <div class="col-md-6">
-                    <label class="form-label">سعر المتر المقترح</label>
-                    <input type="number" step="0.01" name="price_per_meter" id="price_per_meter" class="form-control" readonly>
-                  </div>
-                </div>
-              </div>
-
-              <div id="vehicle_fields" style="display:none;" class="mt-3 border-top pt-3">
-                <h6>🚗 تفاصيل المركبة</h6>
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <label class="form-label">نوع المركبة</label>
-                    <input type="text" name="vehicle_type" class="form-control">
-                  </div>
-                  <div class="col-md-6">
-                    <label class="form-label">الموديل</label>
-                    <input type="text" name="vehicle_model" class="form-control">
-                  </div>
-                </div>
-              </div>
-
-              <!-- الملفات والرسوم -->
-              <div class="row g-3 mt-3">
-                <div class="col-md-6">
-                  <label class="form-label">💵 رسوم المعاملة</label>
-                  <input type="number" step="0.01" name="fee" class="form-control">
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">📎 ملفات المعاملة</label>
-                  <input type="file" name="files" class="form-control" multiple>
-                </div>
-              </div>
-
-              <div id="estimate_box" class="alert alert-info mt-3" style="display:none;">
-                <b>القيمة التقديرية للأرض:</b> <span id="land_value">0</span> ريال <br>
-                <b>القيمة التقديرية للبناء:</b> <span id="building_value">0</span> ريال <br>
-                <b>الإجمالي:</b> <span id="total_estimate">0</span> ريال
-              </div>
-
-              <button type="submit" class="btn btn-primary w-100 mt-3">🚀 حفظ المعاملة وإشعار المهندس</button>
-            </form>
+        <div id="real_estate_fields" class="employee-section-divider" style="display:none;">
+          <h6 class="fw-semibold mb-3">تفاصيل التقييم العقاري</h6>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">المنطقة</label>
+              <input type="text" name="state" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">المدينة / الحي</label>
+              <input type="text" name="region" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">المساحة (م²)</label>
+              <input type="number" step="0.01" name="area" id="area" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">سعر المتر (يُحدّث لاحقًا)</label>
+              <input type="number" step="0.01" name="price_per_meter" id="price_per_meter" class="form-control" readonly>
+            </div>
           </div>
         </div>
+
+        <div id="vehicle_fields" class="employee-section-divider" style="display:none;">
+          <h6 class="fw-semibold mb-3">تفاصيل التقييم للمركبات</h6>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">نوع المركبة</label>
+              <input type="text" name="vehicle_type" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">الموديل / الطراز</label>
+              <input type="text" name="vehicle_model" class="form-control">
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">أتعاب التقييم (اختياري)</label>
+          <input type="number" step="0.01" name="fee" class="form-control">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">مرفقات المعاملة</label>
+          <input type="file" name="files" class="form-control" multiple>
+        </div>
+
+        <div id="estimate_box" class="alert alert-info mt-2" style="display:none;">
+          <p class="mb-1 fw-semibold">تقدير قيمة المعاملة</p>
+          <div class="small text-muted">يظهر بعد إدخال تفاصيل التقييم العقاري.</div>
+          <div class="d-flex flex-column gap-1 mt-2">
+            <span>قيمة الأرض: <strong id="land_value">0</strong> ر.س</span>
+            <span>قيمة المبنى: <strong id="building_value">0</strong> ر.س</span>
+            <span>الإجمالي التقديري: <strong id="total_estimate">0</strong> ر.س</span>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <button type="submit" class="btn btn-primary w-100">تسجيل المعاملة</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="tab-pane fade" id="tab-bankdocs" role="tabpanel" tabindex="0">
+      <div class="row g-3">
+        <div class="col-12">
+          <p class="text-muted mb-3">ارفع مستندات البنوك المرتبطة بمعاملاتك أو التقييمات الحالية.</p>
+        </div>
+        <form class="row g-3" method="POST" action="{{ url_for('employee_add_bank_document') }}" enctype="multipart/form-data">
+          <div class="col-md-4">
+            <label class="form-label">اختر البنك</label>
+            <select name="bank_id" class="form-select" required>
+              <option value="">حدد البنك</option>
+              {% for bank in banks %}
+                <option value="{{ bank.id }}">{{ bank.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">عنوان المستند</label>
+            <input type="text" name="title" class="form-control" required>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">المستند</label>
+            <input type="file" name="file" class="form-control">
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button class="btn btn-primary w-100">رفع المستند</button>
+          </div>
+        </form>
       </div>
     </div>
 
-    <!-- تبويب مستندات البنك -->
-    <div class="tab-pane fade" id="tab-bankdocs" role="tabpanel">
-      <div class="row justify-content-center mt-3">
-        <div class="col-md-8" data-aos="fade-up">
-          <div class="card p-3 shadow-sm">
-            <h5 class="mb-3">✉️ إرسال رسالة/سيرة ذاتية للبنك (بدون معاملة)</h5>
-            <form class="row g-2" method="POST" action="{{ url_for('employee_add_bank_document') }}" enctype="multipart/form-data">
-              <div class="col-md-4">
-                <label class="form-label">🏦 اختر البنك</label>
-                <select name="bank_id" class="form-select" required>
-                  <option value="">— اختر البنك —</option>
-                  {% for bank in banks %}
-                    <option value="{{ bank.id }}">{{ bank.name }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="col-md-8">
-                <label class="form-label">العنوان</label>
-                <input type="text" name="title" class="form-control" required>
-              </div>
-              <div class="col-md-8">
-                <label class="form-label">ملف مرفق (اختياري)</label>
-                <input type="file" name="file" class="form-control">
-              </div>
-              <div class="col-md-4 d-flex align-items-end">
-                <button class="btn btn-primary w-100">إرسال</button>
-              </div>
-            </form>
+    <div class="tab-pane fade" id="tab-branchdocs" role="tabpanel" tabindex="0">
+      <div class="row g-3">
+        <div class="col-12">
+          <p class="text-muted mb-3">إدارة مستندات الفرع الحالي ومتابعة صلاحيتها.</p>
+        </div>
+        <form method="POST" action="{{ url_for('employee_add_branch_document') }}" enctype="multipart/form-data" class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">عنوان المستند</label>
+            <input type="text" name="title" class="form-control" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">نوع المستند</label>
+            <input type="text" name="doc_type" class="form-control" placeholder="مثل: ترخيص، عقد، خطاب...">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">تاريخ الإصدار</label>
+            <input type="date" name="issued_at" class="form-control">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">تاريخ الانتهاء</label>
+            <input type="date" name="expires_at" class="form-control">
+          </div>
+          <div class="col-md-10">
+            <label class="form-label">ملف المستند</label>
+            <input type="file" name="file" class="form-control">
+          </div>
+          <div class="col-md-2 d-flex align-items-end">
+            <button class="btn btn-success w-100">حفظ المستند</button>
+          </div>
+        </form>
+
+        {% if docs %}
+        <div class="col-12 mt-4">
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>المستند</th>
+                  <th>النوع</th>
+                  <th>تاريخ الإصدار</th>
+                  <th>تاريخ الانتهاء</th>
+                  <th>الحالة</th>
+                  <th class="text-end">ملف</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for doc in docs %}
+                {% set status = status_for(doc) %}
+                <tr>
+                  <td class="fw-semibold">{{ doc.title }}</td>
+                  <td>{{ doc.doc_type or 'غير محدد' }}</td>
+                  <td>{{ doc.issued_at.strftime('%Y-%m-%d') if doc.issued_at else '—' }}</td>
+                  <td>{{ doc.expires_at.strftime('%Y-%m-%d') if doc.expires_at else '—' }}</td>
+                  <td>
+                    <span class="status-chip
+                      {% if status == 'منتهي' %}status-chip--danger{% elif status == 'قارب على الانتهاء' %}status-chip--warning{% else %}status-chip--success{% endif %}">
+                      {{ status }}
+                    </span>
+                  </td>
+                  <td class="text-end">
+                    {% if doc.b2_file_name %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ build_b2_public_url(doc.b2_file_name) }}" target="_blank">عرض</a>
+                    {% elif doc.file %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('download_local_file', filename=doc.file) }}">تحميل</a>
+                    {% else %}
+                      <span class="text-muted">لا يوجد ملف</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- تبويب مستندات الفرع -->
-    <div class="tab-pane fade" id="tab-branchdocs" role="tabpanel">
-      <div class="row justify-content-center mt-3">
-        <div class="col-md-10" data-aos="fade-up">
-          <div class="card p-4 shadow-lg">
-            <h5 class="mb-3">📁 مستندات الشركة/الفرع</h5>
-            <!-- نموذج رفع مستند -->
-            <form method="POST" action="{{ url_for('employee_add_branch_document') }}" enctype="multipart/form-data" class="mb-3">
-              <div class="row g-2">
-                <div class="col-md-4">
-                  <label class="form-label">عنوان المستند</label>
-                  <input type="text" name="title" class="form-control" required>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">نوع المستند</label>
-                  <input type="text" name="doc_type" class="form-control" placeholder="سجل تجاري، ضريبة، ..">
-                </div>
-                <div class="col-md-2">
-                  <label class="form-label">تاريخ الإصدار</label>
-                  <input type="date" name="issued_at" class="form-control">
-                </div>
-                <div class="col-md-2">
-                  <label class="form-label">تاريخ الانتهاء</label>
-                  <input type="date" name="expires_at" class="form-control">
-                </div>
-                <div class="col-md-10 mt-2">
-                  <label class="form-label">الملف</label>
-                  <input type="file" name="file" class="form-control">
-                </div>
-                <div class="col-md-2 mt-2 d-flex align-items-end">
-                  <button class="btn btn-success w-100">⬆️ رفع المستند</button>
-                </div>
-              </div>
-            </form>
+        {% else %}
+        <div class="col-12">
+          <div class="empty-state">
+            <h4>لا توجد مستندات مسجلة حتى الآن</h4>
+            <p>عند رفع المستندات سيظهر هنا ملخصها مع حالة الصلاحية.</p>
           </div>
         </div>
+        {% endif %}
       </div>
     </div>
-
   </div>
 </div>
+
+{% if transactions %}
+<div class="app-card mt-4" data-aos="fade-up" data-aos-delay="180">
+  <div class="app-card__header">
+    <div>
+      <h3 class="app-card__title">أحدث المعاملات المسندة إليك</h3>
+      <p class="app-card__subtitle mb-0">عرض سريع لآخر خمس معاملات مرتبطة بحسابك.</p>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>العميل</th>
+          <th>نوع المعاملة</th>
+          <th>البنك</th>
+          <th>التاريخ</th>
+          <th>الحالة</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transactions[:5] %}
+        {% if t.status == 'Completed' %}
+          {% set status_class = 'status-chip--success' %}
+          {% set status_label = 'منتهية' %}
+        {% elif t.status == 'In Progress' %}
+          {% set status_class = 'status-chip--info' %}
+          {% set status_label = 'قيد التنفيذ' %}
+        {% elif t.status == 'Pending' %}
+          {% set status_class = 'status-chip--warning' %}
+          {% set status_label = 'قيد المراجعة' %}
+        {% elif t.status == 'Cancelled' %}
+          {% set status_class = 'status-chip--danger' %}
+          {% set status_label = 'ملغاة' %}
+        {% else %}
+          {% set status_class = 'status-chip--info' %}
+          {% set status_label = t.status or 'غير محدد' %}
+        {% endif %}
+        <tr>
+          <td>{{ t.id }}</td>
+          <td>{{ t.client }}</td>
+          <td>{{ 'تقييم عقاري' if t.transaction_type == 'real_estate' else 'تقييم مركبة' }}</td>
+          <td>{{ t.bank.name if t.bank else 'غير محدد' }}</td>
+          <td>{{ t.date.strftime('%Y-%m-%d') if t.date else '—' }}</td>
+          <td><span class="status-chip {{ status_class }}">{{ status_label }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-  // إعادة استخدام الكود السابق للحقول الديناميكية والحساب التقديري
-  const typeSelect = document.getElementById("transaction_type");
-  const realFields = document.getElementById("real_estate_fields");
-  const vehicleFields = document.getElementById("vehicle_fields");
-  const estimateBox = document.getElementById("estimate_box");
+  document.addEventListener('DOMContentLoaded', function () {
+    const typeSelect = document.getElementById('transaction_type');
+    const realFields = document.getElementById('real_estate_fields');
+    const vehicleFields = document.getElementById('vehicle_fields');
+    const estimateBox = document.getElementById('estimate_box');
+    const realRequiredNames = ['state', 'region', 'area'];
 
-  function toggleTypeFields() {
-    const val = typeSelect.value;
-    realFields.style.display = val === 'real_estate' ? 'block' : 'none';
-    vehicleFields.style.display = val === 'vehicle' ? 'block' : 'none';
-    estimateBox.style.display = val === 'real_estate' ? 'block' : 'none';
-  }
-  typeSelect.addEventListener('change', toggleTypeFields);
-  toggleTypeFields();
+    const toggleTypeFields = () => {
+      if (!typeSelect) {
+        return;
+      }
+      const val = typeSelect.value;
+      const isRealEstate = val === 'real_estate';
+      if (realFields) {
+        realFields.style.display = isRealEstate ? 'block' : 'none';
+      }
+      if (vehicleFields) {
+        vehicleFields.style.display = val === 'vehicle' ? 'block' : 'none';
+      }
+      if (estimateBox) {
+        estimateBox.style.display = isRealEstate ? 'block' : 'none';
+      }
+      realRequiredNames.forEach((name) => {
+        const field = document.querySelector(`[name=\"${name}\"]`);
+        if (field) {
+          if (isRealEstate) {
+            field.setAttribute('required', 'required');
+          } else {
+            field.removeAttribute('required');
+          }
+        }
+      });
+    };
+
+    if (typeSelect) {
+      typeSelect.addEventListener('change', toggleTypeFields);
+      toggleTypeFields();
+    }
+  });
 </script>
 {% endblock %}

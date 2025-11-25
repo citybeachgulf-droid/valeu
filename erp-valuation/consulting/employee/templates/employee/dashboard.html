@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% from 'partials/nav.html' import app_nav %}
+
+{% block navbar %}
+  {{ app_nav(
+      brand='موظف الاستشارات الهندسية',
+      brand_url=url_for('consulting_employee.dashboard'),
+      appearance='dark',
+      items=[
+        {'label': 'لوحة الموظف', 'href': url_for('consulting_employee.dashboard'), 'active': True},
+        {'label': 'لوحة الاستشارات', 'href': url_for('consulting_dashboard.dashboard_home')},
+        {'label': 'المشاريع', 'href': url_for('consulting_projects.list_projects')},
+        {'label': 'الفواتير', 'href': url_for('consulting_invoices.list_invoices')}
+      ],
+      actions=[
+        {'label': 'تسجيل الخروج', 'href': url_for('logout'), 'variant': 'outline-light'}
+      ]
+  ) }}
+{% endblock %}
+
+{% block content %}
+<div class="app-page-title" data-aos="fade-up">
+  <h1>مرحبًا بك في لوحة موظف الاستشارات</h1>
+  <div class="app-page-title__meta">
+    <span>ملخص سريع لأداء مشاريع وفواتير الاستشارات الهندسية.</span>
+    <span class="pill">إجمالي المشاريع: {{ total_projects }}</span>
+    <span class="pill">إجمالي الفواتير: {{ total_invoices }}</span>
+  </div>
+</div>
+
+<div class="stats-row" data-aos="fade-up" data-aos-delay="90">
+  <div class="stat-card">
+    <span class="stat-card__label">مشاريع نشطة</span>
+    <span class="stat-card__value">{{ active_projects }}</span>
+    <div class="text-muted small">تم احتسابها بناءً على المشاريع التي لم تُغلق بعد (نسبة إنجاز أقل من 100%).</div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-card__label">مشاريع مكتملة</span>
+    <span class="stat-card__value">{{ completed_projects }}</span>
+    <div class="text-muted small">المشاريع التي وصلت نسبة إنجازها إلى 100٪.</div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-card__label">فواتير مدفوعة</span>
+    <span class="stat-card__value">{{ paid_invoices }} / {{ total_invoices }}</span>
+    <div class="text-muted small">عدد الفواتير التي تم سدادها مقارنة بإجمالي الفواتير.</div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-card__label">فواتير متأخرة</span>
+    <span class="stat-card__value">{{ overdue_invoices }}</span>
+    <div class="text-muted small">فواتير لم تُسدَّد بعد، وتاريخ الاستحقاق الخاص بها قبل {{ today.strftime('%Y-%m-%d') }}.</div>
+  </div>
+</div>
+
+<div class="stats-row mt-3" data-aos="fade-up" data-aos-delay="110">
+  <div class="stat-card">
+    <span class="stat-card__label">عقود استشارات سارية</span>
+    <span class="stat-card__value">{{ total_contracts }}</span>
+    <div class="text-muted small">إجمالي العقود المرتبطة بمشاريع الاستشارات.</div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-card__label">عدد العملاء</span>
+    <span class="stat-card__value">{{ total_clients }}</span>
+    <div class="text-muted small">إجمالي العملاء المسجلين في قسم الاستشارات.</div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-card__label">متوسط نسبة الإنجاز</span>
+    <span class="stat-card__value">{{ total_progress }}%</span>
+    <div class="text-muted small">متوسط تقدم المشاريع الحالية بناءً على نسب الإنجاز.</div>
+  </div>
+</div>
+
+<div class="app-grid app-grid--two mt-4">
+  <div class="app-card" data-aos="fade-up" data-aos-delay="120">
+    <div class="app-card__header">
+      <div>
+        <h3 class="app-card__title">أحدث المشاريع</h3>
+        <p class="app-card__subtitle mb-0">آخر خمسة مشاريع تم إنشاؤها في الاستشارات.</p>
+      </div>
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_projects.list_projects') }}">عرض جميع المشاريع</a>
+    </div>
+    {% if latest_projects %}
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>المشروع</th>
+            <th>العميل</th>
+            <th>نسبة الإنجاز</th>
+            <th>آخر تحديث</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for project in latest_projects %}
+          <tr>
+            <td class="fw-semibold">{{ project.name }}</td>
+            <td>{{ project.client.name if project.client else 'غير محدد' }}</td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1" style="height: 6px;">
+                  <div class="progress-bar" role="progressbar" style="width: {{ project.progress }}%;" aria-valuenow="{{ project.progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <span class="small text-muted">{{ project.progress }}%</span>
+              </div>
+            </td>
+            <td>{{ project.updated_at.strftime('%Y-%m-%d') if project.updated_at else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <h4>لا توجد مشاريع حديثة</h4>
+      <p>ابدأ بإضافة مشروع جديد من خلال لوحة المشاريع.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="app-card" data-aos="fade-up" data-aos-delay="150">
+    <div class="app-card__header">
+      <div>
+        <h3 class="app-card__title">متابعة الفواتير</h3>
+        <p class="app-card__subtitle mb-0">نظرة سريعة على آخر الفواتير وحالتها.</p>
+      </div>
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_invoices.list_invoices') }}">إدارة الفواتير</a>
+    </div>
+    {% if latest_invoices %}
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>المشروع</th>
+            <th>المبلغ</th>
+            <th>تاريخ الإصدار</th>
+            <th>الاستحقاق</th>
+            <th>الحالة</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for invoice in latest_invoices %}
+          {% set is_paid = invoice.paid_date is not none %}
+          {% set is_overdue = (invoice.paid_date is none and invoice.due_date and invoice.due_date < today) %}
+          <tr>
+            <td>{{ invoice.id }}</td>
+            <td>{{ invoice.project.name if invoice.project else 'غير محدد' }}</td>
+            <td>{{ '{:,.2f}'.format(invoice.amount) }} ر.س</td>
+            <td>{{ invoice.issue_date.strftime('%Y-%m-%d') if invoice.issue_date else '—' }}</td>
+            <td>{{ invoice.due_date.strftime('%Y-%m-%d') if invoice.due_date else '—' }}</td>
+            <td>
+              <span class="status-chip
+                {% if is_paid %}status-chip--success{% elif is_overdue %}status-chip--danger{% else %}status-chip--warning{% endif %}">
+                {% if is_paid %}
+                  مدفوعة
+                {% elif is_overdue %}
+                  متأخرة
+                {% else %}
+                  بانتظار الدفع
+                {% endif %}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <h4>لا توجد فواتير مسجلة</h4>
+      <p>يمكنك إنشاء الفواتير من خلال لوحة الفواتير الخاصة بالاستشارات.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="app-grid app-grid--two mt-4">
+  <div class="app-card" data-aos="fade-up" data-aos-delay="180">
+    <div class="app-card__header">
+      <div>
+        <h3 class="app-card__title">مهام متأخرة</h3>
+        <p class="app-card__subtitle mb-0">مهام هندسية تجاوزت تاريخ الاستحقاق المحدد.</p>
+      </div>
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_hr.dashboard') }}">لوحة الموارد البشرية</a>
+    </div>
+    {% if overdue_tasks %}
+    <ul class="list-group list-group-flush">
+      {% for task in overdue_tasks %}
+      <li class="list-group-item d-flex flex-column gap-1">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="fw-semibold">{{ task.title }}</span>
+          <span class="badge bg-danger">{{ task.deadline.strftime('%Y-%m-%d') if task.deadline else '—' }}</span>
+        </div>
+        <div class="text-muted small">
+          المشروع: {{ task.project.name if task.project else 'غير محدد' }} — المهندس: {{ task.engineer.name if task.engineer else 'غير محدد' }}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">
+      <h4>لا توجد مهام متأخرة</h4>
+      <p>حافظ على تحديث المهام من خلال لوحة الموارد البشرية.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="app-card" data-aos="fade-up" data-aos-delay="210">
+    <div class="app-card__header">
+      <div>
+        <h3 class="app-card__title">أحدث العملاء</h3>
+        <p class="app-card__subtitle mb-0">آخر خمسة عملاء تمت إضافتهم في النظام.</p>
+      </div>
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('consulting_clients.list_clients') }}">إدارة العملاء</a>
+    </div>
+    {% if recent_clients %}
+    <ul class="list-group list-group-flush">
+      {% for client in recent_clients %}
+      <li class="list-group-item d-flex flex-column gap-1">
+        <span class="fw-semibold">{{ client.name }}</span>
+        <div class="text-muted small d-flex flex-wrap gap-2">
+          <span>النوع: {{ client.type }}</span>
+          {% if client.phone %}<span>الهاتف: {{ client.phone }}</span>{% endif %}
+          <span>أضيف في {{ client.created_at.strftime('%Y-%m-%d') if client.created_at else '—' }}</span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">
+      <h4>لا يوجد عملاء جدد</h4>
+      <p>ابدأ بإضافة العملاء من خلال لوحة عملاء الاستشارات.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

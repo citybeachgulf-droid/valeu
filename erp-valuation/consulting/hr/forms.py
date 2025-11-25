@@ -336,6 +336,13 @@ def validate_employee_form(form: Dict[str, str], *, for_update: bool = False) ->
     if not for_update and not department_id_value:
         errors["department_id"] = "يجب اختيار القسم"
 
+    branch_id_value = _normalize_int(form.get("branch_id"))
+    branch_section_id_value = _normalize_int(form.get("branch_section_id"))
+    if not for_update and not branch_id_value:
+        errors["branch_id"] = "يجب اختيار الفرع"
+    if branch_section_id_value and not branch_id_value:
+        errors["branch_section_id"] = "يجب اختيار الفرع قبل تحديد القسم"
+
     data = {
         "employee_number": employee_number or None,
         "first_name": first_name,
@@ -357,6 +364,8 @@ def validate_employee_form(form: Dict[str, str], *, for_update: bool = False) ->
         "emergency_contact_phone": _normalize_str(form.get("emergency_contact_phone")) or None,
         "emergency_contact_relation": _normalize_str(form.get("emergency_contact_relation")) or None,
         "department_id": department_id_value,
+        "branch_id": branch_id_value,
+        "branch_section_id": branch_section_id_value,
         "position": _normalize_str(form.get("position")) or None,
         "job_title": _normalize_str(form.get("job_title")) or None,
         "employment_type": _normalize_str(form.get("employment_type")) or None,
@@ -367,7 +376,7 @@ def validate_employee_form(form: Dict[str, str], *, for_update: bool = False) ->
         "resignation_date": _parse_date(form.get("resignation_date")),
         "termination_date": _parse_date(form.get("termination_date")),
         "base_salary": base_salary,
-        "currency": _normalize_str(form.get("currency")) or "SAR",
+        "currency": _normalize_str(form.get("currency")) or "OMR",
         "notes": _normalize_str(form.get("notes")) or None,
     }
     
@@ -619,7 +628,7 @@ def validate_job_posting_form(form: Dict[str, str]) -> Tuple[Dict, Dict[str, str
         "education_level": _normalize_str(form.get("education_level")) or None,
         "salary_min": salary_min,
         "salary_max": salary_max,
-        "currency": _normalize_str(form.get("currency")) or "SAR",
+        "currency": _normalize_str(form.get("currency")) or "OMR",
         "posting_date": posting_date,
         "closing_date": closing_date,
         "status": status,

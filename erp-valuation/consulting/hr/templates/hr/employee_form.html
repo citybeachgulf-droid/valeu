@@ -160,7 +160,24 @@ label.form-label {
       <h5 class="section-title">بيانات الوظيفة</h5>
     </div>
     <div class="col-md-3">
-      <label class="form-label">القسم <span class="text-danger">*</span></label>
+      <label class="form-label">الفرع <span class="text-danger">*</span></label>
+      <select class="form-select {% if form_errors.get('branch_id') %}is-invalid{% endif %}" name="branch_id" id="branchSelect" required>
+        <option value="">-- اختر الفرع --</option>
+        {% for branch in branch_choices %}
+        <option value="{{ branch.id }}" {% if form_values.branch_id == branch.id|string or form_values.branch_id == branch.id %}selected{% endif %}>{{ branch.name }}</option>
+        {% endfor %}
+      </select>
+      {% if form_errors.get('branch_id') %}<div class="invalid-feedback d-block">{{ form_errors.get('branch_id') }}</div>{% endif %}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">القسم الداخلي</label>
+      <select class="form-select {% if form_errors.get('branch_section_id') %}is-invalid{% endif %}" name="branch_section_id" id="branchSectionSelect" data-current="{{ form_values.branch_section_id or '' }}">
+        <option value="">-- اختر --</option>
+      </select>
+      {% if form_errors.get('branch_section_id') %}<div class="invalid-feedback d-block">{{ form_errors.get('branch_section_id') }}</div>{% endif %}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">القسم الإداري <span class="text-danger">*</span></label>
       <select class="form-select {% if form_errors.get('department_id') %}is-invalid{% endif %}" name="department_id" required>
         <option value="">-- اختر القسم --</option>
         {% for dept in departments %}
@@ -238,4 +255,41 @@ label.form-label {
 
   </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const branchSections = {{ branch_sections_json|default('{}')|safe }};
+  const branchSelect = document.getElementById('branchSelect');
+  const sectionSelect = document.getElementById('branchSectionSelect');
+  if (!branchSelect || !sectionSelect) {
+    return;
+  }
+  function populateSections() {
+    const branchId = branchSelect.value || '';
+    const current = sectionSelect.dataset.current || '';
+    const sections = branchSections[branchId] || [];
+    sectionSelect.innerHTML = '<option value="">-- اختر --</option>';
+    sections.forEach(function (sec) {
+      const opt = document.createElement('option');
+      opt.value = sec.id;
+      opt.textContent = sec.name;
+      if (String(sec.id) === String(current)) {
+        opt.selected = true;
+      }
+      sectionSelect.appendChild(opt);
+    });
+    if (!sections.length) {
+      sectionSelect.dataset.current = '';
+    }
+  }
+  branchSelect.addEventListener('change', function () {
+    sectionSelect.dataset.current = '';
+    populateSections();
+  });
+  populateSections();
+});
+</script>
 {% endblock %}

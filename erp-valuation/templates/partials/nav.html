@@ -1,0 +1,100 @@
+{% macro app_nav(brand='نظام التقييم الاحترافي', brand_url='/', items=None, actions=None, appearance='light', extra_class='', collapse_id='appNav') %}
+  {% set nav_items = items or [] %}
+  {% set nav_actions = actions or [] %}
+  {% set is_dark = appearance == 'dark' %}
+  <nav class="navbar navbar-expand-lg app-navbar {{ 'navbar-dark bg-dark text-white' if is_dark else 'navbar-light bg-transparent' }} {{ extra_class }}" data-back-button-target>
+    <div class="app-container">
+      <div class="d-flex align-items-center justify-content-between w-100 gap-3">
+        <a class="navbar-brand" href="{{ brand_url }}">{{ brand }}</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#{{ collapse_id }}" aria-controls="{{ collapse_id }}" aria-expanded="false" aria-label="القائمة">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+      </div>
+      <div class="collapse navbar-collapse justify-content-between gap-3" id="{{ collapse_id }}">
+        {% if nav_items %}
+        <ul class="navbar-nav me-auto gap-1 flex-wrap">
+          {% for item in nav_items %}
+          {% set active = item.active if item.active is defined else False %}
+          <li class="nav-item">
+            <a class="nav-link {{ 'active' if active else '' }} {{ item.class if item.class is defined else '' }}" href="{{ item.href }}">
+              {% if item.icon %}<span class="me-1">{{ item.icon }}</span>{% endif %}
+              {{ item.label }}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        {% if nav_actions %}
+        <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
+          {% for action in nav_actions %}
+          {% set variant = action.variant if action.variant is defined else 'primary' %}
+          <a class="btn btn-sm btn-{{ variant }} {{ action.class if action.class is defined else '' }}" href="{{ action.href }}">
+            {% if action.icon %}<span aria-hidden="true">{{ action.icon }}</span>{% endif %}
+            {{ action.label }}
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+{% endmacro %}
+
+{% macro manager_nav(active='dashboard', collapse_id='managerNav', actions=None) %}
+  {% set base_items = [
+    {'key': 'dashboard', 'label': 'اللوحة الرئيسية', 'href': url_for('manager_dashboard')},
+    {'key': 'employees', 'label': 'إدارة الموظفين', 'href': url_for('manage_employees')},
+    {'key': 'branches', 'label': 'إدارة الفروع', 'href': url_for('manage_branches')},
+    {'key': 'add_bank', 'label': 'إضافة بنك', 'href': url_for('add_bank')},
+    {'key': 'banks', 'label': 'البنوك الشريكة', 'href': url_for('banks_overview')},
+    {'key': 'inactive', 'label': 'الموظفون غير النشطين', 'href': url_for('inactive_bank_employees')},
+    {'key': 'documents', 'label': 'وثائق الفروع', 'href': url_for('branch_documents')},
+    {'key': 'commissions', 'label': 'العمولات', 'href': url_for('commissions_page')},
+    {'key': 'customers', 'label': 'العملاء', 'href': url_for('customers_page')},
+    {'key': 'reports', 'label': 'التقارير', 'href': url_for('reports')}
+  ] %}
+  {% set ns = namespace(items=[]) %}
+  {% for item in base_items %}
+    {% set ns.items = ns.items + [{'label': item.label, 'href': item.href, 'active': item.key == active}] %}
+  {% endfor %}
+  {% set base_actions = [
+    {'label': 'لوحة المالية', 'href': url_for('finance_dashboard'), 'variant': 'outline-light'},
+    {'label': 'تسجيل الخروج', 'href': url_for('logout'), 'variant': 'outline-light'}
+  ] %}
+  {% set nav_actions = actions if actions is not none else base_actions %}
+  {{ app_nav(
+    brand='لوحة المدير',
+    brand_url=url_for('manager_dashboard'),
+    appearance='dark',
+    collapse_id=collapse_id,
+    items=ns.items,
+    actions=nav_actions
+  ) }}
+{% endmacro %}
+
+{% macro finance_nav(active='dashboard', collapse_id='financeNav', actions=None) %}
+  {% set base_items = [
+    {'key': 'dashboard', 'label': 'لوحة المالية', 'href': url_for('finance_dashboard')},
+    {'key': 'paid', 'label': 'المدفوعات المكتملة', 'href': url_for('finance_paid')},
+    {'key': 'templates', 'label': 'نماذج التقارير', 'href': url_for('finance_templates')},
+    {'key': 'customers', 'label': 'العملاء', 'href': url_for('customers_page')},
+    {'key': 'reports', 'label': 'التقارير', 'href': url_for('reports')}
+  ] %}
+  {% set ns = namespace(items=[]) %}
+  {% for item in base_items %}
+    {% set ns.items = ns.items + [{'label': item.label, 'href': item.href, 'active': item.key == active}] %}
+  {% endfor %}
+  {% set base_actions = [
+    {'label': 'لوحة المدير', 'href': url_for('manager_dashboard'), 'variant': 'outline-light'},
+    {'label': 'تسجيل الخروج', 'href': url_for('logout'), 'variant': 'outline-light'}
+  ] %}
+  {% set nav_actions = actions if actions is not none else base_actions %}
+  {{ app_nav(
+    brand='إدارة المالية',
+    brand_url=url_for('finance_dashboard'),
+    appearance='dark',
+    collapse_id=collapse_id,
+    items=ns.items,
+    actions=nav_actions
+  ) }}
+{% endmacro %}

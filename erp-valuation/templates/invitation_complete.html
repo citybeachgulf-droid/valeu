@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-5" style="max-width:540px;">
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <h3 class="mb-3 text-center">تفعيل حساب الموظف</h3>
+
+      {% if status == 'used' %}
+        <p class="text-muted text-center mb-0">
+          تم استخدام هذا الرابط بالفعل لإعداد الحساب. يمكنك التوجه إلى
+          <a href="{{ url_for('login') }}">صفحة تسجيل الدخول</a>.
+        </p>
+      {% elif status == 'expired' %}
+        <p class="text-muted text-center mb-0">
+          انتهت صلاحية رابط التفعيل. الرجاء التواصل مع إدارة الموارد البشرية لإرسال رابط جديد.
+        </p>
+      {% else %}
+        <p class="text-muted small">
+          أهلاً بك! يرجى اختيار اسم مستخدم وكلمة مرور جديدة لحسابك. بعد الإعداد يمكنك تسجيل الدخول مباشرة.
+        </p>
+
+        <form method="POST" class="d-flex flex-column gap-3">
+          <div>
+            <label class="form-label">اسم المستخدم</label>
+            <input type="text" class="form-control" name="username" required value="{{ form_values.username }}">
+          </div>
+          <div>
+            <label class="form-label">كلمة المرور الجديدة</label>
+            <input type="password" class="form-control" name="password" required minlength="8">
+            <small class="text-muted">يُفضل استخدام حروف كبيرة وصغيرة وأرقام.</small>
+          </div>
+          <div>
+            <label class="form-label">تأكيد كلمة المرور</label>
+            <input type="password" class="form-control" name="confirm_password" required minlength="8">
+          </div>
+          <button type="submit" class="btn btn-primary">حفظ وتفعيل الحساب</button>
+        </form>
+
+        <hr>
+        <div class="text-muted small">
+          <strong>معلومة:</strong> إذا واجهت أي مشكلة يمكنك التواصل مع مسؤولي الموارد البشرية لإعادة إرسال رابط التفعيل.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

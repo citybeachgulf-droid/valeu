@@ -1,110 +1,108 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>📁 مستندات وعقود الفروع</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light" data-back-button-label="{{ role_home_label }}" data-back-button-fallback="{{ role_home_url }}">
+{% extends 'base.html' %}
+{% from 'partials/nav.html' import manager_nav %}
+{% set title = 'وثائق الفروع' %}
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="#">🛠️ نظام التثمين</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto">
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('manager_dashboard') }}">👨‍💼 المدير</a></li>
-        <li class="nav-item"><a class="nav-link text-danger" href="{{ url_for('logout') }}">🚪 خروج</a></li>
-      </ul>
-    </div>
+{% block navbar %}
+  {{ manager_nav(active='documents') }}
+{% endblock %}
+
+{% block content %}
+<div class="app-page-title" data-aos="fade-up">
+  <h1>توثيق الفروع</h1>
+  <div class="app-page-title__meta">
+    <span>إدارة شهادات الاعتماد، السجلات، وبطاقات العمل للفروع.</span>
+    {% if selected_branch_id %}
+    <span class="pill">الفرع المحدد: {{ branches|selectattr('id', 'equalto', selected_branch_id|int)|map(attribute='name')|first }}</span>
+    {% endif %}
+    <span class="pill">عدد الوثائق: {{ docs|length }}</span>
   </div>
-</nav>
+</div>
 
-<div class="container py-3">
-  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-3">
-    <h3 class="mb-0">📁 مستندات وعقود الفروع</h3>
-    <form method="get" class="d-flex flex-wrap gap-2">
-      <select name="branch_id" class="form-select">
-        <option value="">كل الفروع</option>
+<div class="app-card mb-4" data-aos="fade-up" data-aos-delay="80">
+  <form method="get" class="d-flex flex-wrap gap-3 align-items-end">
+    <div>
+      <label class="form-label">اختيار الفرع</label>
+      <select name="branch_id" class="form-select" onchange="this.form.submit()">
+        <option value="">جميع الفروع</option>
         {% for b in branches %}
           <option value="{{ b.id }}" {% if selected_branch_id and selected_branch_id|int == b.id %}selected{% endif %}>{{ b.name }}</option>
         {% endfor %}
       </select>
-      <button class="btn btn-outline-primary">تطبيق</button>
-    </form>
-  </div>
-
-  
-
-  <div class="card">
-    <div class="card-header bg-dark text-white">📋 قائمة المستندات</div>
-    <div class="card-body">
-      <div class="table-responsive">
-        <table class="table table-bordered table-striped align-middle">
-          <thead class="table-dark">
-            <tr>
-              <th>#</th>
-              <th>الفرع</th>
-              <th>العنوان</th>
-              <th>النوع</th>
-              <th>الإصدار</th>
-              <th>الانتهاء</th>
-              <th>الحالة</th>
-              <th>الملف</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for d in docs %}
-            {% set status = status_for(d) %}
-            <tr class="{% if status == 'قريب الانتهاء' %}table-warning{% elif status == 'منتهي' %}table-danger{% endif %}">
-              <td>{{ d.id }}</td>
-              <td>{{ d.branch.name if d.branch else '-' }}</td>
-              <td>{{ d.title }}</td>
-              <td>{{ d.doc_type or '-' }}</td>
-              <td>{{ d.issued_at.strftime('%Y-%m-%d') if d.issued_at else '-' }}</td>
-              <td>{{ d.expires_at.strftime('%Y-%m-%d') if d.expires_at else '-' }}</td>
-              <td>
-                {% if status == 'قريب الانتهاء' %}<span class="badge bg-warning text-dark">قريب الانتهاء</span>
-                {% elif status == 'منتهي' %}<span class="badge bg-danger">منتهي</span>
-                {% else %}<span class="badge bg-success">ساري</span>{% endif %}
-              </td>
-              <td>
-                <div class="btn-group btn-group-sm" role="group">
-                  {% set b2url = build_b2_public_url(d.b2_file_name) if d.b2_file_name else None %}
-                  {% if b2url or d.file %}
-                    {% set src = b2url if b2url else url_for('uploaded_file', filename=d.file, _external=True) %}
-                    {% set name = d.b2_file_name if b2url else d.file %}
-                    {% set ext = (name.rsplit('.', 1)[1] | lower) if (name and '.' in name) else '' %}
-                    {% set office_exts = ['doc','docx','xls','xlsx','ppt','pptx'] %}
-                    {% set view_href = ('https://view.officeapps.live.com/op/view.aspx?src=' ~ (src | urlencode)) if ext in office_exts else src %}
-                    <a href="{{ view_href }}" class="btn btn-outline-primary" target="_blank">عرض</a>
-                    {% if b2url %}
-                      <a href="{{ url_for('download_b2_file') }}?file={{ d.b2_file_name }}" class="btn btn-outline-secondary">تنزيل</a>
-                    {% else %}
-                      <a href="{{ url_for('download_local_file', filename=d.file) }}" class="btn btn-outline-secondary">تنزيل</a>
-                    {% endif %}
-                  {% else %}
-                    -
-                  {% endif %}
-                </div>
-              </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="8" class="text-center">لا توجد مستندات</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
     </div>
-  </div>
-
+    <button class="btn btn-outline-primary">تصفية</button>
+  </form>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script defer src="{{ url_for('static', filename='js/back-button.js') }}"></script>
-</body>
-</html>
-
+<div class="app-card" data-aos="fade-up" data-aos-delay="120">
+  <div class="app-card__header">
+    <div>
+      <h3 class="app-card__title">سجل الوثائق</h3>
+      <p class="app-card__subtitle mb-0">تابع صلاحيات الوثائق وقم بتنزيل النسخ المحدثة.</p>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>الفرع</th>
+          <th>عنوان الوثيقة</th>
+          <th>نوع الوثيقة</th>
+          <th>تاريخ الإصدار</th>
+          <th>تاريخ الانتهاء</th>
+          <th>الحالة</th>
+          <th class="text-center">الإجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in docs %}
+        {% set status = status_for(d) %}
+        <tr class="{% if status == 'قريب الانتهاء' %}table-warning{% elif status == 'منتهي' %}table-danger{% endif %}">
+          <td>{{ d.id }}</td>
+          <td>{{ d.branch.name if d.branch else '-' }}</td>
+          <td class="fw-semibold">{{ d.title }}</td>
+          <td>{{ d.doc_type or '-' }}</td>
+          <td>{{ d.issued_at.strftime('%Y-%m-%d') if d.issued_at else '-' }}</td>
+          <td>{{ d.expires_at.strftime('%Y-%m-%d') if d.expires_at else '-' }}</td>
+          <td>
+            {% if status == 'قريب الانتهاء' %}
+              <span class="status-chip status-chip--warning">قريب الانتهاء</span>
+            {% elif status == 'منتهي' %}
+              <span class="status-chip status-chip--danger">منتهي</span>
+            {% elif status == 'بدون انتهاء' %}
+              <span class="status-chip status-chip--info">بدون تاريخ انتهاء</span>
+            {% else %}
+              <span class="status-chip status-chip--success">ساري</span>
+            {% endif %}
+          </td>
+          <td class="text-center">
+            {% set b2url = build_b2_public_url(d.b2_file_name) if d.b2_file_name else None %}
+            {% if b2url or d.file %}
+              {% set src = b2url if b2url else url_for('uploaded_file', filename=d.file, _external=True) %}
+              {% set name = d.b2_file_name if b2url else d.file %}
+              {% set ext = (name.rsplit('.', 1)[1] | lower) if (name and '.' in name) else '' %}
+              {% set office_exts = ['doc','docx','xls','xlsx','ppt','pptx'] %}
+              {% set view_href = ('https://view.officeapps.live.com/op/view.aspx?src=' ~ (src | urlencode)) if ext in office_exts else src %}
+              <div class="d-inline-flex flex-wrap gap-2 justify-content-center">
+                <a href="{{ view_href }}" class="btn btn-sm btn-outline-primary" target="_blank">عرض</a>
+                {% if b2url %}
+                  <a href="{{ url_for('download_b2_file') }}?file={{ d.b2_file_name }}" class="btn btn-sm btn-outline-secondary">تنزيل</a>
+                {% else %}
+                  <a href="{{ url_for('download_local_file', filename=d.file) }}" class="btn btn-sm btn-outline-secondary">تنزيل</a>
+                {% endif %}
+              </div>
+            {% else %}
+              <span class="text-muted">غير متوفر</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" class="text-center text-muted py-4">لا توجد وثائق مسجلة ضمن المعايير الحالية.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

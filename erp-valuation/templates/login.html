@@ -1,24 +1,45 @@
 {% extends 'base.html' %}
-{% set title = 'تسجيل الدخول ' %}
+{% from 'partials/nav.html' import app_nav %}
+{% set title = 'تسجيل الدخول' %}
+{% set hide_logout = True %}
 
-{% block body_class %}login-gradient d-flex justify-content-center align-items-center vh-100{% endblock %}
+{% block body_class %}login-gradient{% endblock %}
 
-{% block content %}
-  <div class="card shadow p-4 animate__animated animate__fadeInUp" data-aos="zoom-in" style="min-width:350px">
-    <h4 class="mb-3 text-center fw-bold">👨‍💼 تسجيل الدخول</h4>
-    <form method="post" action="{{ url_for('login') }}">
-      <div class="mb-3">
+{% block navbar %}
+  {{ app_nav(
+    brand='نظام التقييم الاحترافي',
+    brand_url=url_for('login'),
+    items=[],
+    actions=[],
+    appearance='light',
+    extra_class='bg-transparent border-0 shadow-none',
+    collapse_id='authNav'
+  ) }}
+{% endblock %}
+
+{% block main_wrapper %}
+<div class="d-flex align-items-center justify-content-center py-5 min-vh-100">
+  <div class="auth-card animate__animated animate__fadeInUp" data-aos="zoom-in">
+    <div class="text-center mb-4">
+      <span class="pill mb-3">مرحباً بك من جديد</span>
+      <h2 class="fw-bold mb-2">تسجيل الدخول للنظام</h2>
+      <p class="text-muted mb-0">أدخل بياناتك للوصول إلى لوحة التحكم الخاصة بك</p>
+    </div>
+    <form method="post" action="{{ url_for('login') }}" class="d-grid gap-3">
+      <div>
         <label class="form-label">اسم المستخدم</label>
-        <input type="text" name="username" class="form-control" required>
+        <input type="text" name="username" class="form-control" required autofocus>
       </div>
-      <div class="mb-3">
+      <div>
         <label class="form-label">كلمة المرور</label>
         <input type="password" name="password" class="form-control" required>
       </div>
-      <button type="submit" class="btn btn-primary w-100">
-        دخول
-      </button>
+      <div class="d-grid gap-2 mt-2">
+        <button type="submit" class="btn btn-primary btn-lg">
+          تسجيل الدخول
+        </button>
+      </div>
     </form>
   </div>
+</div>
 {% endblock %}
-

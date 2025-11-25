@@ -67,6 +67,7 @@ h3 {
     <div class="d-flex gap-2">
       <a class="btn btn-outline-secondary" href="{{ url_for('consulting_hr.dashboard') }}">لوحة HR</a>
       {% if can_manage %}
+      <a class="btn btn-outline-primary" href="{{ url_for('manage_employees') }}">👥 إدارة حسابات المستخدمين</a>
       <a class="btn btn-primary" href="{{ url_for('consulting_hr.create_employee') }}">إضافة موظف</a>
       {% endif %}
     </div>
@@ -109,6 +110,7 @@ h3 {
           <th>المسمى الوظيفي</th>
           <th>البريد الإلكتروني</th>
           <th>الهاتف</th>
+          <th>حساب النظام</th>
           <th>تاريخ الانضمام</th>
           <th>الحالة</th>
           <th>عمليات</th>
@@ -123,6 +125,14 @@ h3 {
           <td>{{ emp.job_title or emp.position or '-' }}</td>
           <td>{{ emp.email or '-' }}</td>
           <td>{{ emp.phone or emp.mobile or '-' }}</td>
+          <td>
+            {% if emp.user_account %}
+              <span class="badge bg-info text-dark">{{ emp.user_account.username }}</span>
+              <div class="text-muted small">دور: {{ emp.user_account.role }}</div>
+            {% else %}
+              <span class="text-muted small">لا يوجد</span>
+            {% endif %}
+          </td>
           <td>{% if emp.join_date %}{{ emp.join_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</td>
           <td>
             <span class="badge {% if emp.status == 'نشط' %}bg-success{% elif emp.status == 'إجازة' %}bg-warning{% else %}bg-secondary{% endif %}">
@@ -140,7 +150,7 @@ h3 {
         </tr>
         {% else %}
         <tr>
-          <td colspan="9" class="text-center text-muted py-4">لا توجد موظفين للعرض.</td>
+          <td colspan="10" class="text-center text-muted py-4">لا توجد موظفين للعرض.</td>
         </tr>
         {% endfor %}
       </tbody>

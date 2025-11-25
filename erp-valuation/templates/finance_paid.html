@@ -26,7 +26,7 @@
   <h3 class="mb-3">✅ المعاملات المدفوعة</h3>
 
   <div class="mb-3">
-    <span class="badge bg-success">إجمالي الدخل: {{ total_income }} ريال</span>
+    <span class="badge bg-success">إجمالي الدخل: {{ total_income }} ر.ع</span>
   </div>
 
   <div class="card">
@@ -56,7 +56,7 @@
                 {% endif %}
               </td>
               <td>{{ p.transaction.employee if p.transaction else '-' }}</td>
-              <td>{{ p.amount }} ريال</td>
+              <td>{{ p.amount }} ر.ع</td>
               <td>{{ p.method }}</td>
               <td>{{ p.date_received.strftime('%Y-%m-%d') if p.date_received else '-' }}</td>
               <td>
@@ -122,4 +122,3 @@
   <script defer src="{{ url_for('static', filename='js/back-button.js') }}"></script>
 </body>
 </html>
-
