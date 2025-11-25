@@ -1,4 +1,5 @@
 import os, sys, json, re
+from urllib.parse import urlparse, quote
 # Ensure this module is registered as "app" even when executed as a script.
 sys.modules.setdefault("app", sys.modules[__name__])
 import hashlib
@@ -13,9 +14,10 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from extensions import db
-from sqlalchemy import func, or_, and_, text, inspect
+from sqlalchemy import func, or_, and_, text, inspect, create_engine
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import OperationalError
+from psycopg.rows import dict_row
 from pywebpush import webpush, WebPushException
 from docx import Document
 from pdf_templates import create_pdf
@@ -224,49 +226,64 @@ except Exception:
 default_sqlite_path = os.path.join(app.instance_path, "erp.db")
 default_sqlite_uri = f"sqlite:///{default_sqlite_path}"
 
-# دعم ربط PostgreSQL عبر متغير البيئة DATABASE_URL بما يتوافق مع SQLAlchemy
-database_url = os.environ.get("DATABASE_URL", default_sqlite_uri)
-if database_url.startswith("postgres://"):
-    # تحويل الصيغة القديمة إلى محرك SQLAlchemy psycopg (psycopg v3)
-    database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
-elif database_url.startswith("postgresql://"):
-    # فرض استخدام برنامج تشغيل psycopg v3 حتى لو كانت الصيغة حديثة بدون تحديد درايفر
-    database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
-elif database_url.startswith("postgresql+psycopg2://"):
-    # ترقية أي توجيه قديم إلى psycopg v3
-    database_url = database_url.replace("postgresql+psycopg2://", "postgresql+psycopg://", 1)
 
-# فرض SSL على Render وما شابه إذا لم يُذكر صراحةً
-if database_url.startswith("postgresql") and "sslmode=" not in database_url:
-    connector = "&" if "?" in database_url else "?"
-    database_url = f"{database_url}{connector}sslmode=require"
+def build_database_urls(raw_url: str | None) -> tuple[str, str]:
+    """Validate DATABASE_URL and return (corrected_url, sqlalchemy_url)."""
 
-# تمكين keepalives و connect_timeout لتقليل انقطاعات الاتصال على Postgres
-if database_url.startswith("postgresql"):
-    params_to_add = []
-    if "keepalives=" not in database_url:
-        params_to_add.append("keepalives=1")
-    if "keepalives_idle=" not in database_url:
-        params_to_add.append("keepalives_idle=30")
-    if "keepalives_interval=" not in database_url:
-        params_to_add.append("keepalives_interval=10")
-    if "keepalives_count=" not in database_url:
-        params_to_add.append("keepalives_count=3")
-    if "connect_timeout=" not in database_url:
-        params_to_add.append("connect_timeout=10")
-    if params_to_add:
-        connector = "&" if "?" in database_url else "?"
-        database_url = f"{database_url}{connector}{'&'.join(params_to_add)}"
+    if not raw_url:
+        return default_sqlite_uri, default_sqlite_uri
 
-app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+    normalized = raw_url.strip()
+    if normalized.startswith("postgres://"):
+        normalized = normalized.replace("postgres://", "postgresql://", 1)
+    if normalized.startswith("postgresql+psycopg://"):
+        normalized = normalized.replace("postgresql+psycopg://", "postgresql://", 1)
+
+    parsed = urlparse(normalized)
+    if parsed.scheme != "postgresql":
+        raise ValueError("DATABASE_URL must start with postgresql://USER:PASSWORD@HOST:PORT/DBNAME")
+    if parsed.query or parsed.fragment:
+        raise ValueError("DATABASE_URL must not include query parameters or fragments")
+    if not all([parsed.username, parsed.password, parsed.hostname, parsed.port, parsed.path]):
+        raise ValueError("DATABASE_URL must look like postgresql://USER:PASSWORD@HOST:PORT/DBNAME")
+
+    host_pattern = r"^dpg-[a-z0-9\\-]+\\.oregon-postgres\\.render\\.com$"
+    if not re.match(host_pattern, parsed.hostname):
+        raise ValueError(
+            "DATABASE_URL host must be your Render hostname (e.g. dpg-xxxxx.oregon-postgres.render.com)"
+        )
+
+    encoded_password = quote(parsed.password, safe="")
+    dbname = parsed.path.strip("/")
+    if not dbname:
+        raise ValueError("DATABASE_URL must include a database name without a trailing slash")
+
+    corrected_url = f"postgresql://{parsed.username}:{encoded_password}@{parsed.hostname}:{parsed.port}/{dbname}"
+    sqlalchemy_url = corrected_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return corrected_url, sqlalchemy_url
+
+
+raw_database_url = os.environ.get("DATABASE_URL")
+try:
+    corrected_database_url, sqlalchemy_database_url = build_database_urls(raw_database_url)
+except Exception as exc:
+    raise RuntimeError(f"Invalid DATABASE_URL: {exc}") from exc
+
+app.config["DATABASE_URL_CORRECTED"] = corrected_database_url
+app.config["SQLALCHEMY_DATABASE_URI"] = sqlalchemy_database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+
+engine_options: dict[str, object] = {
     "pool_pre_ping": True,
-    "pool_recycle": 270,
-    "pool_size": int(os.environ.get("SQL_POOL_SIZE", "5")),
-    "max_overflow": int(os.environ.get("SQL_MAX_OVERFLOW", "10")),
-    "pool_timeout": int(os.environ.get("SQL_POOL_TIMEOUT", "30")),
+    "future": True,
 }
+if sqlalchemy_database_url.startswith("postgresql+psycopg://"):
+    engine_options["connect_args"] = {"row_factory": dict_row}
+
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = engine_options
+
+# Explicit engine creation keeps psycopg3 row factory and pool settings in sync everywhere.
+engine = create_engine(sqlalchemy_database_url, **engine_options)
 db.init_app(app)
 
 # ---------------- Register Blueprints (Consulting) ----------------
@@ -1141,8 +1158,8 @@ def ensure_branch_sections_from_department():
         # في حال لم يتم إنشاؤه بعد، لعل create_all سيقوم بذلك
         try:
             db.create_all()
-        except Exception:
-            pass
+        except Exception as e:
+            print("DB INIT ERROR:", e)
 
     try:
         branches = Branch.query.all()
@@ -5824,7 +5841,10 @@ def search_report():
 
 # --------- إنشاء الجداول + ترقيعات متوافقة مع قواعد قديمة ---------
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+    except Exception as e:
+        print("DB INIT ERROR:", e)
 
     # محاولة إضافة عمود sent_to_engineer_at إذا كان الجدول قديم
     try:
